@@ -1,29 +1,49 @@
 """
 PrintA4 Cloud — שרת המרת HTML ל-PDF (גרסת ענן)
-מנוע: WeasyPrint (ללא Chromium)
+מנוע: Playwright + Chromium
 """
 
+import asyncio
 import os
 import tempfile
 
 from flask import Flask, jsonify, render_template_string, request, send_file
 
 
-# ── WeasyPrint PDF engine ──────────────────────────────────
+# ── Playwright PDF engine ──────────────────────────────────
 
-def html_to_pdf_sync(html_content: str, options: dict) -> bytes:
-    """Convert HTML string to PDF bytes using WeasyPrint."""
-    from weasyprint import HTML, CSS
-    from weasyprint.text.fonts import FontConfiguration
+async def _html_to_pdf(html: str, options: dict) -> bytes:
+    from playwright.async_api import async_playwright
+    margin = options.get("margin", "10mm")
+    orient = options.get("orientation", "portrait")
+    async with async_playwright() as p:
+        browser = await p.chromium.launch(
+            args=[
+                "--no-sandbox",
+                "--disable-setuid-sandbox",
+                "--disable-dev-shm-usage",
+                "--disable-gpu"
+            ]
+        )
+        page = await browser.new_page()
+        await page.set_content(html, wait_until="networkidle")
+        await page.wait_for_timeout(1000)
+        has_page = "@page" in html
+        pdf = await page.pdf(
+            format="A4",
+            print_background=True,
+            prefer_css_page_size=True,
+            margin={"top": "0", "right": "0", "bottom": "0", "left": "0"}
+                if has_page else
+                {"top": margin, "right": margin, "bottom": margin, "left": margin}
+        )
+        await browser.close()
+        return pdf
 
-    font_config = FontConfiguration()
-    pdf_bytes = HTML(string=html_content).write_pdf(font_config=font_config)
-    return pdf_bytes
 
-
-def _has_page_rule(html: str) -> bool:
-    """Check if HTML already contains @page CSS rule."""
-    return "@page" in html
+def html_to_pdf_sync(html: str, options: dict) -> bytes:
+    prepared = smart_inject(html, options)
+    return asyncio.run(_html_to_pdf(prepared, options))
 
 
 # ── Smart CSS Injector ─────────────────────────────────────
@@ -638,10 +658,8 @@ def convert():
         "inject_mode":  data.get("inject_mode", "smart"),
     }
 
-    html = smart_inject(data["html"], options)
-
     try:
-        pdf_bytes = html_to_pdf_sync(html, options)
+        pdf_bytes = html_to_pdf_sync(data["html"], options)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
