@@ -1,49 +1,49 @@
 """
 PrintA4 Cloud — שרת המרת HTML ל-PDF (גרסת ענן)
-מנוע: Playwright + Chromium
+מנוע: WeasyPrint
 """
 
-import asyncio
 import os
+import re
 import tempfile
 
 from flask import Flask, jsonify, render_template_string, request, send_file
 
 
-# ── Playwright PDF engine ──────────────────────────────────
+# ── Emoji replacer ────────────────────────────────────────
 
-async def _html_to_pdf(html: str, options: dict) -> bytes:
-    from playwright.async_api import async_playwright
-    margin = options.get("margin", "10mm")
-    orient = options.get("orientation", "portrait")
-    async with async_playwright() as p:
-        browser = await p.chromium.launch(
-            args=[
-                "--no-sandbox",
-                "--disable-setuid-sandbox",
-                "--disable-dev-shm-usage",
-                "--disable-gpu"
-            ]
-        )
-        page = await browser.new_page()
-        await page.set_content(html, wait_until="networkidle")
-        await page.wait_for_timeout(1000)
-        has_page = "@page" in html
-        pdf = await page.pdf(
-            format="A4",
-            print_background=True,
-            prefer_css_page_size=True,
-            margin={"top": "0", "right": "0", "bottom": "0", "left": "0"}
-                if has_page else
-                {"top": margin, "right": margin, "bottom": margin, "left": margin}
-        )
-        await browser.close()
-        return pdf
+def replace_emoji(html: str) -> str:
+    replacements = {
+        '🏀': '🏀', '⭐': '★', '🎯': '◎', '🏆': '🏆',
+        '📋': '📋', '✅': '✓', '❌': '✗', '🔑': '🔑',
+        '💡': '💡', '📝': '📝', '🎨': '🎨', '🌟': '★',
+        '👑': '♛', '🎉': '✦', '💪': '✊', '🙂': ':)',
+        '😊': ':)', '👍': '✓', '🔥': '★', '💯': '100%',
+    }
+    emoji_pattern = re.compile("["
+        u"\U0001F600-\U0001F64F"
+        u"\U0001F300-\U0001F5FF"
+        u"\U0001F680-\U0001F6FF"
+        u"\U0001F1E0-\U0001F1FF"
+        u"\U00002500-\U00002BEF"
+        u"\U00002702-\U000027B0"
+        u"\U000024C2-\U0001F251"
+        "]+", flags=re.UNICODE)
+    for emoji, replacement in replacements.items():
+        html = html.replace(emoji, replacement)
+    html = emoji_pattern.sub('', html)
+    return html
 
+
+# ── WeasyPrint PDF engine ─────────────────────────────────
 
 def html_to_pdf_sync(html: str, options: dict) -> bytes:
+    from weasyprint import HTML
+    from weasyprint.text.fonts import FontConfiguration
     prepared = smart_inject(html, options)
-    return asyncio.run(_html_to_pdf(prepared, options))
+    prepared = replace_emoji(prepared)
+    font_config = FontConfiguration()
+    return HTML(string=prepared).write_pdf(font_config=font_config)
 
 
 # ── Smart CSS Injector ─────────────────────────────────────
@@ -59,6 +59,14 @@ def smart_inject(html: str, options: dict) -> str:
     has_page    = "@page" in html
     has_color   = "print-color-adjust" in html or "-webkit-print-color-adjust" in html
     has_charset = "utf-8" in html.lower()
+
+    # WeasyPrint baseline — always injected
+    injections.append(
+        "html { -weasyprint-optimize-images: 1; }\n"
+        "body { font-family: Arial, 'Noto Color Emoji', sans-serif; margin: 0; width: 100%; }\n"
+        "* { box-sizing: border-box; }\n"
+        "img { max-width: 100%; }"
+    )
 
     if not has_page or mode == "force":
         injections.append(f"@page {{ size: A4 {orient}; margin: {margin}; }}")
