@@ -1,9 +1,8 @@
 """
 PrintA4 Cloud — שרת המרת HTML ל-PDF (גרסת ענן)
-מנוע: Playwright + Chromium (Docker)
+מנוע: WeasyPrint
 """
 
-import asyncio
 import os
 import re
 import tempfile
@@ -36,82 +35,52 @@ def replace_emoji(html: str) -> str:
     return html
 
 
-# ── Playwright PDF engine ────────────────────────────────
-
-async def _html_to_pdf(html: str, options: dict) -> bytes:
-    from playwright.async_api import async_playwright
-    margin = options.get("margin", "10mm")
-    orient = options.get("orientation", "portrait")
-    async with async_playwright() as p:
-        browser = await p.chromium.launch(
-            args=[
-                "--no-sandbox",
-                "--disable-setuid-sandbox",
-                "--disable-dev-shm-usage",
-                "--disable-gpu",
-                "--single-process",
-            ]
-        )
-        page = await browser.new_page()
-        await page.set_content(html, wait_until="networkidle")
-        await page.wait_for_timeout(1000)
-        has_page = "@page" in html
-        pdf = await page.pdf(
-            format="A4",
-            print_background=True,
-            prefer_css_page_size=True,
-            margin={"top": "0", "right": "0", "bottom": "0", "left": "0"}
-                if has_page else
-                {"top": margin, "right": margin, "bottom": margin, "left": margin}
-        )
-        await browser.close()
-        return pdf
-
+# ── WeasyPrint PDF engine ─────────────────────────────────
 
 def html_to_pdf_sync(html: str, options: dict) -> bytes:
+    from weasyprint import HTML
+    from weasyprint.text.fonts import FontConfiguration
     prepared = smart_inject(html, options)
-    return asyncio.run(_html_to_pdf(prepared, options))
+    font_config = FontConfiguration()
+    return HTML(string=prepared).write_pdf(font_config=font_config)
 
 
 # ── Smart CSS Injector ─────────────────────────────────────
 
 def smart_inject(html: str, options: dict) -> str:
-    """Add only missing print CSS without overriding existing styles."""
-    mode = options.get("inject_mode", "smart")
+    """Add print CSS and WeasyPrint fixes."""
+    mode   = options.get("inject_mode", "smart")
     margin = options.get("margin", "10mm")
     orient = options.get("orientation", "portrait")
 
-    injections = []
-
-    has_page    = "@page" in html
-    has_color   = "print-color-adjust" in html or "-webkit-print-color-adjust" in html
-    has_charset = "utf-8" in html.lower()
-
-    if not has_page or mode == "force":
-        injections.append(f"@page {{ size: A4 {orient}; margin: {margin}; }}")
-
-    if not has_color or mode == "force":
-        injections.append(
-            "* { -webkit-print-color-adjust: exact !important; "
-            "print-color-adjust: exact !important; }"
-        )
-
-    if not has_charset:
+    # charset
+    if "utf-8" not in html.lower():
         charset_tag = '<meta charset="UTF-8">'
         if "<head>" in html:
             html = html.replace("<head>", "<head>\n" + charset_tag, 1)
         else:
             html = charset_tag + "\n" + html
 
-    if injections:
-        style_block = "<style id='__printa4__'>\n" + "\n".join(injections) + "\n</style>"
-        if "</head>" in html:
-            html = html.replace("</head>", style_block + "\n</head>", 1)
-        elif "<body" in html:
-            import re
-            html = re.sub(r"(<body[^>]*>)", style_block + r"\n\1", html, count=1)
-        else:
-            html = style_block + "\n" + html
+    weasyprint_fix = f"""<style id="__weasyfix__">
+@page {{ size: A4 {orient}; margin: {margin}; }}
+* {{ box-sizing: border-box !important; }}
+body {{
+    width: 190mm !important;
+    margin: 0 auto !important;
+    font-family: Arial, sans-serif !important;
+}}
+div, section, p, table {{
+    min-height: unset !important;
+    page-break-inside: avoid;
+}}
+img {{ max-width: 100% !important; height: auto !important; }}
+[style*="min-height"] {{ min-height: unset !important; }}
+</style>"""
+
+    if "</head>" in html:
+        html = html.replace("</head>", weasyprint_fix + "\n</head>", 1)
+    else:
+        html = weasyprint_fix + "\n" + html
 
     return html
 
