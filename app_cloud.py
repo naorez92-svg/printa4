@@ -65,7 +65,7 @@ select { background: #161b22; color: #e6edf3; border: 1px solid #30363d; border-
 
 @app.route("/")
 def index():
-    return HTML_UI
+    return Response(HTML_UI, mimetype="text/html; charset=utf-8")
 
 @app.route("/show", methods=["POST"])
 def show():
