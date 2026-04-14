@@ -153,7 +153,7 @@ select{background:#21262d;color:#e6edf3;border:1px solid #30363d;border-radius:8
   <iframe id="previewFrame" class="preview-frame" sandbox="allow-same-origin allow-scripts"></iframe>
 </div>
 
-<form id="printForm" method="POST" action="/show" target="_blank" style="display:none">
+<form id="printForm" method="GET" action="/show" target="_blank" style="display:none">
   <input type="hidden" name="html" id="formHtml">
   <input type="hidden" name="margin" id="formMargin">
   <input type="hidden" name="orient" id="formOrient">
@@ -303,11 +303,11 @@ def sw():
 def health():
     return "ok"
 
-@app.route("/show", methods=["POST"])
+@app.route("/show", methods=["POST", "GET"])
 def show():
-    html = request.form.get("html", "")
-    margin = request.form.get("margin", "10mm")
-    orient = request.form.get("orient", "portrait")
+    html = request.form.get("html", "") or request.args.get("html", "")
+    margin = request.form.get("margin", "10mm") or request.args.get("margin", "10mm")
+    orient = request.form.get("orient", "portrait") or request.args.get("orient", "portrait")
     if not html.strip():
         return "<h1>אין HTML</h1>", 400
     if "@page" not in html:
