@@ -196,27 +196,17 @@ function submitPrint(){
   if(!h){toast('הדבק HTML תחילה','err');return;}
   const margin=document.getElementById('margin').value;
   const orient=document.getElementById('orient').value;
-  
-  // קידוד base64
-  const encoded=btoa(unescape(encodeURIComponent(h)));
-  
-  // שליחה דרך form נסתר
-  const form=document.createElement('form');
-  form.method='POST';
-  form.action='/show';
-  form.target='_blank';
-  form.style.display='none';
-  
-  [['html',encoded],['margin',margin],['orient',orient]].forEach(([k,v])=>{
-    const inp=document.createElement('input');
-    inp.type='hidden';inp.name=k;inp.value=v;
-    form.appendChild(inp);
-  });
-  
-  document.body.appendChild(form);
-  form.submit();
-  document.body.removeChild(form);
-  saveH(h);
+  let html=h;
+  if(!html.includes('@page')){
+    const css='<style>@page{size:A4 '+orient+';margin:'+margin+'}*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}</style>';
+    html=html.includes('</head>')?html.replace('</head>',css+'</head>'):css+html;
+  }
+  // פתח ישירות בלשונית חדשה — ללא שרת, ללא WAF
+  const blob=new Blob([html],{type:'text/html;charset=utf-8'});
+  const url=URL.createObjectURL(blob);
+  const w=window.open(url,'_blank');
+  if(w){saveH(h);toast('נפתח — תפריט ⋮ \u2190 הדפס','ok');}
+  else{toast('אפשר חלונות קופצים בכרום','err');}
 }
 
 // Copy
