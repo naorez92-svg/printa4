@@ -1,14 +1,20 @@
-import os, base64, json
+import os, base64, json, shutil, subprocess, tempfile
 from flask import Flask, request, Response, stream_with_context
 
+# --- AI availability detection ---
+# Method 1: claude CLI (works in Claude Code / OAuth environments)
+CLAUDE_BIN = shutil.which("claude")
+HAS_CLI = bool(CLAUDE_BIN)
+
+# Method 2: Anthropic SDK with API key
+_KEY = os.environ.get("ANTHROPIC_API_KEY", "").strip()
 try:
     import anthropic as _ant
-    _KEY = os.environ.get("ANTHROPIC_API_KEY", "").strip()
     _client = _ant.Anthropic(api_key=_KEY) if _KEY else None
-    HAS_AI = bool(_KEY)
 except Exception:
     _client = None
-    HAS_AI = False
+
+HAS_AI = HAS_CLI or bool(_KEY)
 
 app = Flask(__name__)
 
@@ -750,9 +756,9 @@ def index():
 
 @app.route("/api/generate", methods=["POST"])
 def api_generate():
-    if not HAS_AI or not _client:
+    if not HAS_AI:
         return Response(
-            json.dumps({"error": "מפתח ANTHROPIC_API_KEY לא מוגדר בשרת"}, ensure_ascii=False),
+            json.dumps({"error": "אין גישה ל-AI. הגדר ANTHROPIC_API_KEY."}, ensure_ascii=False),
             status=503, mimetype="application/json"
         )
 
@@ -781,7 +787,55 @@ def api_generate():
         f"צור HTML מלא עם כל 5 העמודים לפי המבנה הפדגוגי. קוד HTML גולמי בלבד, ללא הסברים."
     )
 
-    def gen():
+    def gen_cli():
+        """Stream using claude CLI (OAuth — no API key needed)."""
+        sys_f = None
+        proc = None
+        try:
+            # Write system prompt to temp file
+            with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False, encoding='utf-8') as f:
+                f.write(BOOKLET_SYSTEM)
+                sys_f = f.name
+
+            proc = subprocess.Popen(
+                [CLAUDE_BIN, '-p',
+                 '--system-prompt-file', sys_f,
+                 '--output-format', 'text',
+                 '--model', 'claude-opus-4-8'],
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                bufsize=0
+            )
+            # Send user message via stdin
+            proc.stdin.write(user_msg.encode('utf-8'))
+            proc.stdin.close()
+
+            # Stream stdout in 64-byte chunks
+            while True:
+                chunk = proc.stdout.read(64)
+                if not chunk:
+                    break
+                text = chunk.decode('utf-8', 'replace')
+                yield f"data: {json.dumps({'t': text}, ensure_ascii=False)}\n\n"
+
+            proc.wait()
+            if proc.returncode != 0:
+                err = proc.stderr.read().decode('utf-8', 'replace')
+                yield f"data: {json.dumps({'error': err[:300]}, ensure_ascii=False)}\n\n"
+            else:
+                yield f"data: {json.dumps({'done': True})}\n\n"
+
+        except Exception as e:
+            yield f"data: {json.dumps({'error': str(e)}, ensure_ascii=False)}\n\n"
+        finally:
+            if sys_f and os.path.exists(sys_f):
+                os.unlink(sys_f)
+            if proc and proc.poll() is None:
+                proc.kill()
+
+    def gen_sdk():
+        """Stream using Anthropic SDK (API key)."""
         try:
             with _client.messages.stream(
                 model="claude-opus-4-8",
@@ -795,8 +849,10 @@ def api_generate():
         except Exception as e:
             yield f"data: {json.dumps({'error': str(e)}, ensure_ascii=False)}\n\n"
 
+    generator = gen_cli() if HAS_CLI else gen_sdk()
+
     return Response(
-        stream_with_context(gen()),
+        stream_with_context(generator),
         mimetype="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"}
     )
@@ -846,4 +902,4 @@ def show():
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5050))
     print(f"PrintA4 running on port {port} | AI agent: {'enabled' if HAS_AI else 'disabled (set ANTHROPIC_API_KEY)'}")
-    app.run(host="0.0.0.0", port=port, debug=False)
+    app.run(host="0.0.0.0", port=port, debug=False, threaded=True)
