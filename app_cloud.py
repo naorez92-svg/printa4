@@ -580,6 +580,7 @@ async function clearHistory() {
 let _genHtml = '';
 let _genCtrl = null;
 let _selLevel = 'בינוני';
+let _genTokens = null;
 
 function initGenTab() {
   if (!HAS_AI) {
@@ -626,6 +627,7 @@ async function startGenerate() {
   const streamBox = document.getElementById('streamBox');
   streamBox.textContent = '';
   _genHtml = '';
+  _genTokens = null;
   _genCtrl = new AbortController();
 
   try {
@@ -662,6 +664,8 @@ async function startGenerate() {
               streamBox.scrollTop = streamBox.scrollHeight;
             } else if (d.error) {
               throw new Error(d.error);
+            } else if (d.done && d.in) {
+              _genTokens = { in: d.in, out: d.out, est: !!d.est };
             }
           } catch(parseErr) { /* skip bad frames */ }
         }
@@ -673,12 +677,21 @@ async function startGenerate() {
     document.getElementById('genProgress').classList.add('hidden');
     document.getElementById('genDone').classList.remove('hidden');
     const words = _genHtml.trim().split(/\s+/).length;
+    let costHtml = '';
+    if (_genTokens) {
+      const cost = (_genTokens.in * 5 + _genTokens.out * 25) / 1e6;
+      const estNote = _genTokens.est ? ' <span style="color:#484f58;font-size:10px">(הערכה)</span>' : '';
+      costHtml = '<br><span style="font-size:11px;color:#8b5cf6">&#128176; ' +
+        _genTokens.in.toLocaleString() + ' קלט + ' +
+        _genTokens.out.toLocaleString() + ' פלט טוקנים' + estNote +
+        ' &middot; עלות: <strong style="color:#c4b5fd">$' + cost.toFixed(3) + '</strong></span>';
+    }
     document.getElementById('genStats').innerHTML =
       '&#127881; החוברת נוצרה!<br>' +
       '<span style="font-size:12px;color:#8b949e">' +
       _genHtml.length.toLocaleString() + ' תווים &middot; ' +
       words.toLocaleString() + ' מילים &middot; 5 עמודי A4' +
-      '</span>';
+      '</span>' + costHtml;
 
   } catch(e) {
     if (e.name === 'AbortError') { toast('בוטל', 'ok'); }
@@ -791,6 +804,7 @@ def api_generate():
         """Stream using claude CLI (OAuth — no API key needed)."""
         sys_f = None
         proc = None
+        total_bytes = 0
         try:
             # Write system prompt to temp file
             with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False, encoding='utf-8') as f:
@@ -816,6 +830,7 @@ def api_generate():
                 chunk = proc.stdout.read(64)
                 if not chunk:
                     break
+                total_bytes += len(chunk)
                 text = chunk.decode('utf-8', 'replace')
                 yield f"data: {json.dumps({'t': text}, ensure_ascii=False)}\n\n"
 
@@ -824,7 +839,10 @@ def api_generate():
                 err = proc.stderr.read().decode('utf-8', 'replace')
                 yield f"data: {json.dumps({'error': err[:300]}, ensure_ascii=False)}\n\n"
             else:
-                yield f"data: {json.dumps({'done': True})}\n\n"
+                # Estimate tokens: system+user input, output from byte count (~4 bytes/token)
+                est_in = (len(BOOKLET_SYSTEM.encode('utf-8')) + len(user_msg.encode('utf-8'))) // 4
+                est_out = total_bytes // 4
+                yield f"data: {json.dumps({'done': True, 'in': est_in, 'out': est_out, 'est': True}, ensure_ascii=False)}\n\n"
 
         except Exception as e:
             yield f"data: {json.dumps({'error': str(e)}, ensure_ascii=False)}\n\n"
@@ -845,7 +863,9 @@ def api_generate():
             ) as stream:
                 for text in stream.text_stream:
                     yield f"data: {json.dumps({'t': text}, ensure_ascii=False)}\n\n"
-            yield f"data: {json.dumps({'done': True})}\n\n"
+                msg = stream.get_final_message()
+                usage = msg.usage
+            yield f"data: {json.dumps({'done': True, 'in': usage.input_tokens, 'out': usage.output_tokens}, ensure_ascii=False)}\n\n"
         except Exception as e:
             yield f"data: {json.dumps({'error': str(e)}, ensure_ascii=False)}\n\n"
 
