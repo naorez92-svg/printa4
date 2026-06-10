@@ -13,8 +13,7 @@ ENV CHROME_EXECUTABLE=/usr/bin/chromium
 
 WORKDIR /app
 COPY requirements.txt .
-RUN pip install flask playwright
-RUN python -m playwright install chromium
+RUN pip install -r requirements.txt
 
 COPY . .
 EXPOSE 10000
