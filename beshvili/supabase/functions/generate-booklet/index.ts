@@ -1,5 +1,6 @@
 import { createClient } from "jsr:@supabase/supabase-js@2";
 
+// v2 — CORS updated to allow apikey + x-client-info headers
 // ── Commercial limits ────────────────────────────────────────────────────────
 const FREE_BOOKLET_LIMIT = 2;          // free-tier total
 const RATE_LIMIT_SECONDS = 60;         // min gap between generations per user
@@ -71,7 +72,7 @@ const BOOKLET_SYSTEM = `אתה "יוצר החוברות של חני 2.0" — מ�
 • כל 5 העמודים בקובץ HTML אחד`;
 
 Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: cors });
+  if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
 
   // Admin Supabase client (service role — bypasses RLS for server checks)
   const admin = createClient(
