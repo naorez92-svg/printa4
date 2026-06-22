@@ -11,9 +11,12 @@ export default function Login() {
     if (!email.trim()) return;
     setLoading(true);
     setError("");
-    const { error: err } = await supabase.auth.signInWithOtp({ email });
+    const { error: err } = await supabase.auth.signInWithOtp({
+      email,
+      options: { emailRedirectTo: window.location.origin },
+    });
     setLoading(false);
-    if (err) setError("שגיאה בשליחה — בדוק את כתובת האימייל");
+    if (err) setError(err.message || "שגיאה בשליחה — נסה שנית");
     else setSent(true);
   };
 
@@ -62,7 +65,7 @@ export default function Login() {
             ) : (
               <>
                 <h2 className="font-semibold text-ink">כניסה / הרשמה</h2>
-                <p className="text-sm text-ink/50">נשלח לך קישור כניסה למייל — בלי סיסמה</p>
+                <p className="text-sm text-ink/50">נשלח לך קישור כניסה למייל — בלי סיסמא</p>
                 <input
                   className="w-full border border-ink/20 rounded-xl p-3 bg-canvas/50 text-right outline-none focus:border-magic transition-colors"
                   placeholder="כתובת אימייל"
@@ -72,7 +75,7 @@ export default function Login() {
                   onKeyDown={(e) => e.key === "Enter" && send()}
                   autoFocus
                 />
-                {error && <p className="text-red-500 text-sm">{error}</p>}
+                {error && <p className="text-red-500 text-sm text-right">{error}</p>}
                 <button
                   onClick={send}
                   disabled={loading || !email.trim()}
