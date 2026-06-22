@@ -125,7 +125,7 @@ HTML_UI = r"""<!DOCTYPE html>
 body{background:#0d1117;color:#e6edf3;font-family:'Heebo',sans-serif;min-height:100vh;padding:14px 14px 60px}
 .logo{font-size:19px;font-weight:700;margin-bottom:12px;text-align:center;padding:12px 0;border-bottom:1px solid #21262d}
 .logo .g{color:#2ea043}.logo .sub{font-size:10px;font-weight:400;color:#484f58;display:block;margin-top:2px}
-.logo .ver{font-size:9px;font-weight:600;color:#30363d;background:#21262d;padding:1px 6px;border-radius:4px;margin-right:6px;vertical-align:middle;letter-spacing:.3px}
+.logo .ver{font-size:10px;font-weight:700;color:#3fb950;background:rgba(63,185,80,.15);border:1px solid rgba(63,185,80,.35);padding:2px 7px;border-radius:5px;margin-right:6px;vertical-align:middle;letter-spacing:.3px}
 #wake-banner{position:fixed;top:0;inset-inline:0;z-index:9999;padding:9px 16px;text-align:center;font-size:12px;font-family:'Heebo',sans-serif;border-bottom:2px solid #238636;background:#0d1117;color:#8b949e;transition:all .3s}
 .tabs{display:flex;gap:3px;background:#161b22;border:1px solid #21262d;border-radius:10px;padding:4px;margin-bottom:12px}
 .tab{flex:1;padding:8px 4px;border-radius:7px;border:none;background:transparent;color:#8b949e;font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;transition:all .15s}
