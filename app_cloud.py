@@ -1,6 +1,8 @@
 import os, base64, json, shutil, subprocess, tempfile
 from flask import Flask, request, Response, stream_with_context
 
+APP_VERSION = "2.2"
+
 # --- AI availability detection ---
 # Method 1: claude CLI (works in Claude Code / OAuth environments)
 CLAUDE_BIN = shutil.which("claude")
@@ -123,6 +125,8 @@ HTML_UI = r"""<!DOCTYPE html>
 body{background:#0d1117;color:#e6edf3;font-family:'Heebo',sans-serif;min-height:100vh;padding:14px 14px 60px}
 .logo{font-size:19px;font-weight:700;margin-bottom:12px;text-align:center;padding:12px 0;border-bottom:1px solid #21262d}
 .logo .g{color:#2ea043}.logo .sub{font-size:10px;font-weight:400;color:#484f58;display:block;margin-top:2px}
+.logo .ver{font-size:10px;font-weight:700;color:#3fb950;background:rgba(63,185,80,.15);border:1px solid rgba(63,185,80,.35);padding:2px 7px;border-radius:5px;margin-right:6px;vertical-align:middle;letter-spacing:.3px}
+#wake-banner{position:fixed;top:0;inset-inline:0;z-index:9999;padding:9px 16px;text-align:center;font-size:12px;font-family:'Heebo',sans-serif;border-bottom:2px solid #238636;background:#0d1117;color:#8b949e;transition:all .3s}
 .tabs{display:flex;gap:3px;background:#161b22;border:1px solid #21262d;border-radius:10px;padding:4px;margin-bottom:12px}
 .tab{flex:1;padding:8px 4px;border-radius:7px;border:none;background:transparent;color:#8b949e;font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;transition:all .15s}
 .tab.active{background:#21262d;color:#e6edf3;box-shadow:0 1px 3px rgba(0,0,0,.3)}
@@ -193,6 +197,7 @@ select{background:#21262d;color:#e6edf3;border:1px solid #30363d;border-radius:8
 <div class="ios-tip" id="iosTip">&#128241; <strong>הוסף למסך הבית:</strong> לחץ שיתוף &#8592; "הוסף למסך הבית"</div>
 
 <div class="logo">&#128424; Print<span class="g">A4</span>
+  <span class="ver" id="ver-badge">v%%VERSION%%</span>
   <span class="sub">יוצר חוברות לימודיות &mdash; חני עזרא</span>
 </div>
 
@@ -580,6 +585,7 @@ async function clearHistory() {
 let _genHtml = '';
 let _genCtrl = null;
 let _selLevel = 'בינוני';
+let _genTokens = null;
 
 function initGenTab() {
   if (!HAS_AI) {
@@ -626,6 +632,7 @@ async function startGenerate() {
   const streamBox = document.getElementById('streamBox');
   streamBox.textContent = '';
   _genHtml = '';
+  _genTokens = null;
   _genCtrl = new AbortController();
 
   try {
@@ -662,6 +669,8 @@ async function startGenerate() {
               streamBox.scrollTop = streamBox.scrollHeight;
             } else if (d.error) {
               throw new Error(d.error);
+            } else if (d.done && d.in) {
+              _genTokens = { in: d.in, out: d.out, est: !!d.est };
             }
           } catch(parseErr) { /* skip bad frames */ }
         }
@@ -673,12 +682,21 @@ async function startGenerate() {
     document.getElementById('genProgress').classList.add('hidden');
     document.getElementById('genDone').classList.remove('hidden');
     const words = _genHtml.trim().split(/\s+/).length;
+    let costHtml = '';
+    if (_genTokens) {
+      const cost = (_genTokens.in * 5 + _genTokens.out * 25) / 1e6;
+      const estNote = _genTokens.est ? ' <span style="color:#484f58;font-size:10px">(הערכה)</span>' : '';
+      costHtml = '<br><span style="font-size:11px;color:#8b5cf6">&#128176; ' +
+        _genTokens.in.toLocaleString() + ' קלט + ' +
+        _genTokens.out.toLocaleString() + ' פלט טוקנים' + estNote +
+        ' &middot; עלות: <strong style="color:#c4b5fd">$' + cost.toFixed(3) + '</strong></span>';
+    }
     document.getElementById('genStats').innerHTML =
       '&#127881; החוברת נוצרה!<br>' +
       '<span style="font-size:12px;color:#8b949e">' +
       _genHtml.length.toLocaleString() + ' תווים &middot; ' +
       words.toLocaleString() + ' מילים &middot; 5 עמודי A4' +
-      '</span>';
+      '</span>' + costHtml;
 
   } catch(e) {
     if (e.name === 'AbortError') { toast('בוטל', 'ok'); }
@@ -734,6 +752,39 @@ function resetGen() {
   document.getElementById('genForm').classList.remove('hidden');
 }
 
+// ===== WAKE-UP DETECTION & KEEPALIVE =====
+(function () {
+  // Show wake banner only if server takes > 1.5s (= cold start)
+  let banner = null;
+  const wakeT = setTimeout(() => {
+    banner = document.createElement('div');
+    banner.id = 'wake-banner';
+    banner.innerHTML = '&#9203; השרת מתעורר — עוד כמה שניות&#8230;';
+    document.body.prepend(banner);
+  }, 1500);
+
+  const t0 = Date.now();
+  fetch('/health').then(r => r.json()).then(() => {
+    clearTimeout(wakeT);
+    if (banner) {
+      const sec = ((Date.now() - t0) / 1000).toFixed(1);
+      banner.style.borderColor = '#3fb950';
+      banner.style.color = '#3fb950';
+      banner.innerHTML = '&#9989; השרת מוכן! (התעורר ב-' + sec + 's)';
+      setTimeout(() => banner.remove(), 1800);
+    }
+  }).catch(() => {
+    clearTimeout(wakeT);
+    if (!banner) { banner = document.createElement('div'); banner.id = 'wake-banner'; document.body.prepend(banner); }
+    banner.style.borderColor = '#f85149';
+    banner.style.color = '#f85149';
+    banner.innerHTML = '&#10060; שגיאת חיבור &mdash; <a href="/" style="color:inherit">רענן</a>';
+  });
+
+  // Keepalive: ping every 8 min while tab is open → prevents Render sleep
+  setInterval(() => fetch('/health').catch(() => {}), 8 * 60 * 1000);
+})();
+
 // ===== TOAST =====
 function toast(m, t) {
   const c = document.getElementById('toasts');
@@ -750,7 +801,9 @@ function toast(m, t) {
 
 @app.route("/")
 def index():
-    html = HTML_UI.replace('%%HAS_AI%%', 'true' if HAS_AI else 'false')
+    html = (HTML_UI
+            .replace('%%HAS_AI%%', 'true' if HAS_AI else 'false')
+            .replace('%%VERSION%%', APP_VERSION))
     return Response(html, mimetype="text/html; charset=utf-8")
 
 
@@ -791,6 +844,7 @@ def api_generate():
         """Stream using claude CLI (OAuth — no API key needed)."""
         sys_f = None
         proc = None
+        total_bytes = 0
         try:
             # Write system prompt to temp file
             with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False, encoding='utf-8') as f:
@@ -816,6 +870,7 @@ def api_generate():
                 chunk = proc.stdout.read(64)
                 if not chunk:
                     break
+                total_bytes += len(chunk)
                 text = chunk.decode('utf-8', 'replace')
                 yield f"data: {json.dumps({'t': text}, ensure_ascii=False)}\n\n"
 
@@ -824,7 +879,10 @@ def api_generate():
                 err = proc.stderr.read().decode('utf-8', 'replace')
                 yield f"data: {json.dumps({'error': err[:300]}, ensure_ascii=False)}\n\n"
             else:
-                yield f"data: {json.dumps({'done': True})}\n\n"
+                # Estimate tokens: system+user input, output from byte count (~4 bytes/token)
+                est_in = (len(BOOKLET_SYSTEM.encode('utf-8')) + len(user_msg.encode('utf-8'))) // 4
+                est_out = total_bytes // 4
+                yield f"data: {json.dumps({'done': True, 'in': est_in, 'out': est_out, 'est': True}, ensure_ascii=False)}\n\n"
 
         except Exception as e:
             yield f"data: {json.dumps({'error': str(e)}, ensure_ascii=False)}\n\n"
@@ -845,7 +903,9 @@ def api_generate():
             ) as stream:
                 for text in stream.text_stream:
                     yield f"data: {json.dumps({'t': text}, ensure_ascii=False)}\n\n"
-            yield f"data: {json.dumps({'done': True})}\n\n"
+                msg = stream.get_final_message()
+                usage = msg.usage
+            yield f"data: {json.dumps({'done': True, 'in': usage.input_tokens, 'out': usage.output_tokens}, ensure_ascii=False)}\n\n"
         except Exception as e:
             yield f"data: {json.dumps({'error': str(e)}, ensure_ascii=False)}\n\n"
 
@@ -875,7 +935,7 @@ def sw():
 
 @app.route("/health")
 def health():
-    return Response(json.dumps({"ok": True, "ai": HAS_AI}), mimetype="application/json")
+    return Response(json.dumps({"ok": True, "ai": HAS_AI, "v": APP_VERSION}), mimetype="application/json")
 
 
 @app.route("/show", methods=["POST", "GET"])

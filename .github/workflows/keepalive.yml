@@ -1,0 +1,22 @@
+name: Keep Render Alive
+
+on:
+  schedule:
+    # Every 10 minutes — prevents Render free-tier spin-down
+    - cron: '*/10 * * * *'
+  workflow_dispatch: # allow manual trigger too
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping printa4 server
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 30 \
+            https://printa4.onrender.com/health)
+          echo "Health check status: $STATUS"
+          if [ "$STATUS" != "200" ]; then
+            echo "⚠️ Server returned $STATUS (may be waking up)"
+          else
+            echo "✅ Server is alive"
+          fi
