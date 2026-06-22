@@ -11,9 +11,12 @@ export default function Login() {
     if (!email.trim()) return;
     setLoading(true);
     setError("");
-    const { error: err } = await supabase.auth.signInWithOtp({ email });
+    const { error: err } = await supabase.auth.signInWithOtp({
+      email,
+      options: { emailRedirectTo: window.location.origin },
+    });
     setLoading(false);
-    if (err) setError("שגיאה בשליחה — בדוק את כתובת האימייל");
+    if (err) setError(err.message || "שגיאה בשליחה — נסה שנית");
     else setSent(true);
   };
 
