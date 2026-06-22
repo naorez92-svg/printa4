@@ -20,14 +20,35 @@ const TEMPLATES = [
   { icon: "🌟", label: "העשרה מתקדמת",     f: { grade: "",        world: "חלל",    goal: "חשיבה מתמטית: פאזלים, לוגיקה, חשיבה מחוץ לקופסה", level: "advanced" } },
 ];
 const EMPTY = { childName: "", grade: "", world: "כדורגל", goal: "", level: "medium" };
+const PAGE_OPTIONS = [3, 5, 7, 10];
+const LOADING_MSGS = [
+  "קורא את הבקשה שלך...",
+  "מתכנן את מבנה החוברת...",
+  "כותב תרגילים ומשימות...",
+  "מעצב עמודי A4...",
+  "מוסיף צבעים ואימוג'ים...",
+  "עוד קצת בסבלנות, זה כבר בדרך...",
+  "בודק איכות ומסיים...",
+  "כמעט מוכן! עוד רגע...",
+];
 
 export default function Create({ onSaved, remaining, isPro }) {
-  const [mode, setMode]         = useState("form");
-  const [f, setF]               = useState(EMPTY);
-  const [freeText, setFreeText] = useState("");
-  const [loading, setLoading]   = useState(false);
-  const [html, setHtml]         = useState(null);
-  const [error, setError]       = useState(null); // null | "quota" | "rate:{wait}" | "generic:{msg}"
+  const [mode, setMode]           = useState("form");
+  const [f, setF]                 = useState(EMPTY);
+  const [freeText, setFreeText]   = useState("");
+  const [pageCount, setPageCount] = useState(5);
+  const [withAnswerKey, setWithAnswerKey] = useState(false);
+  const [loading, setLoading]     = useState(false);
+  const [loadingMsgIdx, setLoadingMsgIdx] = useState(0);
+  const [html, setHtml]           = useState(null);
+  const [error, setError]         = useState(null); // null | "quota" | "rate:{wait}" | "generic:{msg}"
+
+  // Rotate loading messages every 3.5 s while generating
+  useEffect(() => {
+    if (!loading) { setLoadingMsgIdx(0); return; }
+    const id = setInterval(() => setLoadingMsgIdx(i => (i + 1) % LOADING_MSGS.length), 3500);
+    return () => clearInterval(id);
+  }, [loading]);
 
   const canSubmit = !loading && (mode === "free" ? freeText.trim().length > 5 : f.childName.trim() && f.goal.trim());
 
@@ -37,7 +58,9 @@ export default function Create({ onSaved, remaining, isPro }) {
     setHtml(null);
     setError(null);
 
-    const body = mode === "free" ? { freeText: freeText.trim() } : { ...f };
+    const body = mode === "free"
+      ? { freeText: freeText.trim(), pageCount, withAnswerKey }
+      : { ...f, pageCount, withAnswerKey };
 
     // Use raw fetch — apikey as query param avoids CORS preflight listing it as a header,
     // so the existing Edge Function's CORS (authorization, content-type only) passes.
@@ -83,7 +106,7 @@ export default function Create({ onSaved, remaining, isPro }) {
 
     setHtml(data.html);
     onSaved?.();
-  }, [canSubmit, mode, freeText, f, onSaved]);
+  }, [canSubmit, mode, freeText, f, pageCount, withAnswerKey, onSaved]);
 
   useEffect(() => {
     const h = (e) => { if ((e.ctrlKey || e.metaKey) && e.key === "Enter") create(); };
@@ -106,7 +129,7 @@ export default function Create({ onSaved, remaining, isPro }) {
         </div>
 
         <div className="bg-canvas rounded-2xl p-4 space-y-2 text-right">
-          {["חוברות ללא הגבלה", "5 עמודי A4 מלאים בכל חוברת", "שמירה בענן — גישה מכל מכשיר", "תמיכה אישית"].map((f) => (
+          {["חוברות ללא הגבלה", "עד 20 עמודים בחוברת", "מפתח תשובות אוטומטי", "שמירה בענן — גישה מכל מכשיר", "תמיכה אישית"].map((f) => (
             <div key={f} className="flex items-center gap-2 text-sm text-ink/70">
               <span className="text-grow">✓</span> {f}
             </div>
@@ -212,6 +235,35 @@ export default function Create({ onSaved, remaining, isPro }) {
           />
         )}
 
+        <div className="border-t border-ink/5" />
+
+        {/* Page count selector */}
+        <div>
+          <p className="text-xs text-ink/40 mb-2 font-medium">כמות עמודים</p>
+          <div className="flex gap-2">
+            {PAGE_OPTIONS.map((n) => (
+              <button key={n} onClick={() => setPageCount(n)} disabled={loading}
+                className={`flex-1 rounded-xl p-2 text-sm font-medium border transition-colors ${pageCount === n ? "bg-brand text-white border-brand shadow-sm" : "bg-canvas/50 border-ink/15 text-ink/60 hover:border-brand/50"}`}>
+                {n} עמ'
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Answer key toggle */}
+        <label className="flex items-center justify-between gap-3 cursor-pointer select-none">
+          <div>
+            <span className="text-sm font-medium text-ink">מפתח תשובות</span>
+            <span className="text-xs text-ink/40 mr-2">דף תשובות בסוף החוברת</span>
+          </div>
+          <div
+            onClick={() => !loading && setWithAnswerKey(v => !v)}
+            className={`relative w-11 h-6 rounded-full transition-colors cursor-pointer ${withAnswerKey ? "bg-magic" : "bg-ink/20"}`}
+          >
+            <div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all ${withAnswerKey ? "right-0.5" : "left-0.5"}`} />
+          </div>
+        </label>
+
         {/* Rate limit error */}
         {rateWait && (
           <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-amber-700 text-sm text-center">
@@ -234,7 +286,8 @@ export default function Create({ onSaved, remaining, isPro }) {
                 <div key={i} className="w-2.5 h-2.5 rounded-full bg-magic animate-bounce" style={{ animationDelay: `${i * 0.15}s` }} />
               ))}
             </div>
-            <p className="text-ink/50 text-sm">Claude מייצר 5 עמודי A4… (30–90 שניות)</p>
+            <p className="text-ink/60 text-sm font-medium">{LOADING_MSGS[loadingMsgIdx]}</p>
+            <p className="text-ink/30 text-xs">{pageCount} עמודי A4 · 30–90 שניות</p>
             <div className="w-full bg-canvas rounded-full h-1 overflow-hidden">
               <div className="h-full bg-gradient-to-r from-brand via-magic to-grow rounded-full animate-shimmer" />
             </div>
@@ -242,7 +295,7 @@ export default function Create({ onSaved, remaining, isPro }) {
         ) : (
           <button onClick={create} disabled={!canSubmit || (!isPro && remaining === 0)}
             className="w-full bg-gradient-to-l from-brand to-magic text-white rounded-xl p-3.5 font-display font-semibold disabled:opacity-40 hover:opacity-90 transition-opacity shadow-sm">
-            {(!isPro && remaining === 0) ? "🔒 שדרג לפרו להמשיך" : "✨ צור חוברת"}
+            {(!isPro && remaining === 0) ? "🔒 שדרג לפרו להמשיך" : `✨ צור חוברת (${pageCount} עמ')`}
             {canSubmit && <span className="mr-2 text-white/60 text-xs font-normal">Ctrl+Enter</span>}
           </button>
         )}

@@ -36,6 +36,11 @@ export default function Preview({ html, onReset }) {
     return () => window.removeEventListener("keydown", handler);
   }, [html]);
 
+  const shareWhatsApp = () => {
+    const msg = encodeURIComponent("יצרתי חוברת לימוד מותאמת אישית עם בשבילי AI 📚\nנסה גם אתה בחינם ← " + window.location.origin);
+    window.open("https://wa.me/?text=" + msg, "_blank");
+  };
+
   return (
     <div className="space-y-3">
       {/* Preview iframe */}
@@ -60,6 +65,13 @@ export default function Preview({ html, onReset }) {
         </button>
 
         <button
+          onClick={shareWhatsApp}
+          className="flex items-center justify-center gap-2 bg-green-500 text-white rounded-xl p-3 text-sm font-medium hover:bg-green-600 transition-colors"
+        >
+          <span>💬</span> שתף בוואטסאפ
+        </button>
+
+        <button
           onClick={downloadHtml}
           className="flex items-center justify-center gap-2 border border-ink/20 rounded-xl p-3 text-sm text-ink/70 hover:text-ink hover:border-ink/40 transition-colors"
         >
@@ -69,9 +81,9 @@ export default function Preview({ html, onReset }) {
         {onReset && (
           <button
             onClick={onReset}
-            className="flex items-center justify-center gap-2 border border-ink/20 rounded-xl p-3 text-sm text-ink/70 hover:text-ink hover:border-ink/40 transition-colors"
+            className="col-span-2 flex items-center justify-center gap-2 border border-ink/20 rounded-xl p-3 text-sm text-ink/70 hover:text-ink hover:border-ink/40 transition-colors"
           >
-            <span>✨</span> חוברת חדשה
+            <span>✨</span> צור חוברת חדשה
           </button>
         )}
       </div>
