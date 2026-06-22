@@ -4,7 +4,7 @@ import Preview from "./Preview";
 import { FREE_LIMIT } from "../hooks/useProfile";
 
 // Contact link for upgrade — replace with actual WhatsApp/payment link
-const UPGRADE_LINK = "https://wa.me/972500000000?text=" + encodeURIComponent("שלום! אני רוצה לשדרג לבשבילי פרו 🎉");
+const UPGRADE_LINK = "https://wa.me/972509139137?text=" + encodeURIComponent("שלום! אני רוצה לשדרג לבשבילי פרו 🎉");
 
 const WORLDS = ["כדורגל", "גיימינג", "חיות", "חלל", "בישול", "מוזיקה", "סוסים", "נינג'ה", "פוקימון", "מינקראפט"];
 const LEVELS = [["basic", "🌱 בסיסי"], ["medium", "⚡ בינוני"], ["advanced", "🚀 מתקדם"]];
