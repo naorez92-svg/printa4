@@ -4,13 +4,37 @@ on:
   push:
     paths:
       - 'beshvili/supabase/functions/**'
-      - 'beshvili/supabase/migrations/**'
-      - '.github/workflows/deploy-supabase.yml'
   workflow_dispatch:
 
 jobs:
-  deploy:
+  edge-function:
     runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Deploy Edge Function
+        run: supabase functions deploy generate-booklet --project-ref gywpdzkvkdisonuzhsib
+        working-directory: beshvili
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Set Anthropic API Key secret
+        run: |
+          supabase secrets set ANTHROPIC_API_KEY="${{ secrets.ANTHROPIC_API_KEY }}" \
+            --project-ref gywpdzkvkdisonuzhsib
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Done
+        run: echo "✅ Edge Function deployed!"
+
+  migrations:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch'
     steps:
       - uses: actions/checkout@v4
 
@@ -29,18 +53,5 @@ jobs:
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
 
-      - name: Deploy Edge Function
-        run: supabase functions deploy generate-booklet --project-ref gywpdzkvkdisonuzhsib
-        working-directory: beshvili
-        env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-
-      - name: Set Anthropic API Key secret
-        run: |
-          supabase secrets set ANTHROPIC_API_KEY="${{ secrets.ANTHROPIC_API_KEY }}" \
-            --project-ref gywpdzkvkdisonuzhsib
-        env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-
       - name: Done
-        run: echo "✅ Migrations, Edge Function, and secrets deployed!"
+        run: echo "✅ Migrations applied!"
