@@ -1,5 +1,6 @@
 import { createClient } from "jsr:@supabase/supabase-js@2";
 
+// v2 — CORS updated to allow apikey + x-client-info headers
 // ── Commercial limits ────────────────────────────────────────────────────────
 const FREE_BOOKLET_LIMIT = 2;          // free-tier total
 const RATE_LIMIT_SECONDS = 60;         // min gap between generations per user
