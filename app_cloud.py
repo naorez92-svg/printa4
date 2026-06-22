@@ -1,5 +1,28 @@
-import os, base64, json, shutil, subprocess, tempfile
+import os, base64, json, shutil, subprocess, tempfile, time, threading
 from flask import Flask, request, Response, stream_with_context
+
+# ── Rate limiting (in-memory, per IP) ────────────────────────────────────────
+_rl_lock  = threading.Lock()
+_rl_store = {}   # ip → last_request_epoch
+_rl_clean_at = [0]
+RL_SECONDS  = 30        # min gap between generations per IP
+RL_MAX_LEN  = 1000      # max chars per input field
+
+def _rl_check(ip: str) -> int | None:
+    """Return seconds to wait, or None if allowed."""
+    now = time.monotonic()
+    with _rl_lock:
+        # Evict stale entries every 10 min to prevent unbounded growth
+        if now - _rl_clean_at[0] > 600:
+            cutoff = now - RL_SECONDS * 2
+            for k in [k for k, v in _rl_store.items() if v < cutoff]:
+                del _rl_store[k]
+            _rl_clean_at[0] = now
+        last = _rl_store.get(ip)
+        if last and (now - last) < RL_SECONDS:
+            return int(RL_SECONDS - (now - last)) + 1
+        _rl_store[ip] = now
+        return None
 
 APP_VERSION = "2.2"
 
@@ -815,13 +838,24 @@ def api_generate():
             status=503, mimetype="application/json"
         )
 
-    data = request.get_json(force=True) or {}
-    name    = data.get("name", "").strip()
-    age     = data.get("age", "").strip()
-    theme   = data.get("theme", "").strip()
-    goal    = data.get("goal", "").strip()
-    level   = data.get("level", "בינוני").strip()
-    special = data.get("special", "").strip()
+    # Rate limit per client IP
+    client_ip = request.headers.get("X-Forwarded-For", request.remote_addr or "").split(",")[0].strip()
+    wait = _rl_check(client_ip)
+    if wait is not None:
+        return Response(
+            json.dumps({"error": f"יש להמתין {wait} שניות לפני יצירה נוספת"}, ensure_ascii=False),
+            status=429, mimetype="application/json",
+            headers={"Retry-After": str(wait)}
+        )
+
+    data = request.get_json(force=True, silent=True) or {}
+    clamp = lambda v, mx=RL_MAX_LEN: str(v or "").strip()[:mx]
+    name    = clamp(data.get("name"))
+    age     = clamp(data.get("age"), 100)
+    theme   = clamp(data.get("theme"), 100)
+    goal    = clamp(data.get("goal"))
+    level   = clamp(data.get("level"), 20) or "בינוני"
+    special = clamp(data.get("special"))
 
     if not name or not goal:
         return Response(
