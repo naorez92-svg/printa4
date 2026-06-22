@@ -1,9 +1,17 @@
-import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { createClient } from "jsr:@supabase/supabase-js@2";
 
+// ── Commercial limits ────────────────────────────────────────────────────────
+const FREE_BOOKLET_LIMIT = 2;          // free-tier total
+const RATE_LIMIT_SECONDS = 60;         // min gap between generations per user
+const MAX_FREE_TEXT_LEN = 2000;
+const MAX_FIELD_LEN = 500;
+
+// Supabase JS client sends apikey + x-client-info — must be in allow list
 const cors = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Max-Age": "86400",
 };
 
 const BOOKLET_SYSTEM = `אתה "יוצר החוברות של חני 2.0" — מומחה פדגוגי בכיר, מעצב גרפי לפרינט ומפתח HTML/CSS.
@@ -63,26 +71,92 @@ const BOOKLET_SYSTEM = `אתה "יוצר החוברות של חני 2.0" — מ�
 • כל 5 העמודים בקובץ HTML אחד`;
 
 Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
+  if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: cors });
+
+  // Admin Supabase client (service role — bypasses RLS for server checks)
+  const admin = createClient(
+    Deno.env.get("SUPABASE_URL")!,
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+    { auth: { persistSession: false } }
+  );
 
   try {
-    const { childName, grade, world, goal, level, weaknesses, freeText } = await req.json();
+    // ── 1. JWT verification ──────────────────────────────────────────────
+    const jwt = req.headers.get("authorization")?.replace("Bearer ", "");
+    if (!jwt) {
+      return new Response(JSON.stringify({ error: "unauthorized" }), { status: 401, headers: cors });
+    }
+    const { data: { user }, error: authErr } = await admin.auth.getUser(jwt);
+    if (authErr || !user) {
+      return new Response(JSON.stringify({ error: "unauthorized" }), { status: 401, headers: cors });
+    }
+
+    // ── 2. Plan check + quota (server-enforced, cannot be bypassed) ───────
+    const [{ data: profile }, { count: bookletCount }] = await Promise.all([
+      admin.from("profiles").select("plan").eq("id", user.id).single(),
+      admin.from("booklets").select("*", { count: "exact", head: true }).eq("user_id", user.id),
+    ]);
+
+    const isPro = profile?.plan === "pro" || profile?.plan === "admin";
+    const usedCount = bookletCount ?? 0;
+
+    if (!isPro && usedCount >= FREE_BOOKLET_LIMIT) {
+      return new Response(
+        JSON.stringify({ error: "quota_exceeded", used: usedCount, limit: FREE_BOOKLET_LIMIT }),
+        { status: 403, headers: cors }
+      );
+    }
+
+    // ── 3. Rate limiting (1 per 60s per user) ────────────────────────────
+    const { data: lastBooklet } = await admin
+      .from("booklets")
+      .select("created_at")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (lastBooklet?.created_at) {
+      const elapsedSec = (Date.now() - new Date(lastBooklet.created_at).getTime()) / 1000;
+      if (elapsedSec < RATE_LIMIT_SECONDS) {
+        return new Response(
+          JSON.stringify({ error: "rate_limited", wait: Math.ceil(RATE_LIMIT_SECONDS - elapsedSec) }),
+          { status: 429, headers: cors }
+        );
+      }
+    }
+
+    // ── 4. Parse + sanitize input ────────────────────────────────────────
+    const body = await req.json();
+    const clean = (val: unknown, max = MAX_FIELD_LEN): string =>
+      String(val ?? "").trim().substring(0, max);
+
+    const freeText   = clean(body.freeText, MAX_FREE_TEXT_LEN);
+    const childName  = clean(body.childName, 100);
+    const grade      = clean(body.grade, 50);
+    const world      = clean(body.world, 50);
+    const goal       = clean(body.goal);
+    const weaknesses = clean(body.weaknesses, 300);
+    const level      = ["basic", "medium", "advanced"].includes(body.level) ? body.level : "medium";
+
+    if (!freeText && !goal) {
+      return new Response(JSON.stringify({ error: "goal required" }), { status: 400, headers: cors });
+    }
+
+    // ── 5. Build AI prompt ───────────────────────────────────────────────
     const apiKey = Deno.env.get("ANTHROPIC_API_KEY");
     if (!apiKey) throw new Error("ANTHROPIC_API_KEY missing");
 
-    const userMsg = freeText?.trim()
-      ? `צור חוברת עבודה לפי הבקשה הבאה:\n\n${freeText.trim()}\n\nצור HTML מלא עם כל 5 העמודים לפי המבנה הפדגוגי. קוד HTML גולמי בלבד, ללא הסברים.`
-      : `צור חוברת עבודה לפי הפרמטרים הבאים:
+    const userMsg = freeText
+      ? `צור חוברת עבודה לפי הבקשה הבאה:\n\n${freeText}\n\nצור HTML מלא עם כל 5 העמודים. קוד HTML גולמי בלבד.`
+      : `צור חוברת עבודה:
+שם: ${childName || "לא צוין"} | כיתה: ${grade || "לא צוין"} | עולם: ${world || "כללי"}
+יעד: ${goal}
+רמה: ${level === "basic" ? "בסיסי" : level === "advanced" ? "מתקדם" : "בינוני"}
+${weaknesses ? `חולשות לחיזוק: ${weaknesses}` : ""}
+קוד HTML גולמי בלבד, ללא הסברים.`;
 
-שם הילד/ה: ${childName || "לא צוין"}
-גיל/כיתה: ${grade || "לא צוין"}
-עולם תוכן: ${world || "כללי"}
-יעד פדגוגי: ${goal}
-רמת אתגר: ${level === "basic" ? "בסיסי" : level === "advanced" ? "מתקדם" : "בינוני"}
-${weaknesses ? `התמקד בחולשות מהפעם הקודמת: ${weaknesses}.` : ""}
-
-צור HTML מלא עם כל 5 העמודים לפי המבנה הפדגוגי. קוד HTML גולמי בלבד, ללא הסברים.`;
-
+    // ── 6. Generate ──────────────────────────────────────────────────────
     const resp = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: {
@@ -98,10 +172,7 @@ ${weaknesses ? `התמקד בחולשות מהפעם הקודמת: ${weaknesses}
       }),
     });
 
-    if (!resp.ok) {
-      const err = await resp.text();
-      throw new Error(`Anthropic API error ${resp.status}: ${err}`);
-    }
+    if (!resp.ok) throw new Error(`Anthropic ${resp.status}: ${await resp.text()}`);
 
     const data = await resp.json();
     const html = (data.content ?? [])
@@ -110,15 +181,13 @@ ${weaknesses ? `התמקד בחולשות מהפעם הקודמת: ${weaknesses}
       .join("\n")
       .trim();
 
-    const usage = data.usage ?? {};
+    return new Response(
+      JSON.stringify({ html, usage: data.usage ?? {}, remaining: isPro ? null : FREE_BOOKLET_LIMIT - usedCount - 1 }),
+      { headers: { ...cors, "content-type": "application/json" } }
+    );
 
-    return new Response(JSON.stringify({ html, usage }), {
-      headers: { ...cors, "content-type": "application/json" },
-    });
-  } catch (e) {
-    return new Response(JSON.stringify({ error: String(e) }), {
-      status: 500,
-      headers: { ...cors, "content-type": "application/json" },
-    });
+  } catch (e: unknown) {
+    const status = (e as { status?: number }).status ?? 500;
+    return new Response(JSON.stringify({ error: String(e) }), { status, headers: cors });
   }
 });
