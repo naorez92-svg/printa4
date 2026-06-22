@@ -1,4 +1,3 @@
-import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 
 // ── Commercial limits ────────────────────────────────────────────────────────
@@ -7,10 +6,12 @@ const RATE_LIMIT_SECONDS = 60;         // min gap between generations per user
 const MAX_FREE_TEXT_LEN = 2000;
 const MAX_FIELD_LEN = 500;
 
+// Supabase JS client sends apikey + x-client-info — must be in allow list
 const cors = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, content-type",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Max-Age": "86400",
 };
 
 const BOOKLET_SYSTEM = `אתה "יוצר החוברות של חני 2.0" — מומחה פדגוגי בכיר, מעצב גרפי לפרינט ומפתח HTML/CSS.
