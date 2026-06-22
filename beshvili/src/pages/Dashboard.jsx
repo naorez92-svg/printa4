@@ -81,6 +81,19 @@ export default function Dashboard() {
         )}
         {tab === "history" && <History bookletCount={bookletCount} />}
       </main>
+
+      <footer className="max-w-2xl mx-auto px-5 py-6 border-t border-ink/5 text-center text-xs text-ink/25 space-y-1">
+        <div className="flex justify-center gap-4 flex-wrap">
+          <a href="mailto:support@beshvili.co.il" className="hover:text-ink/50 transition-colors">צור קשר</a>
+          <span>·</span>
+          <a href="/privacy.html" target="_blank" className="hover:text-ink/50 transition-colors">מדיניות פרטיות</a>
+          <span>·</span>
+          <a href="/terms.html" target="_blank" className="hover:text-ink/50 transition-colors">תנאי שימוש</a>
+          <span>·</span>
+          <a href="/accessibility.html" target="_blank" className="hover:text-ink/50 transition-colors">נגישות</a>
+        </div>
+        <p>בשבילי © {new Date().getFullYear()} · כל הזכויות שמורות</p>
+      </footer>
     </div>
   );
 }
