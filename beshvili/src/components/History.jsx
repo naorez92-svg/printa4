@@ -5,14 +5,16 @@ import Preview from "./Preview";
 export default function History() {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     supabase
       .from("booklets")
       .select("id, title, world, child_name, grade, created_at")
       .order("created_at", { ascending: false })
-      .then(({ data }) => {
-        setItems(data ?? []);
+      .then(({ data, error: err }) => {
+        if (err) setError("לא הצלחתי לטעון את החוברות");
+        else setItems(data ?? []);
         setLoading(false);
       });
   }, []);
@@ -23,7 +25,8 @@ export default function History() {
     <section className="space-y-3">
       <h2 className="text-xl font-semibold">החוברות שלי</h2>
       {loading && <p className="text-ink/40 text-sm animate-pulse">טוען…</p>}
-      {!loading && items.length === 0 && (
+      {error && <p className="text-red-500 text-sm">{error}</p>}
+      {!loading && !error && items.length === 0 && (
         <p className="text-ink/50 text-sm">עדיין אין חוברות. צור את הראשונה למעלה.</p>
       )}
       {items.map((b) => (
@@ -40,14 +43,16 @@ function BookletRow({ booklet: b, onDelete }) {
   const toggle = async () => {
     if (html) { setHtml(null); return; }
     setLoadingHtml(true);
-    const { data } = await supabase.from("booklets").select("html").eq("id", b.id).single();
-    setHtml(data?.html ?? null);
+    const { data, error } = await supabase.from("booklets").select("html").eq("id", b.id).single();
     setLoadingHtml(false);
+    if (error || !data?.html) { alert("לא הצלחתי לטעון את החוברת"); return; }
+    setHtml(data.html);
   };
 
   const del = async () => {
     if (!confirm(`למחוק את "${b.title}"?`)) return;
-    await supabase.from("booklets").delete().eq("id", b.id);
+    const { error } = await supabase.from("booklets").delete().eq("id", b.id);
+    if (error) { alert("מחיקה נכשלה — נסה שנית"); return; }
     onDelete(b.id);
   };
 

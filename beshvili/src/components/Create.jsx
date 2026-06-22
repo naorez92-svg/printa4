@@ -42,12 +42,18 @@ export default function Create({ onSaved, remaining, isPro }) {
     // Use raw fetch — apikey as query param avoids CORS preflight listing it as a header,
     // so the existing Edge Function's CORS (authorization, content-type only) passes.
     const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      setLoading(false);
+      setError("generic:אתה לא מחובר — נסה להתחבר מחדש");
+      return;
+    }
+
     const fnUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-booklet?apikey=${import.meta.env.VITE_SUPABASE_ANON_KEY}`;
     let data = null, fnErr = null;
     try {
       const resp = await fetch(fnUrl, {
         method: "POST",
-        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${session?.access_token}` },
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${session.access_token}` },
         body: JSON.stringify(body),
       });
       data = await resp.json().catch(() => ({}));
@@ -73,13 +79,16 @@ export default function Create({ onSaved, remaining, isPro }) {
       : `${f.childName} — ${f.goal}`;
 
     const { data: u } = await supabase.auth.getUser();
-    await supabase.from("booklets").insert({
+    if (!u?.user) { setError("generic:שגיאת משתמש — נסה להתחבר מחדש"); return; }
+
+    const { error: insertErr } = await supabase.from("booklets").insert({
       user_id: u.user.id, title,
       child_name: f.childName || null, grade: f.grade || null,
       world: f.world || null,
       goal: mode === "free" ? freeText.trim().substring(0, 200) : f.goal,
       level: f.level, html: data.html,
     });
+    if (insertErr) { setError(`generic:שמירה נכשלה — ${insertErr.message}`); return; }
 
     setHtml(data.html);
     onSaved?.();
@@ -106,9 +115,9 @@ export default function Create({ onSaved, remaining, isPro }) {
         </div>
 
         <div className="bg-canvas rounded-2xl p-4 space-y-2 text-right">
-          {["חוברות ללא הגבלה", "5 עמודי A4 מלאים בכל חוברת", "שמירה בענן — גישה מכל מכשיר", "תמיכה אישית"].map((f) => (
-            <div key={f} className="flex items-center gap-2 text-sm text-ink/70">
-              <span className="text-grow">✓</span> {f}
+          {["חוברות ללא הגבלה", "5 עמודי A4 מלאים בכל חוברת", "שמירה בענן — גישה מכל מכשיר", "תמיכה אישית"].map((feat) => (
+            <div key={feat} className="flex items-center gap-2 text-sm text-ink/70">
+              <span className="text-grow">✓</span> {feat}
             </div>
           ))}
         </div>
