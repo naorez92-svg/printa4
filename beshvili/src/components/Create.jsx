@@ -38,12 +38,27 @@ export default function Create({ onSaved, remaining, isPro }) {
     setError(null);
 
     const body = mode === "free" ? { freeText: freeText.trim() } : { ...f };
-    const { data, error: fnErr } = await supabase.functions.invoke("generate-booklet", { body });
+
+    // Use raw fetch — apikey as query param avoids CORS preflight listing it as a header,
+    // so the existing Edge Function's CORS (authorization, content-type only) passes.
+    const { data: { session } } = await supabase.auth.getSession();
+    const fnUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-booklet?apikey=${import.meta.env.VITE_SUPABASE_ANON_KEY}`;
+    let data = null, fnErr = null;
+    try {
+      const resp = await fetch(fnUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${session?.access_token}` },
+        body: JSON.stringify(body),
+      });
+      data = await resp.json().catch(() => ({}));
+      if (!resp.ok) fnErr = { message: data?.error || `שגיאת שרת ${resp.status}` };
+    } catch (e) {
+      fnErr = { message: String(e) };
+    }
 
     setLoading(false);
 
     if (fnErr) {
-      // Parse structured errors from Edge Function
       const code = data?.error ?? fnErr.message;
       if (code === "quota_exceeded") { setError("quota"); return; }
       if (code === "rate_limited")   { setError(`rate:${data?.wait ?? 60}`); return; }
