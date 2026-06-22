@@ -66,13 +66,15 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
 
   try {
-    const { childName, grade, world, goal, level, weaknesses } = await req.json();
+    const { childName, grade, world, goal, level, weaknesses, freeText } = await req.json();
     const apiKey = Deno.env.get("ANTHROPIC_API_KEY");
     if (!apiKey) throw new Error("ANTHROPIC_API_KEY missing");
 
-    const userMsg = `צור חוברת עבודה לפי הפרמטרים הבאים:
+    const userMsg = freeText?.trim()
+      ? `צור חוברת עבודה לפי הבקשה הבאה:\n\n${freeText.trim()}\n\nצור HTML מלא עם כל 5 העמודים לפי המבנה הפדגוגי. קוד HTML גולמי בלבד, ללא הסברים.`
+      : `צור חוברת עבודה לפי הפרמטרים הבאים:
 
-שם הילד/ה: ${childName}
+שם הילד/ה: ${childName || "לא צוין"}
 גיל/כיתה: ${grade || "לא צוין"}
 עולם תוכן: ${world || "כללי"}
 יעד פדגוגי: ${goal}
