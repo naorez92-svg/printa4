@@ -16,8 +16,19 @@ export default function Login() {
       options: { emailRedirectTo: window.location.origin },
     });
     setLoading(false);
-    if (err) setError(err.message || "שגיאה בשליחה — נסה שנית");
-    else setSent(true);
+    if (err) {
+      const msg = err.message || "";
+      const waitMatch = msg.match(/after (\d+) second/);
+      if (waitMatch) {
+        setError(`שלחנו מייל לאחרונה — המתן ${waitMatch[1]} שניות ונסה שנית`);
+      } else if (msg.toLowerCase().includes("rate") || msg.toLowerCase().includes("security")) {
+        setError("שלחנו מייל לאחרונה — המתן דקה ונסה שנית");
+      } else {
+        setError(msg || "שגיאה בשליחה — נסה שנית");
+      }
+    } else {
+      setSent(true);
+    }
   };
 
   return (
@@ -55,6 +66,7 @@ export default function Login() {
                 <div className="text-4xl">✉️</div>
                 <p className="text-grow font-semibold">שלחנו קישור למייל שלך!</p>
                 <p className="text-ink/50 text-sm">לחץ על הקישור במייל כדי להיכנס</p>
+                <p className="text-ink/40 text-xs">לא קיבלת? בדוק ספאם או חכה כמה דקות</p>
                 <button
                   onClick={() => { setSent(false); setEmail(""); }}
                   className="text-xs text-ink/40 hover:text-ink/60 underline"
@@ -75,7 +87,7 @@ export default function Login() {
                   onKeyDown={(e) => e.key === "Enter" && send()}
                   autoFocus
                 />
-                {error && <p className="text-red-500 text-sm text-right">{error}</p>}
+                {error && <p className="text-amber-600 text-sm bg-amber-50 rounded-xl p-2">{error}</p>}
                 <button
                   onClick={send}
                   disabled={loading || !email.trim()}
