@@ -16,7 +16,17 @@ export default function Login() {
       options: { emailRedirectTo: window.location.origin },
     });
     setLoading(false);
-    if (err) setError(err.message || "שגיאה בשליחה — נסה שנית");
+    if (err) {
+      const msg = err.message || "";
+      const waitMatch = msg.match(/after (\d+) second/);
+      if (waitMatch) {
+        setError(`שלחנו מייל לאחרונה — המתן ${waitMatch[1]} שניות ונסה שנית`);
+      } else if (msg.toLowerCase().includes("rate") || msg.toLowerCase().includes("security")) {
+        setError("שלחנו מייל לאחרונה — המתן דקה ונסה שנית");
+      } else {
+        setError(msg || "שגיאה בשליחה — נסה שנית");
+      }
+    }
     else setSent(true);
   };
 
