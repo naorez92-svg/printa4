@@ -40,12 +40,13 @@ export default function Create({ onSaved, remaining, isPro }) {
   const [withAnswerKey, setWithAnswerKey] = useState(false);
   const [loading, setLoading]     = useState(false);
   const [loadingMsgIdx, setLoadingMsgIdx] = useState(0);
+  const [streamChars, setStreamChars] = useState(0);
   const [html, setHtml]           = useState(null);
   const [error, setError]         = useState(null); // null | "quota" | "rate:{wait}" | "generic:{msg}"
 
   // Rotate loading messages every 3.5 s while generating
   useEffect(() => {
-    if (!loading) { setLoadingMsgIdx(0); return; }
+    if (!loading) { setLoadingMsgIdx(0); setStreamChars(0); return; }
     const id = setInterval(() => setLoadingMsgIdx(i => (i + 1) % LOADING_MSGS.length), 3500);
     return () => clearInterval(id);
   }, [loading]);
@@ -62,49 +63,97 @@ export default function Create({ onSaved, remaining, isPro }) {
       ? { freeText: freeText.trim(), pageCount, withAnswerKey }
       : { ...f, pageCount, withAnswerKey };
 
-    // Use raw fetch — apikey as query param avoids CORS preflight listing it as a header,
-    // so the existing Edge Function's CORS (authorization, content-type only) passes.
     const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      setLoading(false);
+      setError("generic:אתה לא מחובר — נסה להתחבר מחדש");
+      return;
+    }
+
     const fnUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-booklet?apikey=${import.meta.env.VITE_SUPABASE_ANON_KEY}`;
-    let data = null, fnErr = null;
+    let resp;
     try {
-      const resp = await fetch(fnUrl, {
+      resp = await fetch(fnUrl, {
         method: "POST",
-        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${session?.access_token}` },
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${session.access_token}` },
         body: JSON.stringify(body),
       });
-      data = await resp.json().catch(() => ({}));
-      if (!resp.ok) fnErr = { message: data?.error || `שגיאת שרת ${resp.status}` };
     } catch (e) {
-      fnErr = { message: String(e) };
+      setLoading(false);
+      setError(`generic:שגיאת רשת — ${String(e)}`);
+      return;
+    }
+
+    if (!resp.ok) {
+      const errData = await resp.json().catch(() => ({}));
+      const code = errData?.error;
+      setLoading(false);
+      if (code === "quota_exceeded") { setError("quota"); return; }
+      if (code === "rate_limited")   { setError(`rate:${errData?.wait ?? 60}`); return; }
+      setError(`generic:${code || `שגיאת שרת ${resp.status}`}`);
+      return;
+    }
+
+    // Read SSE stream — Anthropic sends content_block_delta events with text chunks
+    const reader = resp.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    let htmlAccumulated = "";
+    let updateTimer = 0;
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? "";
+        for (const line of lines) {
+          if (!line.startsWith("data: ")) continue;
+          const raw = line.slice(6).trim();
+          if (!raw || raw === "[DONE]") continue;
+          try {
+            const ev = JSON.parse(raw);
+            if (ev.type === "content_block_delta" && ev.delta?.type === "text_delta") {
+              htmlAccumulated += ev.delta.text;
+              // Throttle React state updates to ~10fps
+              const now = Date.now();
+              if (now - updateTimer > 100) {
+                setStreamChars(htmlAccumulated.length);
+                updateTimer = now;
+              }
+            }
+          } catch {}
+        }
+      }
+    } catch (streamErr) {
+      setLoading(false);
+      setError("generic:שגיאה בקבלת הנתונים מהשרת");
+      return;
     }
 
     setLoading(false);
 
-    if (fnErr) {
-      const code = data?.error ?? fnErr.message;
-      if (code === "quota_exceeded") { setError("quota"); return; }
-      if (code === "rate_limited")   { setError(`rate:${data?.wait ?? 60}`); return; }
-      setError(`generic:${fnErr.message}`);
-      return;
-    }
-
-    if (!data?.html) { setError("generic:לא התקבל HTML מהשרת"); return; }
+    const html = htmlAccumulated.trim();
+    if (!html || !html.includes("<")) { setError("generic:לא התקבל HTML תקין מהשרת"); return; }
 
     const title = mode === "free"
       ? freeText.trim().substring(0, 60) + (freeText.length > 60 ? "…" : "")
       : `${f.childName} — ${f.goal}`;
 
     const { data: u } = await supabase.auth.getUser();
-    await supabase.from("booklets").insert({
+    if (!u?.user) { setError("generic:שגיאת משתמש — נסה להתחבר מחדש"); return; }
+
+    const { error: insertErr } = await supabase.from("booklets").insert({
       user_id: u.user.id, title,
       child_name: f.childName || null, grade: f.grade || null,
       world: f.world || null,
       goal: mode === "free" ? freeText.trim().substring(0, 200) : f.goal,
-      level: f.level, html: data.html,
+      level: f.level, html,
     });
+    if (insertErr) { setError(`generic:שמירה נכשלה — ${insertErr.message}`); return; }
 
-    setHtml(data.html);
+    setHtml(html);
     onSaved?.();
   }, [canSubmit, mode, freeText, f, pageCount, withAnswerKey, onSaved]);
 
@@ -287,9 +336,16 @@ export default function Create({ onSaved, remaining, isPro }) {
               ))}
             </div>
             <p className="text-ink/60 text-sm font-medium">{LOADING_MSGS[loadingMsgIdx]}</p>
-            <p className="text-ink/30 text-xs">{pageCount} עמודי A4 · 30–90 שניות</p>
-            <div className="w-full bg-canvas rounded-full h-1 overflow-hidden">
-              <div className="h-full bg-gradient-to-r from-brand via-magic to-grow rounded-full animate-shimmer" />
+            {streamChars > 0
+              ? <p className="text-magic text-xs font-mono">{streamChars.toLocaleString("he-IL")} תווים נכתבו...</p>
+              : <p className="text-ink/30 text-xs">{pageCount} עמודי A4 · 30–90 שניות</p>
+            }
+            <div className="w-full bg-canvas rounded-full h-1.5 overflow-hidden">
+              {streamChars > 0
+                ? <div className="h-full bg-gradient-to-r from-brand via-magic to-grow rounded-full transition-all duration-300"
+                    style={{ width: `${Math.min(95, (streamChars / (pageCount * 3200)) * 100)}%` }} />
+                : <div className="h-full bg-gradient-to-r from-brand via-magic to-grow rounded-full animate-shimmer" />
+              }
             </div>
           </div>
         ) : (

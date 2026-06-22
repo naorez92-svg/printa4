@@ -170,8 +170,8 @@ Deno.serve(async (req) => {
 ${weaknesses ? `חולשות לחיזוק: ${weaknesses}` : ""}${answerKeyNote}
 קוד HTML גולמי בלבד, ללא הסברים.`;
 
-    // ── 6. Generate ──────────────────────────────────────────────────────
-    const resp = await fetch("https://api.anthropic.com/v1/messages", {
+    // ── 6. Generate (streaming — client receives SSE, sees HTML in real time) ──
+    const anthropicResp = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: {
         "content-type": "application/json",
@@ -181,24 +181,24 @@ ${weaknesses ? `חולשות לחיזוק: ${weaknesses}` : ""}${answerKeyNote}
       body: JSON.stringify({
         model: "claude-opus-4-8",
         max_tokens: Math.min(20000, Math.max(8000, pageCount * 1800)),
+        stream: true,
         system: BOOKLET_SYSTEM,
         messages: [{ role: "user", content: userMsg }],
       }),
     });
 
-    if (!resp.ok) throw new Error(`Anthropic ${resp.status}: ${await resp.text()}`);
+    if (!anthropicResp.ok) {
+      throw new Error(`Anthropic ${anthropicResp.status}: ${await anthropicResp.text()}`);
+    }
 
-    const data = await resp.json();
-    const html = (data.content ?? [])
-      .filter((b: { type: string }) => b.type === "text")
-      .map((b: { text: string }) => b.text)
-      .join("\n")
-      .trim();
-
-    return new Response(
-      JSON.stringify({ html, usage: data.usage ?? {}, remaining: isPro ? null : FREE_BOOKLET_LIMIT - usedCount - 1 }),
-      { headers: { ...cors, "content-type": "application/json" } }
-    );
+    return new Response(anthropicResp.body, {
+      headers: {
+        ...cors,
+        "content-type": "text/event-stream",
+        "cache-control": "no-cache",
+        "x-remaining": String(isPro ? -1 : FREE_BOOKLET_LIMIT - usedCount - 1),
+      },
+    });
 
   } catch (e: unknown) {
     const status = (e as { status?: number }).status ?? 500;
