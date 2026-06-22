@@ -1,6 +1,8 @@
 import os, base64, json, shutil, subprocess, tempfile
 from flask import Flask, request, Response, stream_with_context
 
+APP_VERSION = "2.2"
+
 # --- AI availability detection ---
 # Method 1: claude CLI (works in Claude Code / OAuth environments)
 CLAUDE_BIN = shutil.which("claude")
@@ -123,6 +125,8 @@ HTML_UI = r"""<!DOCTYPE html>
 body{background:#0d1117;color:#e6edf3;font-family:'Heebo',sans-serif;min-height:100vh;padding:14px 14px 60px}
 .logo{font-size:19px;font-weight:700;margin-bottom:12px;text-align:center;padding:12px 0;border-bottom:1px solid #21262d}
 .logo .g{color:#2ea043}.logo .sub{font-size:10px;font-weight:400;color:#484f58;display:block;margin-top:2px}
+.logo .ver{font-size:9px;font-weight:600;color:#30363d;background:#21262d;padding:1px 6px;border-radius:4px;margin-right:6px;vertical-align:middle;letter-spacing:.3px}
+#wake-banner{position:fixed;top:0;inset-inline:0;z-index:9999;padding:9px 16px;text-align:center;font-size:12px;font-family:'Heebo',sans-serif;border-bottom:2px solid #238636;background:#0d1117;color:#8b949e;transition:all .3s}
 .tabs{display:flex;gap:3px;background:#161b22;border:1px solid #21262d;border-radius:10px;padding:4px;margin-bottom:12px}
 .tab{flex:1;padding:8px 4px;border-radius:7px;border:none;background:transparent;color:#8b949e;font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;transition:all .15s}
 .tab.active{background:#21262d;color:#e6edf3;box-shadow:0 1px 3px rgba(0,0,0,.3)}
@@ -193,6 +197,7 @@ select{background:#21262d;color:#e6edf3;border:1px solid #30363d;border-radius:8
 <div class="ios-tip" id="iosTip">&#128241; <strong>הוסף למסך הבית:</strong> לחץ שיתוף &#8592; "הוסף למסך הבית"</div>
 
 <div class="logo">&#128424; Print<span class="g">A4</span>
+  <span class="ver" id="ver-badge">v%%VERSION%%</span>
   <span class="sub">יוצר חוברות לימודיות &mdash; חני עזרא</span>
 </div>
 
@@ -747,6 +752,39 @@ function resetGen() {
   document.getElementById('genForm').classList.remove('hidden');
 }
 
+// ===== WAKE-UP DETECTION & KEEPALIVE =====
+(function () {
+  // Show wake banner only if server takes > 1.5s (= cold start)
+  let banner = null;
+  const wakeT = setTimeout(() => {
+    banner = document.createElement('div');
+    banner.id = 'wake-banner';
+    banner.innerHTML = '&#9203; השרת מתעורר — עוד כמה שניות&#8230;';
+    document.body.prepend(banner);
+  }, 1500);
+
+  const t0 = Date.now();
+  fetch('/health').then(r => r.json()).then(() => {
+    clearTimeout(wakeT);
+    if (banner) {
+      const sec = ((Date.now() - t0) / 1000).toFixed(1);
+      banner.style.borderColor = '#3fb950';
+      banner.style.color = '#3fb950';
+      banner.innerHTML = '&#9989; השרת מוכן! (התעורר ב-' + sec + 's)';
+      setTimeout(() => banner.remove(), 1800);
+    }
+  }).catch(() => {
+    clearTimeout(wakeT);
+    if (!banner) { banner = document.createElement('div'); banner.id = 'wake-banner'; document.body.prepend(banner); }
+    banner.style.borderColor = '#f85149';
+    banner.style.color = '#f85149';
+    banner.innerHTML = '&#10060; שגיאת חיבור &mdash; <a href="/" style="color:inherit">רענן</a>';
+  });
+
+  // Keepalive: ping every 8 min while tab is open → prevents Render sleep
+  setInterval(() => fetch('/health').catch(() => {}), 8 * 60 * 1000);
+})();
+
 // ===== TOAST =====
 function toast(m, t) {
   const c = document.getElementById('toasts');
@@ -763,7 +801,9 @@ function toast(m, t) {
 
 @app.route("/")
 def index():
-    html = HTML_UI.replace('%%HAS_AI%%', 'true' if HAS_AI else 'false')
+    html = (HTML_UI
+            .replace('%%HAS_AI%%', 'true' if HAS_AI else 'false')
+            .replace('%%VERSION%%', APP_VERSION))
     return Response(html, mimetype="text/html; charset=utf-8")
 
 
@@ -895,7 +935,7 @@ def sw():
 
 @app.route("/health")
 def health():
-    return Response(json.dumps({"ok": True, "ai": HAS_AI}), mimetype="application/json")
+    return Response(json.dumps({"ok": True, "ai": HAS_AI, "v": APP_VERSION}), mimetype="application/json")
 
 
 @app.route("/show", methods=["POST", "GET"])
