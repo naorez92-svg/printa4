@@ -11,7 +11,7 @@ import { useProfile, FREE_LIMIT } from "../hooks/useProfile";
 export default function Dashboard() {
   const [tab, setTab]             = useState("create");
   const [showUpgrade, setShowUpgrade] = useState(false);
-  const { profile, plan, bookletCount, remaining, isPro, isAdmin, loading, refresh } = useProfile();
+  const { profile, plan, bookletCount, monthlyBookletCount, monthlyLimit, remaining, isPro, isAdmin, loading, refresh } = useProfile();
 
   return (
     <div className="min-h-screen bg-canvas">
@@ -48,18 +48,30 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Quota bar (free users only) */}
-        {!loading && !isPro && (
+        {/* Quota bar */}
+        {!loading && (
           <div className="max-w-2xl mx-auto px-5 pb-2">
-            <div className="flex items-center gap-2 text-xs text-ink/50">
-              <div className="flex-1 h-1 bg-ink/10 rounded-full overflow-hidden">
-                <div
-                  className={`h-full rounded-full transition-all ${bookletCount >= FREE_LIMIT ? "bg-red-400" : "bg-brand"}`}
-                  style={{ width: `${Math.min(100, (bookletCount / FREE_LIMIT) * 100)}%` }}
-                />
+            {isPro && monthlyLimit ? (
+              <div className="flex items-center gap-2 text-xs text-ink/50">
+                <div className="flex-1 h-1 bg-ink/10 rounded-full overflow-hidden">
+                  <div
+                    className={`h-full rounded-full transition-all ${monthlyBookletCount >= monthlyLimit ? "bg-amber-400" : "bg-magic"}`}
+                    style={{ width: `${Math.min(100, (monthlyBookletCount / monthlyLimit) * 100)}%` }}
+                  />
+                </div>
+                <span>{monthlyBookletCount}/{monthlyLimit} חוברות החודש</span>
               </div>
-              <span>{bookletCount}/{FREE_LIMIT} חוברות חינם</span>
-            </div>
+            ) : !isPro ? (
+              <div className="flex items-center gap-2 text-xs text-ink/50">
+                <div className="flex-1 h-1 bg-ink/10 rounded-full overflow-hidden">
+                  <div
+                    className={`h-full rounded-full transition-all ${bookletCount >= FREE_LIMIT ? "bg-red-400" : "bg-brand"}`}
+                    style={{ width: `${Math.min(100, (bookletCount / FREE_LIMIT) * 100)}%` }}
+                  />
+                </div>
+                <span>{bookletCount}/{FREE_LIMIT} חוברות חינם</span>
+              </div>
+            ) : null}
           </div>
         )}
 

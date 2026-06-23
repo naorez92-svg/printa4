@@ -40,12 +40,28 @@ export default function QuickCreate({ student, onClose, onSaved, remaining, isPr
   const [bookletId, setBookletId]   = useState(null);
   const [showRating, setShowRating] = useState(false);
   const [error, setError]           = useState(null);
+  const [shareToken, setShareToken] = useState(null);
+  const [rateCountdown, setRateCountdown] = useState(null);
 
   useEffect(() => {
     if (!loading) { setLoadingMsgIdx(0); setStreamChars(0); return; }
     const id = setInterval(() => setLoadingMsgIdx(i => (i + 1) % LOADING_MSGS.length), 3500);
     return () => clearInterval(id);
   }, [loading]);
+
+  useEffect(() => {
+    const match = error?.match?.(/^rate:(\d+)$/);
+    setRateCountdown(match ? parseInt(match[1]) : null);
+  }, [error]);
+
+  useEffect(() => {
+    if (!rateCountdown || rateCountdown <= 0) {
+      if (rateCountdown === 0) setError(null);
+      return;
+    }
+    const t = setTimeout(() => setRateCountdown(c => c - 1), 1000);
+    return () => clearTimeout(t);
+  }, [rateCountdown]);
 
   const canSubmit = !loading && subject.length > 0;
 
@@ -149,15 +165,14 @@ export default function QuickCreate({ student, onClose, onSaved, remaining, isPr
       goal,
       level: student.level || "medium",
       html: finalHtml,
-    }).select("id").single();
+    }).select("id, share_token").single();
 
     setBookletId(inserted?.id ?? null);
+    setShareToken(inserted?.share_token ?? null);
     setShowRating(true);
     setHtml(finalHtml);
     onSaved?.();
   }, [canSubmit, student, subject, world, specificGoal, pageCount, onSaved]);
-
-  const rateWait = error?.startsWith?.("rate:") ? parseInt(error.split(":")[1]) : null;
 
   if (html) {
     return (
@@ -174,7 +189,7 @@ export default function QuickCreate({ student, onClose, onSaved, remaining, isPr
               <span className="text-xl">✅</span>
               <span>החוברת נוצרה עבור {student.name}!</span>
             </div>
-            <Preview html={html} onReset={onClose} />
+            <Preview html={html} onReset={onClose} shareToken={shareToken} />
           </div>
         )}
       </section>
@@ -267,12 +282,12 @@ export default function QuickCreate({ student, onClose, onSaved, remaining, isPr
         </div>
 
         {/* Errors */}
-        {rateWait && (
+        {rateCountdown > 0 && (
           <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-amber-700 text-sm text-center">
-            ⏳ יש להמתין עוד {rateWait} שניות לפני יצירה נוספת
+            ⏳ יש להמתין עוד {rateCountdown} שניות לפני יצירה נוספת
           </div>
         )}
-        {error && error !== "quota" && !rateWait && (
+        {error && error !== "quota" && !rateCountdown && (
           <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-red-600 text-sm">{error}</div>
         )}
         {error === "quota" && (
@@ -282,7 +297,7 @@ export default function QuickCreate({ student, onClose, onSaved, remaining, isPr
               onClick={() => setShowUpgrade(true)}
               className="w-full bg-gradient-to-l from-brand to-magic text-white rounded-xl p-3.5 font-semibold text-center hover:opacity-90 transition-opacity"
             >
-              🚀 שדרגי לפרו — 30 ₪/חודש
+              🚀 שדרגי — מ-₪19/חודש
             </button>
           </div>
         )}

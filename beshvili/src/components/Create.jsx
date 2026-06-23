@@ -60,7 +60,8 @@ export default function Create({ onSaved, remaining, isPro }) {
   const [bookletId, setBookletId] = useState(null);
   const [shareToken, setShareToken] = useState(null);
   const [showRating, setShowRating] = useState(false);
-  const [error, setError]         = useState(null); // null | "quota" | "rate:{wait}" | "generic:{msg}"
+  const [error, setError]         = useState(null); // null | "quota" | "quota_monthly" | "rate:{wait}" | "generic:{msg}"
+  const [rateCountdown, setRateCountdown] = useState(null);
 
   // Rotate loading messages every 3.5 s while generating
   useEffect(() => {
@@ -68,6 +69,22 @@ export default function Create({ onSaved, remaining, isPro }) {
     const id = setInterval(() => setLoadingMsgIdx(i => (i + 1) % LOADING_MSGS.length), 3500);
     return () => clearInterval(id);
   }, [loading]);
+
+  // Start countdown when rate-limited
+  useEffect(() => {
+    const match = error?.match(/^rate:(\d+)$/);
+    setRateCountdown(match ? parseInt(match[1]) : null);
+  }, [error]);
+
+  // Tick countdown and auto-clear at 0
+  useEffect(() => {
+    if (!rateCountdown || rateCountdown <= 0) {
+      if (rateCountdown === 0) setError(null);
+      return;
+    }
+    const t = setTimeout(() => setRateCountdown(c => c - 1), 1000);
+    return () => clearTimeout(t);
+  }, [rateCountdown]);
 
   const canSubmit = !loading && (
     mode === "free"  ? freeText.trim().length > 5 :
@@ -300,9 +317,6 @@ export default function Create({ onSaved, remaining, isPro }) {
     );
   }
 
-  // ── Rate limited ───────────────────────────────────────────────────────────
-  const rateWait = error?.startsWith("rate:") ? parseInt(error.split(":")[1]) : null;
-
   return (
     <>
     {showUpgrade && <UpgradeModal onClose={() => setShowUpgrade(false)} />}
@@ -460,10 +474,10 @@ export default function Create({ onSaved, remaining, isPro }) {
           </div>
         </label>
 
-        {/* Rate limit error */}
-        {rateWait && (
+        {/* Rate limit countdown */}
+        {rateCountdown > 0 && (
           <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-amber-700 text-sm text-center">
-            ⏳ יש להמתין עוד {rateWait} שניות לפני יצירה נוספת
+            ⏳ יש להמתין עוד {rateCountdown} שניות לפני יצירה נוספת
           </div>
         )}
 

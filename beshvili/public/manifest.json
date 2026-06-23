@@ -1,0 +1,19 @@
+{
+  "name": "בשבילי · חוברות לימוד AI",
+  "short_name": "בשבילי",
+  "description": "יצירת חוברות לימוד מותאמות אישית בעברית בתוך דקה",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#F7F6FB",
+  "theme_color": "#6C5CE7",
+  "lang": "he",
+  "dir": "rtl",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

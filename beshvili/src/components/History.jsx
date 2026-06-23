@@ -5,6 +5,7 @@ import Preview from "./Preview";
 export default function History() {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
 
   useEffect(() => {
     supabase
@@ -19,14 +20,47 @@ export default function History() {
 
   const onDelete = (id) => setItems((prev) => prev.filter((b) => b.id !== id));
 
+  const filtered = search.trim()
+    ? items.filter(b =>
+        b.title?.includes(search) ||
+        b.world?.includes(search) ||
+        b.child_name?.includes(search)
+      )
+    : items;
+
   return (
     <section className="space-y-3">
-      <h2 className="text-xl font-semibold">החוברות שלי</h2>
+      <div className="flex items-center justify-between gap-3">
+        <h2 className="text-xl font-semibold flex-shrink-0">החוברות שלי</h2>
+        {items.length > 3 && (
+          <div className="relative flex-1 max-w-xs">
+            <input
+              type="text"
+              placeholder="🔍 חיפוש..."
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              className="w-full border border-ink/15 rounded-xl p-2 pr-3 text-right bg-white text-sm outline-none focus:border-magic text-ink"
+            />
+            {search && (
+              <button
+                onClick={() => setSearch("")}
+                className="absolute left-2.5 top-1/2 -translate-y-1/2 text-ink/30 hover:text-ink text-lg leading-none"
+              >
+                ×
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+
       {loading && <p className="text-ink/40 text-sm animate-pulse">טוען…</p>}
       {!loading && items.length === 0 && (
         <p className="text-ink/50 text-sm">עדיין אין חוברות. צור את הראשונה למעלה.</p>
       )}
-      {items.map((b) => (
+      {!loading && items.length > 0 && filtered.length === 0 && (
+        <p className="text-ink/40 text-sm text-center py-4">לא נמצאו תוצאות עבור "{search}"</p>
+      )}
+      {filtered.map((b) => (
         <BookletRow key={b.id} booklet={b} onDelete={onDelete} />
       ))}
     </section>
@@ -35,13 +69,15 @@ export default function History() {
 
 function BookletRow({ booklet: b, onDelete }) {
   const [html, setHtml] = useState(null);
+  const [shareToken, setShareToken] = useState(null);
   const [loadingHtml, setLoadingHtml] = useState(false);
 
   const toggle = async () => {
-    if (html) { setHtml(null); return; }
+    if (html) { setHtml(null); setShareToken(null); return; }
     setLoadingHtml(true);
-    const { data } = await supabase.from("booklets").select("html").eq("id", b.id).single();
+    const { data } = await supabase.from("booklets").select("html, share_token").eq("id", b.id).single();
     setHtml(data?.html ?? null);
+    setShareToken(data?.share_token ?? null);
     setLoadingHtml(false);
   };
 
@@ -62,7 +98,7 @@ function BookletRow({ booklet: b, onDelete }) {
         <div className="min-w-0">
           <div className="font-display font-semibold truncate">{b.title}</div>
           <div className="text-sm text-ink/50">
-            {b.world} · {fmtDate(b.created_at)}
+            {[b.world, b.child_name, fmtDate(b.created_at)].filter(Boolean).join(" · ")}
           </div>
         </div>
         <div className="flex gap-2 flex-shrink-0">
@@ -83,7 +119,7 @@ function BookletRow({ booklet: b, onDelete }) {
       </div>
       {html && (
         <div className="border-t border-ink/5 p-4">
-          <Preview html={html} />
+          <Preview html={html} shareToken={shareToken} />
         </div>
       )}
     </div>

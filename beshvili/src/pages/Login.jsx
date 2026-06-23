@@ -5,7 +5,8 @@ const scrollTo = (id) => document.getElementById(id)?.scrollIntoView({ behavior:
 
 export default function Login() {
   const [email, setEmail] = useState("");
-  const [sent, setSent] = useState(false);
+  const [step, setStep]   = useState("email"); // "email" | "verify"
+  const [code, setCode]   = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -20,14 +21,28 @@ export default function Login() {
     setLoading(false);
     if (err) {
       const msg = err.message || "";
-      const isRateLimit = msg.match(/after (\d+) second/) || msg.toLowerCase().includes("rate") || msg.toLowerCase().includes("security");
-      if (isRateLimit) {
-        // OTP was already sent in a previous attempt — show success state
-        setSent(true);
+      // Rate limited = OTP probably sent already → go to verify step
+      const alreadySent = /after \d+ second/i.test(msg) || /rate|security/i.test(msg);
+      if (alreadySent) {
+        setStep("verify");
       } else {
         setError(msg || "שגיאה בשליחה — נסה שנית");
       }
-    } else setSent(true);
+    } else {
+      setStep("verify");
+    }
+  };
+
+  const verify = async () => {
+    if (code.length !== 6) return;
+    setLoading(true);
+    setError("");
+    const { error: err } = await supabase.auth.verifyOtp({ email, token: code, type: "email" });
+    setLoading(false);
+    if (err) {
+      setError(/expired/i.test(err.message) ? "הקוד פג תוקף — שלח שוב" : "קוד שגוי — נסה שנית");
+    }
+    // on success → App.jsx onAuthStateChange fires → Dashboard renders
   };
 
   return (
@@ -214,21 +229,54 @@ export default function Login() {
             <p className="text-ink/50">ההרשמה חינמית — ללא כרטיס אשראי</p>
           </div>
           <div className="bg-canvas rounded-2xl p-6 border border-ink/10 shadow-sm">
-            {sent ? (
-              <div className="space-y-3 text-center">
-                <div className="text-4xl">✉️</div>
-                <p className="text-grow font-semibold">שלחנו קישור למייל שלך!</p>
-                <p className="text-ink/50 text-sm">לחץ על הקישור במייל כדי להיכנס</p>
+            {step === "verify" ? (
+              <div className="space-y-4">
+                <div className="text-center space-y-1">
+                  <div className="text-3xl">✉️</div>
+                  <p className="font-semibold text-ink text-sm">שלחנו מייל ל:</p>
+                  <p className="text-magic font-mono text-sm break-all">{email}</p>
+                </div>
+
+                <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-700 leading-relaxed">
+                  <p><strong>לא קיבלת?</strong> בדוק תיקיית ספאם / קידומי מכירות</p>
+                  <p className="mt-1">הקישור בתוך המייל יכניס אותך ישירות.</p>
+                </div>
+
+                <div>
+                  <p className="text-xs text-ink/50 mb-1.5 text-center font-medium">חלופה: הזן את הקוד בן-6 הספרות מהמייל</p>
+                  <input
+                    className="w-full border border-ink/20 rounded-xl p-3 bg-white text-center outline-none focus:border-magic transition-colors text-xl font-mono tracking-widest"
+                    placeholder="123456"
+                    type="text"
+                    inputMode="numeric"
+                    maxLength={6}
+                    value={code}
+                    onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
+                    onKeyDown={(e) => e.key === "Enter" && code.length === 6 && verify()}
+                    autoFocus
+                  />
+                </div>
+
+                {error && <p className="text-red-500 text-sm text-center">{error}</p>}
+
                 <button
-                  onClick={() => { setSent(false); setEmail(""); }}
-                  className="text-xs text-ink/40 hover:text-ink/60 underline"
+                  onClick={verify}
+                  disabled={loading || code.length !== 6}
+                  className="w-full bg-gradient-to-l from-brand to-magic text-white rounded-xl p-3.5 font-display font-semibold disabled:opacity-50 hover:opacity-90 transition-opacity shadow-sm"
                 >
-                  שלח שוב
+                  {loading ? "מאמת…" : "כניסה →"}
+                </button>
+
+                <button
+                  onClick={() => { setStep("email"); setCode(""); setError(""); }}
+                  className="w-full text-xs text-ink/40 hover:text-ink/60 underline text-center"
+                >
+                  שנה מייל / שלח שוב
                 </button>
               </div>
             ) : (
               <div className="space-y-4">
-                <p className="text-sm text-ink/60 text-center">כניסה / הרשמה — בלי סיסמה, קישור ישיר למייל</p>
+                <p className="text-sm text-ink/60 text-center">כניסה / הרשמה — בלי סיסמה</p>
                 <input
                   className="w-full border border-ink/20 rounded-xl p-3 bg-white text-right outline-none focus:border-magic transition-colors"
                   placeholder="כתובת אימייל"
@@ -236,6 +284,7 @@ export default function Login() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && send()}
+                  autoFocus
                 />
                 {error && <p className="text-red-500 text-sm text-center">{error}</p>}
                 <button
