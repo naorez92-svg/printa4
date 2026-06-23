@@ -20,11 +20,10 @@ export default function Login() {
     setLoading(false);
     if (err) {
       const msg = err.message || "";
-      const waitMatch = msg.match(/after (\d+) second/);
-      if (waitMatch) {
-        setError(`שלחנו מייל לאחרונה — המתן ${waitMatch[1]} שניות ונסה שנית`);
-      } else if (msg.toLowerCase().includes("rate") || msg.toLowerCase().includes("security")) {
-        setError("שלחנו מייל לאחרונה — המתן דקה ונסה שנית");
+      const isRateLimit = msg.match(/after (\d+) second/) || msg.toLowerCase().includes("rate") || msg.toLowerCase().includes("security");
+      if (isRateLimit) {
+        // OTP was already sent in a previous attempt — show success state
+        setSent(true);
       } else {
         setError(msg || "שגיאה בשליחה — נסה שנית");
       }
@@ -69,7 +68,7 @@ export default function Login() {
           >
             ✨ התחל חינם — 2 חוברות במתנה
           </button>
-          <p className="text-xs text-ink/30">ללא כרטיס אשראי · ללא סיסמה · כניסה קלה במייל</p>
+          <p className="text-xs text-ink/30">ללא כרטיס אשראי · ללא סיסמא · כניסה קלה במייל</p>
         </div>
       </section>
 
@@ -103,7 +102,7 @@ export default function Login() {
             {[
               { num: "01", icon: "✍️", title: "מלא פרטי הילד", desc: "שם, כיתה, העולם האהוב, יעד פדגוגי — או פשוט כתוב מה תרצה בחופשיות" },
               { num: "02", icon: "⚡", title: "AI יוצר תוך שניות", desc: "מערכת ה-AI מייצרת חוברת עבודה מלאה עם תרגילים, עמודים ואיור — הכל בעברית" },
-              { num: "03", icon: "🖨️", title: "הדפס ומסור", desc: "לחץ הדפס → שמור כ-PDF — מקבל קובץ A4 מוכן, חסכוני בדיו" },
+              { num: "03", icon: "🖨️", title: "הדפס ומסור", desc: "לחץ הדפס → שמור כע-PDF — מקבל קובץ A4 מוכן, חסכוני בדיו" },
             ].map(({ num, icon, title, desc }) => (
               <div key={num} className="relative bg-white rounded-2xl p-6 border border-ink/5 shadow-sm">
                 <div className="absolute -top-3 right-4 text-xs font-bold text-brand bg-brand/10 rounded-full px-2.5 py-0.5">{num}</div>
@@ -202,7 +201,7 @@ export default function Login() {
               </div>
             ) : (
               <div className="space-y-4">
-                <p className="text-sm text-ink/60 text-center">כניסה / הרשמה — בלי סיסמה, קישור ישיר למייל</p>
+                <p className="text-sm text-ink/60 text-center">כניסה / הרשמה — בלי סיסמא, קישור ישיר למייל</p>
                 <input
                   className="w-full border border-ink/20 rounded-xl p-3 bg-white text-right outline-none focus:border-magic transition-colors"
                   placeholder="כתובת אימייל"
