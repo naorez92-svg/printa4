@@ -1,14 +1,16 @@
 import { createClient } from "jsr:@supabase/supabase-js@2";
 
-// v3 — variable page count + answer key support
+// v4 — monthly pro cap + security fixes
 // ── Commercial limits ────────────────────────────────────────────────────────
-const FREE_BOOKLET_LIMIT = 2;
-const RATE_LIMIT_SECONDS = 60;
+const FREE_BOOKLET_LIMIT = 2;          // free-tier total (lifetime)
+const PRO_MONTHLY_LIMIT  = 20;         // pro-tier per calendar month
+const RATE_LIMIT_SECONDS = 60;         // min gap between generations per user
 const MAX_FREE_TEXT_LEN = 2000;
 const MAX_FIELD_LEN = 500;
 const FREE_MAX_PAGES = 10;
 const PRO_MAX_PAGES = 20;
 
+// Supabase JS client sends apikey + x-client-info — must be in allow list
 const cors = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -105,6 +107,7 @@ const BOOKLET_SYSTEM = `אתה "יוצר החוברות של חני 2.0" — מ�
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
 
+  // Admin Supabase client (service role — bypasses RLS for server checks)
   const admin = createClient(
     Deno.env.get("SUPABASE_URL")!,
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
@@ -112,6 +115,7 @@ Deno.serve(async (req) => {
   );
 
   try {
+    // ── 1. JWT verification ──────────────────────────────────────────────
     const jwt = req.headers.get("authorization")?.replace("Bearer ", "");
     if (!jwt) {
       return new Response(JSON.stringify({ error: "unauthorized" }), { status: 401, headers: cors });
@@ -121,13 +125,18 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: "unauthorized" }), { status: 401, headers: cors });
     }
 
-    const [{ data: profile }, { count: bookletCount }] = await Promise.all([
+    // ── 2. Plan check + quota (server-enforced, cannot be bypassed) ───────
+    const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString();
+    const [{ data: profile }, { count: bookletCount }, { count: monthlyCount }] = await Promise.all([
       admin.from("profiles").select("plan").eq("id", user.id).single(),
       admin.from("booklets").select("*", { count: "exact", head: true }).eq("user_id", user.id),
+      admin.from("booklets").select("*", { count: "exact", head: true }).eq("user_id", user.id).gte("created_at", startOfMonth),
     ]);
 
-    const isPro = profile?.plan === "pro" || profile?.plan === "admin";
-    const usedCount = bookletCount ?? 0;
+    const isAdmin = profile?.plan === "admin";
+    const isPro   = profile?.plan === "pro" || isAdmin;
+    const usedCount    = bookletCount  ?? 0;
+    const usedMonthly  = monthlyCount  ?? 0;
 
     if (!isPro && usedCount >= FREE_BOOKLET_LIMIT) {
       return new Response(
@@ -136,6 +145,15 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Pro monthly cap (admins are exempt)
+    if (isPro && !isAdmin && usedMonthly >= PRO_MONTHLY_LIMIT) {
+      return new Response(
+        JSON.stringify({ error: "quota_exceeded", used: usedMonthly, limit: PRO_MONTHLY_LIMIT, period: "monthly" }),
+        { status: 403, headers: cors }
+      );
+    }
+
+    // ── 3. Rate limiting (1 per 60s per user) ────────────────────────────
     const { data: lastBooklet } = await admin
       .from("booklets")
       .select("created_at")
@@ -154,6 +172,7 @@ Deno.serve(async (req) => {
       }
     }
 
+    // ── 4. Parse + sanitize input ────────────────────────────────────────
     const body = await req.json();
     const clean = (val: unknown, max = MAX_FIELD_LEN): string =>
       String(val ?? "").trim().substring(0, max);
@@ -173,6 +192,7 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: "goal required" }), { status: 400, headers: cors });
     }
 
+    // ── 5. Build AI prompt ───────────────────────────────────────────────
     const apiKey = Deno.env.get("ANTHROPIC_API_KEY");
     if (!apiKey) throw new Error("ANTHROPIC_API_KEY missing");
 
@@ -189,6 +209,7 @@ Deno.serve(async (req) => {
 ${weaknesses ? `חולשות לחיזוק: ${weaknesses}` : ""}${answerKeyNote}
 קוד HTML גולמי בלבד, ללא הסברים.`;
 
+    // ── 6. Generate (streaming — client receives SSE, sees HTML in real time) ──
     const anthropicResp = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: {
@@ -214,7 +235,7 @@ ${weaknesses ? `חולשות לחיזוק: ${weaknesses}` : ""}${answerKeyNote}
         ...cors,
         "content-type": "text/event-stream",
         "cache-control": "no-cache",
-        "x-remaining": String(isPro ? -1 : FREE_BOOKLET_LIMIT - usedCount - 1),
+        "x-remaining": String(isAdmin ? -1 : isPro ? PRO_MONTHLY_LIMIT - usedMonthly - 1 : FREE_BOOKLET_LIMIT - usedCount - 1),
       },
     });
 

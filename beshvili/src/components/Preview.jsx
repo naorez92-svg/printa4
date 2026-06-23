@@ -64,7 +64,7 @@ export default function Preview({ html, onReset }) {
         <iframe
           title="תצוגה מקדימה"
           srcDoc={html}
-          sandbox="allow-same-origin allow-scripts"
+          sandbox="allow-scripts"
           style={{
             width:  `${A4_PX}px`,
             height: `${A4_H}px`,
@@ -77,11 +77,13 @@ export default function Preview({ html, onReset }) {
             left: 0,
           }}
         />
+        {/* Fade-out at bottom to hint scrollability */}
         <div className="absolute bottom-0 inset-x-0 h-10 bg-gradient-to-t from-white/70 to-transparent pointer-events-none" />
       </div>
 
       <p className="text-center text-xs text-ink/30">גלול בתוך התצוגה לצפייה בכל העמודים</p>
 
+      {/* Primary CTA */}
       <button
         onClick={openAndPrint}
         className="w-full flex items-center justify-center gap-2 bg-gradient-to-l from-grow to-grow/80 text-white rounded-2xl p-4 font-display font-semibold text-base hover:opacity-90 transition-opacity shadow-md"
@@ -91,6 +93,7 @@ export default function Preview({ html, onReset }) {
         <span className="text-white/50 text-xs font-normal mr-1">Ctrl+P</span>
       </button>
 
+      {/* Secondary actions */}
       <div className="grid grid-cols-2 gap-2">
         <button
           onClick={shareWhatsApp}
