@@ -8,15 +8,30 @@ import { FREE_LIMIT } from "../hooks/useProfile";
 const WORLDS = ["כדורגל", "גיימינג", "חיות", "חלל", "בישול", "מוזיקה", "סוסים", "נינג'ה", "פוקימון", "מינקראפט"];
 const LEVELS = [["basic", "🌱 בסיסי"], ["medium", "⚡ בינוני"], ["advanced", "🚀 מתקדם"]];
 const TEMPLATES = [
-  { icon: "📖", label: "כיתה א — קריאה",    f: { grade: "כיתה א", world: "חיות",    goal: "קריאת מילים בניקוד מלא ומשפטים פשוטים",             level: "basic"    } },
-  { icon: "➕", label: "כיתה ב — חיבור",   f: { grade: "כיתה ב", world: "כדורגל", goal: "חיבור וחיסור עד 100 ללא מעבר עשרת",                level: "medium"   } },
-  { icon: "✖️", label: "כיתה ג — כפל",     f: { grade: "כיתה ג", world: "גיימינג", goal: "לוח כפל 6, 7, 8 — שינון ויישום",                  level: "medium"   } },
-  { icon: "½",  label: "כיתה ד — שברים",   f: { grade: "כיתה ד", world: "חלל",    goal: "שברים: חצי, שליש, רבע — זיהוי, חיבור, השוואה",    level: "medium"   } },
-  { icon: "📐", label: "כיתה ה — שטח",     f: { grade: "כיתה ה", world: "בישול",  goal: "שטח והיקף: ריבוע, מלבן, משולש",                    level: "advanced" } },
-  { icon: "%",  label: "כיתה ו — אחוזים",  f: { grade: "כיתה ו", world: "מוזיקה", goal: "אחוזים: חישוב, הסקה, בעיות מילוליות",              level: "advanced" } },
-  { icon: "📝", label: "מבחן חצי שנתי",    f: { grade: "",        world: "כללי",   goal: "מבחן חצי שנתי: חשבון, שפה, הבנת הנקרא",            level: "advanced" } },
-  { icon: "🔄", label: "חזרה לפני בחינה",  f: { grade: "",        world: "גיימינג",goal: "חזרה כללית: ארבע פעולות, שברים, אחוזים, בעיות",   level: "medium"   } },
-  { icon: "🌟", label: "העשרה מתקדמת",     f: { grade: "",        world: "חלל",    goal: "חשיבה מתמטית: פאזלים, לוגיקה, חשיבה מחוץ לקופסה", level: "advanced" } },
+  { icon: "📖", label: "הבנת הנקרא ג-ד",   f: { grade: "כיתה ג",  world: "כדורגל",  goal: "הבנת הנקרא: טקסט ספרותי, שאלות הבנה ואוצר מילים",            level: "basic"    } },
+  { icon: "📖", label: "הבנת הנקרא ה-ו",   f: { grade: "כיתה ה",  world: "כדורגל",  goal: "הבנת הנקרא: טקסט ספרותי, שאלות הבנה ואסטרטגיות קריאה",       level: "medium"   } },
+  { icon: "🔢", label: "מספרים עשרוניים",   f: { grade: "כיתה ה",  world: "גיימינג", goal: "מספרים עשרוניים: קריאה, כתיבה, השוואה, חיבור וחיסור",          level: "medium"   } },
+  { icon: "📖", label: "כיתה א — קריאה",   f: { grade: "כיתה א",  world: "חיות",    goal: "קריאת מילים בניקוד מלא ומשפטים פשוטים",                        level: "basic"    } },
+  { icon: "➕", label: "כיתה ב — חיבור",   f: { grade: "כיתה ב",  world: "כדורגל",  goal: "חיבור וחיסור עד 100 ללא מעבר עשרת",                            level: "medium"   } },
+  { icon: "✖️", label: "כיתה ג — כפל",     f: { grade: "כיתה ג",  world: "גיימינג", goal: "לוח כפל 6, 7, 8 — שינון ויישום",                               level: "medium"   } },
+  { icon: "½",  label: "כיתה ד — שברים",   f: { grade: "כיתה ד",  world: "חלל",     goal: "שברים: חצי, שליש, רבע — זיהוי, חיבור, השוואה",                 level: "medium"   } },
+  { icon: "📐", label: "כיתה ה — שטח",     f: { grade: "כיתה ה",  world: "בישול",   goal: "שטח והיקף: ריבוע, מלבן, משולש",                                level: "advanced" } },
+  { icon: "%",  label: "כיתה ו — אחוזים",  f: { grade: "כיתה ו",  world: "מוזיקה",  goal: "אחוזים: חישוב, הסקה, בעיות מילוליות",                          level: "advanced" } },
+  { icon: "📝", label: "מבחן חצי שנתי",    f: { grade: "",         world: "כללי",    goal: "מבחן חצי שנתי: חשבון, שפה, הבנת הנקרא",                        level: "advanced" } },
+  { icon: "🔄", label: "חזרה לפני בחינה",  f: { grade: "",         world: "גיימינג", goal: "חזרה כללית: ארבע פעולות, שברים, אחוזים, בעיות",                level: "medium"   } },
+  { icon: "🌟", label: "העשרה מתקדמת",     f: { grade: "",         world: "חלל",     goal: "חשיבה מתמטית: פאזלים, לוגיקה, חשיבה מחוץ לקופסה",             level: "advanced" } },
+];
+const GOAL_PICKS = [
+  { icon: "📖", label: "הבנת הנקרא",       goal: "הבנת הנקרא: טקסט ספרותי, שאלות הבנה ואוצר מילים" },
+  { icon: "🔢", label: "מספרים עשרוניים",  goal: "מספרים עשרוניים: קריאה, כתיבה, השוואה, חיבור וחיסור" },
+  { icon: "½",  label: "שברים",            goal: "שברים: חיבור, חיסור, השוואה ומספר מעורב" },
+  { icon: "✖️", label: "כפל וחילוק",       goal: "לוח כפל וחילוק: שינון, יישום ובעיות מילוליות" },
+  { icon: "%",  label: "אחוזים",           goal: "אחוזים: מציאת האחוז, מציאת הכמות, בעיות מילוליות" },
+  { icon: "📝", label: "כתיבה יוצרת",      goal: "כתיבה יוצרת: בניית סיפור, תיאור דמויות וסצנה" },
+  { icon: "📐", label: "שטח והיקף",        goal: "שטח והיקף: ריבוע, מלבן, משולש" },
+  { icon: "🔤", label: "דקדוק עברי",       goal: "דקדוק עברי: פועל, שם עצם, שם תואר, זמנים" },
+  { icon: "🔡", label: "קריאה בניקוד",     goal: "קריאה בניקוד: פענוח, הבנת המילה, קריאת משפטים" },
+  { icon: "🔢", label: "חיבור וחיסור",     goal: "חיבור וחיסור: אלגוריתמים, מעבר עשרת, בעיות" },
 ];
 const EMPTY = { childName: "", grade: "", world: "כדורגל", goal: "", level: "medium" };
 const PAGE_OPTIONS = [3, 5, 7, 10];
@@ -44,9 +59,8 @@ export default function Create({ onSaved, remaining, isPro }) {
   const [html, setHtml]           = useState(null);
   const [bookletId, setBookletId] = useState(null);
   const [showRating, setShowRating] = useState(false);
-  const [error, setError]         = useState(null); // null | "quota" | "rate:{wait}" | "generic:{msg}"
+  const [error, setError]         = useState(null);
 
-  // Rotate loading messages every 3.5 s while generating
   useEffect(() => {
     if (!loading) { setLoadingMsgIdx(0); setStreamChars(0); return; }
     const id = setInterval(() => setLoadingMsgIdx(i => (i + 1) % LOADING_MSGS.length), 3500);
@@ -104,7 +118,6 @@ export default function Create({ onSaved, remaining, isPro }) {
       return;
     }
 
-    // Read SSE stream — Anthropic sends content_block_delta events with text chunks
     const reader = resp.body.getReader();
     const decoder = new TextDecoder();
     let buffer = "";
@@ -126,7 +139,6 @@ export default function Create({ onSaved, remaining, isPro }) {
             const ev = JSON.parse(raw);
             if (ev.type === "content_block_delta" && ev.delta?.type === "text_delta") {
               htmlAccumulated += ev.delta.text;
-              // Throttle React state updates to ~10fps
               const now = Date.now();
               if (now - updateTimer > 100) {
                 setStreamChars(htmlAccumulated.length);
@@ -138,7 +150,7 @@ export default function Create({ onSaved, remaining, isPro }) {
       }
     } catch (streamErr) {
       setLoading(false);
-      setError("generic:שגיאה בקבלת הנתונים מהשרת");
+      setError("גנריק:שגיאה בקבלת הנתונים מהשרת");
       return;
     }
 
@@ -181,7 +193,6 @@ export default function Create({ onSaved, remaining, isPro }) {
   const set   = (k) => (e) => setF((p) => ({ ...p, [k]: e.target.value }));
   const applyTmpl = (tmpl) => { setF((p) => ({ ...p, ...tmpl.f })); setMode("form"); setTimeout(() => document.getElementById("inp-name")?.focus(), 50); };
 
-  // ── Quota exceeded screen ──────────────────────────────────────────────────
   if (error === "quota") {
     return (
       <>
@@ -215,7 +226,6 @@ export default function Create({ onSaved, remaining, isPro }) {
     );
   }
 
-  // ── Generated ──────────────────────────────────────────────────────────────
   if (html) {
     return (
       <section className="space-y-4">
@@ -227,7 +237,6 @@ export default function Create({ onSaved, remaining, isPro }) {
           />
         ) : (
           <>
-            {/* Success banner */}
             <div className="bg-gradient-to-l from-grow/15 to-brand/10 border border-grow/20 rounded-2xl px-5 py-4 flex items-center gap-3">
               <span className="text-3xl">🎉</span>
               <div className="flex-1">
@@ -247,14 +256,12 @@ export default function Create({ onSaved, remaining, isPro }) {
     );
   }
 
-  // ── Rate limited ───────────────────────────────────────────────────────────
   const rateWait = error?.startsWith("rate:") ? parseInt(error.split(":")[1]) : null;
 
   return (
     <>
     {showUpgrade && <UpgradeModal onClose={() => setShowUpgrade(false)} />}
     <section className="bg-white rounded-2xl shadow-sm border border-ink/5 overflow-hidden">
-      {/* Header */}
       <div className="bg-gradient-to-l from-magic/10 to-brand/10 px-5 pt-5 pb-4">
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-xl font-semibold">✨ חוברת חדשה</h2>
@@ -273,7 +280,6 @@ export default function Create({ onSaved, remaining, isPro }) {
       </div>
 
       <div className="p-5 space-y-4">
-        {/* Templates */}
         <div>
           <p className="text-xs text-ink/40 mb-2 font-medium uppercase tracking-wide">תבניות מהירות</p>
           <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
@@ -288,7 +294,6 @@ export default function Create({ onSaved, remaining, isPro }) {
 
         <div className="border-t border-ink/5" />
 
-        {/* Form mode */}
         {mode === "form" && (
           <div className="space-y-3">
             <input id="inp-name" className="w-full border border-ink/20 rounded-xl p-3 outline-none focus:border-magic text-right bg-canvas/50" placeholder="שם הילד/ה *" value={f.childName} onChange={set("childName")} disabled={loading} />
@@ -296,7 +301,17 @@ export default function Create({ onSaved, remaining, isPro }) {
             <select className="w-full border border-ink/20 rounded-xl p-3 outline-none focus:border-magic bg-canvas/50 text-right" value={f.world} onChange={set("world")} disabled={loading}>
               {WORLDS.map((w) => <option key={w}>{w}</option>)}
             </select>
-            <textarea className="w-full border border-ink/20 rounded-xl p-3 outline-none focus:border-magic text-right resize-none bg-canvas/50" placeholder="יעד פדגוגי *" rows={2} value={f.goal} onChange={set("goal")} disabled={loading} />
+            <div>
+              <textarea className="w-full border border-ink/20 rounded-xl p-3 outline-none focus:border-magic text-right resize-none bg-canvas/50" placeholder="יעד פדגוגי *" rows={2} value={f.goal} onChange={set("goal")} disabled={loading} />
+              <div className="flex flex-wrap gap-1.5 mt-2">
+                {GOAL_PICKS.map(({ icon, label, goal }) => (
+                  <button key={label} type="button" onClick={() => setF(p => ({ ...p, goal }))} disabled={loading}
+                    className={`text-xs border rounded-full px-2.5 py-1 transition-colors disabled:opacity-30 ${f.goal === goal ? "border-magic text-magic bg-magic/5" : "border-ink/15 text-ink/50 hover:border-magic hover:text-magic"}`}>
+                    {icon} {label}
+                  </button>
+                ))}
+              </div>
+            </div>
             <div className="flex gap-2">
               {LEVELS.map(([v, t]) => (
                 <button key={v} onClick={() => setF((p) => ({ ...p, level: v }))} disabled={loading}
@@ -308,7 +323,6 @@ export default function Create({ onSaved, remaining, isPro }) {
           </div>
         )}
 
-        {/* Quick mode */}
         {mode === "quick" && (
           <div className="space-y-3">
             <div className="bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 text-xs text-amber-700 flex items-center gap-2">
@@ -329,14 +343,24 @@ export default function Create({ onSaved, remaining, isPro }) {
               onChange={set("grade")}
               disabled={loading}
             />
-            <input
-              className="w-full border border-ink/20 rounded-xl p-3 outline-none focus:border-magic text-right bg-canvas/50"
-              placeholder="מה לתרגל? * — למשל: חיבור וחיסור עד 100, קריאה בניקוד..."
-              value={f.goal}
-              onChange={set("goal")}
-              disabled={loading}
-              autoFocus
-            />
+            <div>
+              <input
+                className="w-full border border-ink/20 rounded-xl p-3 outline-none focus:border-magic text-right bg-canvas/50"
+                placeholder="מה לתרגל? * — למשל: חיבור וחיסור עד 100, קריאה בניקוד..."
+                value={f.goal}
+                onChange={set("goal")}
+                disabled={loading}
+                autoFocus
+              />
+              <div className="flex flex-wrap gap-1.5 mt-2">
+                {GOAL_PICKS.map(({ icon, label, goal }) => (
+                  <button key={label} type="button" onClick={() => setF(p => ({ ...p, goal }))} disabled={loading}
+                    className={`text-xs border rounded-full px-2.5 py-1 transition-colors disabled:opacity-30 ${f.goal === goal ? "border-magic text-magic bg-magic/5" : "border-ink/15 text-ink/50 hover:border-magic hover:text-magic"}`}>
+                    {icon} {label}
+                  </button>
+                ))}
+              </div>
+            </div>
             <select
               className="w-full border border-ink/20 rounded-xl p-3 outline-none focus:border-magic bg-canvas/50 text-right"
               value={f.world}
@@ -348,7 +372,6 @@ export default function Create({ onSaved, remaining, isPro }) {
           </div>
         )}
 
-        {/* Free text mode */}
         {mode === "free" && (
           <textarea
             className="w-full border border-ink/20 rounded-xl p-3 outline-none focus:border-magic text-right resize-none bg-canvas/50 leading-relaxed"
@@ -359,7 +382,6 @@ export default function Create({ onSaved, remaining, isPro }) {
 
         <div className="border-t border-ink/5" />
 
-        {/* Page count selector — hidden in quick mode */}
         {mode !== "quick" && <div>
           <p className="text-xs text-ink/40 mb-2 font-medium">כמות עמודים</p>
           <div className="flex gap-2">
@@ -372,7 +394,6 @@ export default function Create({ onSaved, remaining, isPro }) {
           </div>
         </div>}
 
-        {/* Answer key toggle — hidden in quick mode */}
         {mode === "quick" && null}
         <label className="flex items-center justify-between gap-3 cursor-pointer select-none">
           <div>
@@ -387,21 +408,18 @@ export default function Create({ onSaved, remaining, isPro }) {
           </div>
         </label>
 
-        {/* Rate limit error */}
         {rateWait && (
           <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-amber-700 text-sm text-center">
             ⏳ יש להמתין עוד {rateWait} שניות לפני יצירה נוספת
           </div>
         )}
 
-        {/* Generic error */}
         {error?.startsWith("generic:") && (
           <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-red-600 text-sm">
             {error.replace("generic:", "")}
           </div>
         )}
 
-        {/* Submit / loading */}
         {loading ? (
           <div className="text-center py-8 space-y-3">
             <div className="flex justify-center gap-1">
