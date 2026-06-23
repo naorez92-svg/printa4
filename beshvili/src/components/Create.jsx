@@ -95,12 +95,16 @@ export default function Create({ onSaved, remaining, isPro }) {
       return;
     }
 
-    const fnUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-booklet?apikey=${import.meta.env.VITE_SUPABASE_ANON_KEY}`;
+    const fnUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-booklet`;
     let resp;
     try {
       resp = await fetch(fnUrl, {
         method: "POST",
-        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${session.access_token}` },
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${session.access_token}`,
+          "apikey": import.meta.env.VITE_SUPABASE_ANON_KEY,
+        },
         body: JSON.stringify(body),
       });
     } catch (e) {
@@ -113,8 +117,11 @@ export default function Create({ onSaved, remaining, isPro }) {
       const errData = await resp.json().catch(() => ({}));
       const code = errData?.error;
       setLoading(false);
-      if (code === "quota_exceeded") { setError("quota"); return; }
-      if (code === "rate_limited")   { setError(`rate:${errData?.wait ?? 60}`); return; }
+      if (code === "quota_exceeded") {
+        setError(errData?.period === "monthly" ? "quota_monthly" : "quota");
+        return;
+      }
+      if (code === "rate_limited") { setError(`rate:${errData?.wait ?? 60}`); return; }
       setError(`generic:${code || `שגיאת שרת ${resp.status}`}`);
       return;
     }
@@ -195,6 +202,30 @@ export default function Create({ onSaved, remaining, isPro }) {
   const reset = () => { setHtml(null); setF(EMPTY); setFreeText(""); setError(null); setBookletId(null); setShowRating(false); };
   const set   = (k) => (e) => setF((p) => ({ ...p, [k]: e.target.value }));
   const applyTmpl = (tmpl) => { setF((p) => ({ ...p, ...tmpl.f })); setMode("form"); setTimeout(() => document.getElementById("inp-name")?.focus(), 50); };
+
+  // ── Pro monthly quota exceeded ────────────────────────────────────────────
+  if (error === "quota_monthly") {
+    return (
+      <section className="bg-white rounded-2xl p-6 shadow-sm border border-ink/5 text-center space-y-5">
+        <div className="text-5xl">📅</div>
+        <div>
+          <h2 className="text-xl font-bold text-ink mb-1">הגעת ל-20 חוברות החודש!</h2>
+          <p className="text-ink/60 text-sm">המכסה החודשית של פרו מתחדשת בתחילת כל חודש</p>
+          <p className="text-ink/40 text-xs mt-1">צריך יותר? שלחי הודעה ונרחיב את המכסה</p>
+        </div>
+        <a
+          href={`https://wa.me/972509139137?text=${encodeURIComponent("שלום! הגעתי ל-20 חוברות החודש — אפשר להרחיב?")}`}
+          target="_blank" rel="noopener noreferrer"
+          className="block w-full bg-[#25D366] text-white rounded-xl p-3.5 font-display font-semibold hover:opacity-90 transition-opacity shadow-sm"
+        >
+          💬 שלחי הודעה
+        </a>
+        <button onClick={() => setError(null)} className="text-xs text-ink/30 hover:text-ink/50 underline">
+          חזרה
+        </button>
+      </section>
+    );
+  }
 
   // ── Quota exceeded screen ──────────────────────────────────────────────────
   if (error === "quota") {

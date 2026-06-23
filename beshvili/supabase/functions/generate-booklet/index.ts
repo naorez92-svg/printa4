@@ -1,8 +1,9 @@
 import { createClient } from "jsr:@supabase/supabase-js@2";
 
-// v3 — variable page count + answer key support
+// v4 — monthly pro cap + security fixes
 // ── Commercial limits ────────────────────────────────────────────────────────
-const FREE_BOOKLET_LIMIT = 2;          // free-tier total
+const FREE_BOOKLET_LIMIT = 2;          // free-tier total (lifetime)
+const PRO_MONTHLY_LIMIT  = 20;         // pro-tier per calendar month
 const RATE_LIMIT_SECONDS = 60;         // min gap between generations per user
 const MAX_FREE_TEXT_LEN = 2000;
 const MAX_FIELD_LEN = 500;
@@ -125,17 +126,29 @@ Deno.serve(async (req) => {
     }
 
     // ── 2. Plan check + quota (server-enforced, cannot be bypassed) ───────
-    const [{ data: profile }, { count: bookletCount }] = await Promise.all([
+    const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString();
+    const [{ data: profile }, { count: bookletCount }, { count: monthlyCount }] = await Promise.all([
       admin.from("profiles").select("plan").eq("id", user.id).single(),
       admin.from("booklets").select("*", { count: "exact", head: true }).eq("user_id", user.id),
+      admin.from("booklets").select("*", { count: "exact", head: true }).eq("user_id", user.id).gte("created_at", startOfMonth),
     ]);
 
-    const isPro = profile?.plan === "pro" || profile?.plan === "admin";
-    const usedCount = bookletCount ?? 0;
+    const isAdmin = profile?.plan === "admin";
+    const isPro   = profile?.plan === "pro" || isAdmin;
+    const usedCount    = bookletCount  ?? 0;
+    const usedMonthly  = monthlyCount  ?? 0;
 
     if (!isPro && usedCount >= FREE_BOOKLET_LIMIT) {
       return new Response(
         JSON.stringify({ error: "quota_exceeded", used: usedCount, limit: FREE_BOOKLET_LIMIT }),
+        { status: 403, headers: cors }
+      );
+    }
+
+    // Pro monthly cap (admins are exempt)
+    if (isPro && !isAdmin && usedMonthly >= PRO_MONTHLY_LIMIT) {
+      return new Response(
+        JSON.stringify({ error: "quota_exceeded", used: usedMonthly, limit: PRO_MONTHLY_LIMIT, period: "monthly" }),
         { status: 403, headers: cors }
       );
     }
@@ -222,7 +235,7 @@ ${weaknesses ? `חולשות לחיזוק: ${weaknesses}` : ""}${answerKeyNote}
         ...cors,
         "content-type": "text/event-stream",
         "cache-control": "no-cache",
-        "x-remaining": String(isPro ? -1 : FREE_BOOKLET_LIMIT - usedCount - 1),
+        "x-remaining": String(isAdmin ? -1 : isPro ? PRO_MONTHLY_LIMIT - usedMonthly - 1 : FREE_BOOKLET_LIMIT - usedCount - 1),
       },
     });
 

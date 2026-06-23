@@ -64,7 +64,7 @@ export default function Preview({ html, onReset }) {
         <iframe
           title="תצוגה מקדימה"
           srcDoc={html}
-          sandbox="allow-same-origin allow-scripts"
+          sandbox="allow-scripts"
           style={{
             width:  `${A4_PX}px`,
             height: `${A4_H}px`,
