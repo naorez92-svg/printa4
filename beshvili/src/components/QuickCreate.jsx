@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect } from "react";
 import { supabase } from "../lib/supabase";
 import Preview from "./Preview";
+import BookletRating from "./BookletRating";
 import UpgradeModal from "./UpgradeModal";
 import { FREE_LIMIT } from "../hooks/useProfile";
 
@@ -36,6 +37,8 @@ export default function QuickCreate({ student, onClose, onSaved, remaining, isPr
   const [loadingMsgIdx, setLoadingMsgIdx] = useState(0);
   const [streamChars, setStreamChars] = useState(0);
   const [html, setHtml]             = useState(null);
+  const [bookletId, setBookletId]   = useState(null);
+  const [showRating, setShowRating] = useState(false);
   const [error, setError]           = useState(null);
 
   useEffect(() => {
@@ -136,7 +139,7 @@ export default function QuickCreate({ student, onClose, onSaved, remaining, isPr
     if (!finalHtml || !finalHtml.includes("<")) { setError("לא התקבל HTML תקין מהשרת"); return; }
 
     const { data: { user } } = await supabase.auth.getUser();
-    await supabase.from("booklets").insert({
+    const { data: inserted } = await supabase.from("booklets").insert({
       user_id: user.id,
       child_id: student.id,
       title: `${student.name} — ${goal}`,
@@ -146,8 +149,10 @@ export default function QuickCreate({ student, onClose, onSaved, remaining, isPr
       goal,
       level: student.level || "medium",
       html: finalHtml,
-    });
+    }).select("id").single();
 
+    setBookletId(inserted?.id ?? null);
+    setShowRating(true);
     setHtml(finalHtml);
     onSaved?.();
   }, [canSubmit, student, subject, world, specificGoal, pageCount, onSaved]);
@@ -156,12 +161,22 @@ export default function QuickCreate({ student, onClose, onSaved, remaining, isPr
 
   if (html) {
     return (
-      <section className="space-y-4 bg-white rounded-2xl p-5 shadow-sm border border-green-100">
-        <div className="flex items-center gap-2 text-green-700 font-medium">
-          <span className="text-xl">✅</span>
-          <span>החוברת נוצרה עבור {student.name}!</span>
-        </div>
-        <Preview html={html} onReset={onClose} />
+      <section className="space-y-4">
+        {showRating && bookletId ? (
+          <BookletRating
+            bookletId={bookletId}
+            studentName={student.name}
+            onDone={() => setShowRating(false)}
+          />
+        ) : (
+          <div className="bg-white rounded-2xl p-5 shadow-sm border border-green-100">
+            <div className="flex items-center gap-2 text-green-700 font-medium mb-4">
+              <span className="text-xl">✅</span>
+              <span>החוברת נוצרה עבור {student.name}!</span>
+            </div>
+            <Preview html={html} onReset={onClose} />
+          </div>
+        )}
       </section>
     );
   }
