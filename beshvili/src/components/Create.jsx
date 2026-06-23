@@ -1,10 +1,8 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "../lib/supabase";
 import Preview from "./Preview";
+import UpgradeModal from "./UpgradeModal";
 import { FREE_LIMIT } from "../hooks/useProfile";
-
-// Contact link for upgrade — replace with actual WhatsApp/payment link
-const UPGRADE_LINK = "https://wa.me/972509139137?text=" + encodeURIComponent("שלום! אני רוצה לשדרג לבשבילי פרו 🎉");
 
 const WORLDS = ["כדורגל", "גיימינג", "חיות", "חלל", "בישול", "מוזיקה", "סוסים", "נינג'ה", "פוקימון", "מינקראפט"];
 const LEVELS = [["basic", "🌱 בסיסי"], ["medium", "⚡ בינוני"], ["advanced", "🚀 מתקדם"]];
@@ -33,6 +31,7 @@ const LOADING_MSGS = [
 ];
 
 export default function Create({ onSaved, remaining, isPro }) {
+  const [showUpgrade, setShowUpgrade] = useState(false);
   const [mode, setMode]           = useState("form");
   const [f, setF]                 = useState(EMPTY);
   const [freeText, setFreeText]   = useState("");
@@ -42,15 +41,20 @@ export default function Create({ onSaved, remaining, isPro }) {
   const [loadingMsgIdx, setLoadingMsgIdx] = useState(0);
   const [streamChars, setStreamChars] = useState(0);
   const [html, setHtml]           = useState(null);
-  const [error, setError]         = useState(null);
+  const [error, setError]         = useState(null); // null | "quota" | "rate:{wait}" | "generic:{msg}"
 
+  // Rotate loading messages every 3.5 s while generating
   useEffect(() => {
     if (!loading) { setLoadingMsgIdx(0); setStreamChars(0); return; }
     const id = setInterval(() => setLoadingMsgIdx(i => (i + 1) % LOADING_MSGS.length), 3500);
     return () => clearInterval(id);
   }, [loading]);
 
-  const canSubmit = !loading && (mode === "free" ? freeText.trim().length > 5 : f.childName.trim() && f.goal.trim());
+  const canSubmit = !loading && (
+    mode === "free"  ? freeText.trim().length > 5 :
+    mode === "quick" ? f.goal.trim().length > 2 :
+    f.childName.trim() && f.goal.trim()
+  );
 
   const create = useCallback(async () => {
     if (!canSubmit) return;
@@ -58,8 +62,12 @@ export default function Create({ onSaved, remaining, isPro }) {
     setHtml(null);
     setError(null);
 
+    const quickText = `דף תרגיל מהיר${f.childName ? ` עבור ${f.childName.trim()}` : ""}${f.grade ? `, כיתה ${f.grade}` : ""}. נושא: ${f.goal.trim()}${f.world ? `, עולם תוכן: ${f.world}` : ""}. צור עמוד A4 אחד עם 8–12 תרגילים מגוונים ומהנים. ללא שער ורפלקציה. קוד HTML גולמי בלבד.`;
+
     const body = mode === "free"
       ? { freeText: freeText.trim(), pageCount, withAnswerKey }
+      : mode === "quick"
+      ? { freeText: quickText, pageCount: 1, withAnswerKey: false }
       : { ...f, pageCount, withAnswerKey };
 
     const { data: { session } } = await supabase.auth.getSession();
@@ -93,6 +101,7 @@ export default function Create({ onSaved, remaining, isPro }) {
       return;
     }
 
+    // Read SSE stream — Anthropic sends content_block_delta events with text chunks
     const reader = resp.body.getReader();
     const decoder = new TextDecoder();
     let buffer = "";
@@ -114,6 +123,7 @@ export default function Create({ onSaved, remaining, isPro }) {
             const ev = JSON.parse(raw);
             if (ev.type === "content_block_delta" && ev.delta?.type === "text_delta") {
               htmlAccumulated += ev.delta.text;
+              // Throttle React state updates to ~10fps
               const now = Date.now();
               if (now - updateTimer > 100) {
                 setStreamChars(htmlAccumulated.length);
@@ -136,6 +146,8 @@ export default function Create({ onSaved, remaining, isPro }) {
 
     const title = mode === "free"
       ? freeText.trim().substring(0, 60) + (freeText.length > 60 ? "…" : "")
+      : mode === "quick"
+      ? `⚡ ${f.goal.trim().substring(0, 50)}`
       : `${f.childName} — ${f.goal}`;
 
     const { data: u } = await supabase.auth.getUser();
@@ -164,44 +176,55 @@ export default function Create({ onSaved, remaining, isPro }) {
   const set   = (k) => (e) => setF((p) => ({ ...p, [k]: e.target.value }));
   const applyTmpl = (tmpl) => { setF((p) => ({ ...p, ...tmpl.f })); setMode("form"); setTimeout(() => document.getElementById("inp-name")?.focus(), 50); };
 
+  // ── Quota exceeded screen ──────────────────────────────────────────────────
   if (error === "quota") {
     return (
-      <section className="bg-white rounded-2xl p-6 shadow-sm border border-ink/5 text-center space-y-5">
-        <div className="text-5xl">🔒</div>
-        <div>
-          <h2 className="text-xl font-bold text-ink mb-1">ניצלת את {FREE_LIMIT} החוברות החינמיות!</h2>
-          <p className="text-ink/60 text-sm">שדרג לפרו וקבל חוברות ללא הגבלה — 30 ₪/חודש בלבד</p>
-        </div>
-        <div className="bg-canvas rounded-2xl p-4 space-y-2 text-right">
-          {["חוברות ללא הגבלה", "עד 20 עמודים בחוברת", "מפתח תשובות אוטומטי", "שמירה בענן — גישה מכל מכשיר", "תמיכה אישית"].map((f) => (
-            <div key={f} className="flex items-center gap-2 text-sm text-ink/70">
-              <span className="text-grow">✓</span> {f}
-            </div>
-          ))}
-        </div>
-        <a
-          href={UPGRADE_LINK}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="block w-full bg-gradient-to-l from-brand to-magic text-white rounded-xl p-3.5 font-display font-semibold hover:opacity-90 transition-opacity shadow-sm"
-        >
-          💬 שדרג עכשיו — 30 ₪/חודש
-        </a>
-        <button onClick={() => setError(null)} className="text-xs text-ink/30 hover:text-ink/50 underline">
-          חזור (למי שכבר שדרג)
-        </button>
-      </section>
+      <>
+        {showUpgrade && <UpgradeModal onClose={() => setShowUpgrade(false)} />}
+        <section className="bg-white rounded-2xl p-6 shadow-sm border border-ink/5 text-center space-y-5">
+          <div className="text-5xl">🔒</div>
+          <div>
+            <h2 className="text-xl font-bold text-ink mb-1">ניצלת את {FREE_LIMIT} החוברות החינמיות!</h2>
+            <p className="text-ink/60 text-sm">שדרגי לפרו וקבלי חוברות ללא הגבלה — 30 ₪/חודש בלבד</p>
+          </div>
+
+          <div className="bg-canvas rounded-2xl p-4 space-y-2 text-right">
+            {["חוברות ללא הגבלה", "עד 20 עמודים בחוברת", "מפתח תשובות אוטומטי", "שמירה בענן — גישה מכל מכשיר", "תמיכה אישית"].map((f) => (
+              <div key={f} className="flex items-center gap-2 text-sm text-ink/70">
+                <span className="text-grow">✓</span> {f}
+              </div>
+            ))}
+          </div>
+
+          <button
+            onClick={() => setShowUpgrade(true)}
+            className="block w-full bg-gradient-to-l from-brand to-magic text-white rounded-xl p-3.5 font-display font-semibold hover:opacity-90 transition-opacity shadow-sm"
+          >
+            🚀 שדרגי עכשיו — 30 ₪/חודש
+          </button>
+          <button onClick={() => setError(null)} className="text-xs text-ink/30 hover:text-ink/50 underline">
+            חזרה (למי שכבר שדרגה)
+          </button>
+        </section>
+      </>
     );
   }
 
+  // ── Generated ──────────────────────────────────────────────────────────────
   if (html) {
     return (
-      <section className="space-y-4 bg-white rounded-2xl p-5 shadow-sm border border-green-100">
-        <div className="flex items-center gap-2 text-green-700 font-medium">
-          <span className="text-xl">✅</span>
-          <span>החוברת נוצרה ונשמרה בענן!</span>
+      <section className="space-y-4">
+        {/* Success banner */}
+        <div className="bg-gradient-to-l from-grow/15 to-brand/10 border border-grow/20 rounded-2xl px-5 py-4 flex items-center gap-3">
+          <span className="text-3xl">🎉</span>
+          <div className="flex-1">
+            <p className="font-bold text-ink text-base">החוברת מוכנה!</p>
+            <p className="text-xs text-ink/50 mt-0.5">נשמרה בענן · מוכנה להדפסה או שיתוף</p>
+          </div>
           {!isPro && remaining !== undefined && (
-            <span className="mr-auto text-xs text-ink/40">{remaining} חוברות חינם נותרו</span>
+            <span className="text-xs text-ink/40 bg-white rounded-full px-2.5 py-1 border border-ink/10">
+              {remaining} נותרו
+            </span>
           )}
         </div>
         <Preview html={html} onReset={reset} />
@@ -209,10 +232,14 @@ export default function Create({ onSaved, remaining, isPro }) {
     );
   }
 
+  // ── Rate limited ───────────────────────────────────────────────────────────
   const rateWait = error?.startsWith("rate:") ? parseInt(error.split(":")[1]) : null;
 
   return (
+    <>
+    {showUpgrade && <UpgradeModal onClose={() => setShowUpgrade(false)} />}
     <section className="bg-white rounded-2xl shadow-sm border border-ink/5 overflow-hidden">
+      {/* Header */}
       <div className="bg-gradient-to-l from-magic/10 to-brand/10 px-5 pt-5 pb-4">
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-xl font-semibold">✨ חוברת חדשה</h2>
@@ -221,7 +248,7 @@ export default function Create({ onSaved, remaining, isPro }) {
           )}
         </div>
         <div className="flex gap-1 bg-white/70 rounded-xl p-1 w-fit">
-          {[["form", "📋 טופס"], ["free", "✍️ טקסט חופשי"]].map(([m, label]) => (
+          {[["form", "📋 טופס"], ["quick", "⚡ דף מהיר"], ["free", "✍️ חופשי"]].map(([m, label]) => (
             <button key={m} onClick={() => setMode(m)}
               className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all ${mode === m ? "bg-white shadow text-ink" : "text-ink/50 hover:text-ink"}`}>
               {label}
@@ -231,6 +258,7 @@ export default function Create({ onSaved, remaining, isPro }) {
       </div>
 
       <div className="p-5 space-y-4">
+        {/* Templates */}
         <div>
           <p className="text-xs text-ink/40 mb-2 font-medium uppercase tracking-wide">תבניות מהירות</p>
           <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
@@ -245,6 +273,7 @@ export default function Create({ onSaved, remaining, isPro }) {
 
         <div className="border-t border-ink/5" />
 
+        {/* Form mode */}
         {mode === "form" && (
           <div className="space-y-3">
             <input id="inp-name" className="w-full border border-ink/20 rounded-xl p-3 outline-none focus:border-magic text-right bg-canvas/50" placeholder="שם הילד/ה *" value={f.childName} onChange={set("childName")} disabled={loading} />
@@ -264,6 +293,47 @@ export default function Create({ onSaved, remaining, isPro }) {
           </div>
         )}
 
+        {/* Quick mode */}
+        {mode === "quick" && (
+          <div className="space-y-3">
+            <div className="bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 text-xs text-amber-700 flex items-center gap-2">
+              <span>⚡</span>
+              <span>דף תרגיל אחד · ~30 שניות · מושלם לשיעורי בית מהירים</span>
+            </div>
+            <input
+              className="w-full border border-ink/20 rounded-xl p-3 outline-none focus:border-magic text-right bg-canvas/50"
+              placeholder="שם הילד/ה (אופציונלי)"
+              value={f.childName}
+              onChange={set("childName")}
+              disabled={loading}
+            />
+            <input
+              className="w-full border border-ink/20 rounded-xl p-3 outline-none focus:border-magic text-right bg-canvas/50"
+              placeholder="כיתה (אופציונלי) — כיתה ב, כיתה ד..."
+              value={f.grade}
+              onChange={set("grade")}
+              disabled={loading}
+            />
+            <input
+              className="w-full border border-ink/20 rounded-xl p-3 outline-none focus:border-magic text-right bg-canvas/50"
+              placeholder="מה לתרגל? * — למשל: חיבור וחיסור עד 100, קריאה בניקוד..."
+              value={f.goal}
+              onChange={set("goal")}
+              disabled={loading}
+              autoFocus
+            />
+            <select
+              className="w-full border border-ink/20 rounded-xl p-3 outline-none focus:border-magic bg-canvas/50 text-right"
+              value={f.world}
+              onChange={set("world")}
+              disabled={loading}
+            >
+              {WORLDS.map((w) => <option key={w}>{w}</option>)}
+            </select>
+          </div>
+        )}
+
+        {/* Free text mode */}
         {mode === "free" && (
           <textarea
             className="w-full border border-ink/20 rounded-xl p-3 outline-none focus:border-magic text-right resize-none bg-canvas/50 leading-relaxed"
@@ -274,7 +344,8 @@ export default function Create({ onSaved, remaining, isPro }) {
 
         <div className="border-t border-ink/5" />
 
-        <div>
+        {/* Page count selector — hidden in quick mode */}
+        {mode !== "quick" && <div>
           <p className="text-xs text-ink/40 mb-2 font-medium">כמות עמודים</p>
           <div className="flex gap-2">
             {PAGE_OPTIONS.map((n) => (
@@ -284,8 +355,10 @@ export default function Create({ onSaved, remaining, isPro }) {
               </button>
             ))}
           </div>
-        </div>
+        </div>}
 
+        {/* Answer key toggle — hidden in quick mode */}
+        {mode === "quick" && null}
         <label className="flex items-center justify-between gap-3 cursor-pointer select-none">
           <div>
             <span className="text-sm font-medium text-ink">מפתח תשובות</span>
@@ -299,18 +372,21 @@ export default function Create({ onSaved, remaining, isPro }) {
           </div>
         </label>
 
+        {/* Rate limit error */}
         {rateWait && (
           <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-amber-700 text-sm text-center">
             ⏳ יש להמתין עוד {rateWait} שניות לפני יצירה נוספת
           </div>
         )}
 
+        {/* Generic error */}
         {error?.startsWith("generic:") && (
           <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-red-600 text-sm">
             {error.replace("generic:", "")}
           </div>
         )}
 
+        {/* Submit / loading */}
         {loading ? (
           <div className="text-center py-8 space-y-3">
             <div className="flex justify-center gap-1">
@@ -321,7 +397,7 @@ export default function Create({ onSaved, remaining, isPro }) {
             <p className="text-ink/60 text-sm font-medium">{LOADING_MSGS[loadingMsgIdx]}</p>
             {streamChars > 0
               ? <p className="text-magic text-xs font-mono">{streamChars.toLocaleString("he-IL")} תווים נכתבו...</p>
-              : <p className="text-ink/30 text-xs">{pageCount} עמודי A4 · 30–90 שניות</p>
+              : <p className="text-ink/30 text-xs">{mode === "quick" ? "עמוד A4 אחד · ~30 שניות" : `${pageCount} עמודי A4 · 30–90 שניות`}</p>
             }
             <div className="w-full bg-canvas rounded-full h-1.5 overflow-hidden">
               {streamChars > 0
@@ -332,22 +408,21 @@ export default function Create({ onSaved, remaining, isPro }) {
             </div>
           </div>
         ) : (!isPro && remaining === 0) ? (
-          <a
-            href={UPGRADE_LINK}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="block w-full bg-gradient-to-l from-brand to-magic text-white rounded-xl p-3.5 font-display font-semibold text-center hover:opacity-90 transition-opacity shadow-sm"
+          <button
+            onClick={() => setShowUpgrade(true)}
+            className="w-full bg-gradient-to-l from-brand to-magic text-white rounded-xl p-3.5 font-display font-semibold hover:opacity-90 transition-opacity shadow-sm"
           >
-            💬 שדרג לפרו להמשיך
-          </a>
+            🚀 שדרגי לפרו להמשיך
+          </button>
         ) : (
           <button onClick={create} disabled={!canSubmit}
             className="w-full bg-gradient-to-l from-brand to-magic text-white rounded-xl p-3.5 font-display font-semibold disabled:opacity-40 hover:opacity-90 transition-opacity shadow-sm">
-            ✨ צור חוברת ({pageCount} עמ')
+            {mode === "quick" ? "⚡ צור דף מהיר (עמוד אחד)" : `✨ צור חוברת (${pageCount} עמ')`}
             {canSubmit && <span className="mr-2 text-white/60 text-xs font-normal">Ctrl+Enter</span>}
           </button>
         )}
       </div>
     </section>
+    </>
   );
 }

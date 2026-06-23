@@ -1,9 +1,8 @@
 import { useState, useCallback, useEffect } from "react";
 import { supabase } from "../lib/supabase";
 import Preview from "./Preview";
+import UpgradeModal from "./UpgradeModal";
 import { FREE_LIMIT } from "../hooks/useProfile";
-
-const UPGRADE_LINK = "https://wa.me/972509139137?text=" + encodeURIComponent("שלום! אני רוצה לשדרג לבשבילי פרו 🎉");
 
 const SUBJECTS = [
   ["חשבון", "➕"],
@@ -27,9 +26,10 @@ const LOADING_MSGS = [
   "כמעט מוכן! עוד רגע...",
 ];
 
-export default function QuickCreate({ student, onClose, onSaved, remaining, isPro }) {
-  const [subject, setSubject]       = useState("");
-  const [world, setWorld]           = useState("כדורגל");
+export default function QuickCreate({ student, onClose, onSaved, remaining, isPro, initialSubject = "", initialWorld = "כדורגל" }) {
+  const [showUpgrade, setShowUpgrade] = useState(false);
+  const [subject, setSubject]       = useState(initialSubject);
+  const [world, setWorld]           = useState(initialWorld);
   const [specificGoal, setSpecificGoal] = useState("");
   const [pageCount, setPageCount]   = useState(5);
   const [loading, setLoading]       = useState(false);
@@ -77,7 +77,10 @@ export default function QuickCreate({ student, onClose, onSaved, remaining, isPr
     try {
       resp = await fetch(fnUrl, {
         method: "POST",
-        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${session.access_token}` },
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${session.access_token}`,
+        },
         body: JSON.stringify(body),
       });
     } catch (e) {
@@ -164,7 +167,10 @@ export default function QuickCreate({ student, onClose, onSaved, remaining, isPr
   }
 
   return (
+    <>
+    {showUpgrade && <UpgradeModal onClose={() => setShowUpgrade(false)} />}
     <div className="bg-white rounded-2xl shadow-sm border border-ink/5 overflow-hidden">
+      {/* Header */}
       <div className="bg-gradient-to-l from-magic/10 to-brand/10 px-5 pt-5 pb-4">
         <div className="flex items-start justify-between gap-3">
           <div>
@@ -181,6 +187,7 @@ export default function QuickCreate({ student, onClose, onSaved, remaining, isPr
       </div>
 
       <div className="p-5 space-y-4">
+        {/* Subject chips */}
         <div>
           <p className="text-xs text-ink/40 mb-2 font-medium uppercase tracking-wide">מקצוע *</p>
           <div className="flex gap-2 flex-wrap">
@@ -201,6 +208,7 @@ export default function QuickCreate({ student, onClose, onSaved, remaining, isPr
           </div>
         </div>
 
+        {/* World (interest) */}
         <div>
           <p className="text-xs text-ink/40 mb-2 font-medium uppercase tracking-wide">עולם תוכן (אינטרס)</p>
           <select
@@ -213,6 +221,7 @@ export default function QuickCreate({ student, onClose, onSaved, remaining, isPr
           </select>
         </div>
 
+        {/* Optional specific goal */}
         <input
           className="w-full border border-ink/20 rounded-xl p-3 outline-none focus:border-magic text-right bg-canvas/50 text-sm"
           placeholder={`יעד ספציפי (אופציונלי) — למשל: "חיבור וחיסור עד 100"`}
@@ -221,6 +230,7 @@ export default function QuickCreate({ student, onClose, onSaved, remaining, isPr
           disabled={loading}
         />
 
+        {/* Page count */}
         <div>
           <p className="text-xs text-ink/40 mb-2 font-medium">כמות עמודים</p>
           <div className="flex gap-2">
@@ -241,6 +251,7 @@ export default function QuickCreate({ student, onClose, onSaved, remaining, isPr
           </div>
         </div>
 
+        {/* Errors */}
         {rateWait && (
           <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-amber-700 text-sm text-center">
             ⏳ יש להמתין עוד {rateWait} שניות לפני יצירה נוספת
@@ -252,13 +263,16 @@ export default function QuickCreate({ student, onClose, onSaved, remaining, isPr
         {error === "quota" && (
           <div className="space-y-3">
             <p className="text-ink/60 text-sm text-center">ניצלת את {FREE_LIMIT} החוברות החינמיות</p>
-            <a href={UPGRADE_LINK} target="_blank" rel="noopener noreferrer"
-              className="block w-full bg-gradient-to-l from-brand to-magic text-white rounded-xl p-3.5 font-semibold text-center hover:opacity-90 transition-opacity">
-              💬 שדרג לפרו — 30 ₪/חודש
-            </a>
+            <button
+              onClick={() => setShowUpgrade(true)}
+              className="w-full bg-gradient-to-l from-brand to-magic text-white rounded-xl p-3.5 font-semibold text-center hover:opacity-90 transition-opacity"
+            >
+              🚀 שדרגי לפרו — 30 ₪/חודש
+            </button>
           </div>
         )}
 
+        {/* Loading */}
         {loading && (
           <div className="text-center py-8 space-y-3">
             <div className="flex justify-center gap-1">
@@ -281,6 +295,7 @@ export default function QuickCreate({ student, onClose, onSaved, remaining, isPr
           </div>
         )}
 
+        {/* Submit */}
         {!loading && error !== "quota" && (
           <button
             onClick={create}
@@ -292,5 +307,6 @@ export default function QuickCreate({ student, onClose, onSaved, remaining, isPr
         )}
       </div>
     </div>
+    </>
   );
 }
