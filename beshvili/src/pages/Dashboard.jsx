@@ -2,6 +2,7 @@ import { useState } from "react";
 import { supabase } from "../lib/supabase";
 import Create from "../components/Create";
 import History from "../components/History";
+import Students from "../components/Students";
 import { useProfile, FREE_LIMIT } from "../hooks/useProfile";
 
 export default function Dashboard() {
@@ -16,6 +17,7 @@ export default function Dashboard() {
             <span className="text-2xl">📚</span>
             <span className="font-bold text-ink text-lg font-display">בשבילי<span className="text-brand">·</span></span>
           </div>
+
           <div className="flex items-center gap-3">
             {!loading && (
               isPro ? (
@@ -52,7 +54,7 @@ export default function Dashboard() {
         )}
 
         <div className="max-w-2xl mx-auto px-5 pb-3 flex gap-1">
-          {[["create", "✨ צור חוברת"], ["history", "📂 החוברות שלי"]].map(([id, label]) => (
+          {[["create", "✨ צור חוברת"], ["students", "👥 תלמידים"], ["history", "📂 החוברות שלי"]].map(([id, label]) => (
             <button
               key={id}
               onClick={() => setTab(id)}
@@ -70,6 +72,13 @@ export default function Dashboard() {
         {tab === "create" && (
           <Create
             onSaved={() => { refresh(); }}
+            remaining={remaining}
+            isPro={isPro}
+          />
+        )}
+        {tab === "students" && (
+          <Students
+            onBookletSaved={() => { refresh(); setTab("history"); }}
             remaining={remaining}
             isPro={isPro}
           />
