@@ -2,7 +2,8 @@ import { useState } from "react";
 import { supabase } from "../lib/supabase";
 
 const WA = "972509139137";
-// Replace with your actual PayBox payment link from payboxapp.com
+const BIT_PHONE = "0509139137";
+// Replace with your actual PayBox payment link from payboxapp.com dashboard
 const PAYBOX_LINK = "https://payboxapp.page.link/YOUR_PAYBOX_LINK";
 
 const FEATURES = [
@@ -32,10 +33,18 @@ export default function UpgradeModal({ onClose }) {
     }
   };
 
+  const payWithBit = async () => {
+    await saveLead();
+    const msg = encodeURIComponent(`שלום! אני רוצה לשדרג לבשבילי פרו 🚀\nשלחתי 30 ₪ בביט${name.trim() ? `\nשם: ${name.trim()}` : ""}`);
+    // Open Bit app deep link, fallback to WhatsApp instructions
+    window.open(`https://wa.me/${WA}?text=${msg}`, "_blank");
+    setSent("bit");
+  };
+
   const payWithPayBox = async () => {
     await saveLead();
     window.open(PAYBOX_LINK, "_blank");
-    setSent(true);
+    setSent("paybox");
   };
 
   const sendWhatsApp = async () => {
@@ -44,7 +53,7 @@ export default function UpgradeModal({ onClose }) {
     if (name.trim())  parts.push(`שם: ${name.trim()}`);
     if (phone.trim()) parts.push(`טלפון: ${phone.trim()}`);
     window.open(`https://wa.me/${WA}?text=${encodeURIComponent(parts.join("\n"))}`, "_blank");
-    setSent(true);
+    setSent("wa");
   };
 
   return (
@@ -73,51 +82,69 @@ export default function UpgradeModal({ onClose }) {
         </ul>
 
         {sent ? (
-          <div className="text-center py-3 space-y-2">
-            <div className="text-4xl">🎉</div>
-            <p className="font-semibold text-ink">תודה! העברנו אותך לתשלום</p>
-            <p className="text-sm text-ink/50">אחרי התשלום נפעיל לך פרו תוך שעה · יש שאלה? שלחי וואטסאפ</p>
-            <button
-              onClick={onClose}
-              className="text-xs text-ink/40 underline hover:text-ink/60"
+          <div className="text-center py-3 space-y-3">
+            <div className="text-4xl">{sent === "bit" ? "💙" : "🎉"}</div>
+            <p className="font-semibold text-ink">
+              {sent === "bit" ? "תשלחי 30 ₪ בביט למספר:" : "תודה! העברנו אותך לתשלום"}
+            </p>
+            {sent === "bit" && (
+              <p className="text-2xl font-bold text-brand tracking-widest">{BIT_PHONE}</p>
+            )}
+            <p className="text-sm text-ink/50">
+              {sent === "bit"
+                ? "אחרי ששלחת — שלחי לנו וואטסאפ ונפעיל תוך שעה"
+                : "אחרי התשלום שלחי לנו וואטסאפ ונפעיל תוך שעה"}
+            </p>
+            <a
+              href={`https://wa.me/${WA}?text=${encodeURIComponent("שלום! שלחתי 30 ₪, אפשר להפעיל פרו? 🙏")}`}
+              target="_blank" rel="noopener noreferrer"
+              className="block w-full bg-[#25D366] text-white rounded-xl p-3 font-semibold text-sm hover:opacity-90 transition-opacity text-center"
             >
-              סגור
-            </button>
+              💬 שלחי וואטסאפ לאישור
+            </a>
+            <button onClick={onClose} className="text-xs text-ink/40 underline hover:text-ink/60">סגור</button>
           </div>
         ) : (
           <div className="space-y-3">
-            <p className="text-sm font-medium text-ink/70">השאירי פרטים (אופציונלי):</p>
+            <p className="text-sm font-medium text-ink/70">השאירי שם (אופציונלי):</p>
             <input
               className="w-full border border-ink/20 rounded-xl p-3 text-right bg-canvas/50 outline-none focus:border-magic text-sm"
               placeholder="שם"
               value={name}
               onChange={e => setName(e.target.value)}
             />
-            <input
-              className="w-full border border-ink/20 rounded-xl p-3 text-right bg-canvas/50 outline-none focus:border-magic text-sm"
-              placeholder="טלפון"
-              type="tel"
-              value={phone}
-              onChange={e => setPhone(e.target.value)}
-            />
 
-            {/* Primary CTA — PayBox */}
+            <p className="text-xs text-ink/40 font-medium text-center pt-1">בחרי אמצעי תשלום:</p>
+
+            {/* Bit */}
             <button
-              onClick={payWithPayBox}
-              className="w-full bg-gradient-to-l from-brand to-magic text-white rounded-xl p-3.5 font-semibold text-sm hover:opacity-90 transition-opacity shadow-sm flex items-center justify-center gap-2"
+              onClick={payWithBit}
+              className="w-full bg-[#0095FF] text-white rounded-xl p-3.5 font-semibold text-sm hover:opacity-90 transition-opacity shadow-sm flex items-center justify-center gap-2"
             >
-              💳 תשלום מאובטח — ₪30 בלבד
+              <span className="text-lg">💙</span>
+              <span>ביט — ₪30</span>
+              <span className="text-white/60 text-xs font-normal mr-1">הכי פשוט</span>
             </button>
 
-            {/* Secondary — WhatsApp */}
+            {/* PayBox */}
+            {PAYBOX_LINK !== "https://payboxapp.page.link/YOUR_PAYBOX_LINK" && (
+              <button
+                onClick={payWithPayBox}
+                className="w-full bg-gradient-to-l from-brand to-magic text-white rounded-xl p-3.5 font-semibold text-sm hover:opacity-90 transition-opacity shadow-sm flex items-center justify-center gap-2"
+              >
+                💳 PayBox — ₪30
+              </button>
+            )}
+
+            {/* WhatsApp fallback */}
             <button
               onClick={sendWhatsApp}
               className="w-full border border-[#25D366] text-[#25D366] rounded-xl p-3 font-semibold text-sm hover:bg-[#25D366]/5 transition-colors flex items-center justify-center gap-2"
             >
-              💬 שלחי בוואטסאפ (תשלום ידני)
+              💬 תיצרי קשר בוואטסאפ
             </button>
 
-            <p className="text-xs text-ink/30 text-center">תשלום מאובטח · ביטול בכל עת</p>
+            <p className="text-xs text-ink/30 text-center">תשלום מאובטח · ביטול בכל עת · פעילה תוך שעה</p>
           </div>
         )}
       </div>
