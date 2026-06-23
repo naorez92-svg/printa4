@@ -50,7 +50,7 @@ Deno.serve(async (req) => {
     admin.from("profiles").select("id, plan, full_name, created_at, followup_sent_at"),
     admin.from("feedback").select("message, created_at, user_id").order("created_at", { ascending: false }).limit(15),
     admin.from("leads").select("name, phone, created_at").order("created_at", { ascending: false }).limit(15),
-    admin.from("booklets").select("user_id, title, world, created_at").order("created_at", { ascending: false }).limit(50),
+    admin.from("booklets").select("user_id, title, world, goal, created_at").order("created_at", { ascending: false }).limit(200),
   ]);
 
   const users = authData?.users ?? [];
@@ -72,6 +72,20 @@ Deno.serve(async (req) => {
     const plan = p.plan ?? "free";
     planBreakdown[plan] = (planBreakdown[plan] ?? 0) + 1;
   });
+
+  // Top topics — normalize goal text to a short label
+  const topicCount: Record<string, number> = {};
+  (allBookletRows ?? []).forEach(b => {
+    const raw = (b.goal ?? b.world ?? "").trim();
+    if (!raw) return;
+    // Take first ~40 chars as the label (trim at last space to avoid mid-word cuts)
+    const label = raw.length > 40 ? raw.substring(0, 40).replace(/\s\S*$/, "") + "…" : raw;
+    topicCount[label] = (topicCount[label] ?? 0) + 1;
+  });
+  const topTopics = Object.entries(topicCount)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 10)
+    .map(([topic, count]) => ({ topic, count }));
 
   const recentUsers = users
     .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
@@ -95,6 +109,7 @@ Deno.serve(async (req) => {
     bookletsThisWeek: bookletsThisWeek ?? 0,
     bookletsToday: bookletsToday ?? 0,
     planBreakdown,
+    topTopics,
     recentUsers,
     recentFeedback: recentFeedback ?? [],
     recentLeads: recentLeads ?? [],

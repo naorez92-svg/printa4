@@ -1,11 +1,12 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 
 const A4_PX = 794; // A4 width at 96dpi
 const A4_H  = 620; // visible iframe height (roughly one A4 page)
 
-export default function Preview({ html, onReset }) {
+export default function Preview({ html, onReset, shareToken }) {
   const wrapperRef = useRef(null);
   const [scale, setScale] = useState(1);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     const update = () => {
@@ -49,9 +50,29 @@ export default function Preview({ html, onReset }) {
   }, [html]);
 
   const shareWhatsApp = () => {
-    const msg = encodeURIComponent("יצרתי חוברת לימוד מותאמת אישית עם בשבילי AI 📚\nגם את יכולה ← " + window.location.origin);
+    const link = shareToken
+      ? `${window.location.origin}/b/${shareToken}`
+      : window.location.origin;
+    const msg = encodeURIComponent(`יצרתי חוברת לימוד מותאמת אישית עם בשבילי AI 📚\n${link}`);
     window.open("https://wa.me/?text=" + msg, "_blank");
   };
+
+  const copyShareLink = useCallback(async () => {
+    if (!shareToken) return;
+    const link = `${window.location.origin}/b/${shareToken}`;
+    try {
+      await navigator.clipboard.writeText(link);
+    } catch {
+      const el = document.createElement("textarea");
+      el.value = link;
+      document.body.appendChild(el);
+      el.select();
+      document.execCommand("copy");
+      document.body.removeChild(el);
+    }
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2500);
+  }, [shareToken]);
 
   return (
     <div className="space-y-4">
@@ -92,6 +113,21 @@ export default function Preview({ html, onReset }) {
         <span>הדפס / שמור PDF</span>
         <span className="text-white/50 text-xs font-normal mr-1">Ctrl+P</span>
       </button>
+
+      {/* Share link (when shareToken available) */}
+      {shareToken && (
+        <button
+          onClick={copyShareLink}
+          className={`w-full flex items-center justify-center gap-2 rounded-xl p-3 text-sm font-semibold transition-all ${
+            copied
+              ? "bg-grow/10 border border-grow/30 text-grow"
+              : "border border-ink/15 text-ink/60 hover:border-magic hover:text-magic"
+          }`}
+        >
+          <span>{copied ? "✓" : "🔗"}</span>
+          {copied ? "הקישור הועתק!" : "העתק קישור לשיתוף"}
+        </button>
+      )}
 
       {/* Secondary actions */}
       <div className="grid grid-cols-2 gap-2">

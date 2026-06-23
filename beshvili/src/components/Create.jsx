@@ -58,6 +58,7 @@ export default function Create({ onSaved, remaining, isPro }) {
   const [streamChars, setStreamChars] = useState(0);
   const [html, setHtml]           = useState(null);
   const [bookletId, setBookletId] = useState(null);
+  const [shareToken, setShareToken] = useState(null);
   const [showRating, setShowRating] = useState(false);
   const [error, setError]         = useState(null); // null | "quota" | "rate:{wait}" | "generic:{msg}"
 
@@ -184,10 +185,11 @@ export default function Create({ onSaved, remaining, isPro }) {
       world: f.world || null,
       goal: mode === "free" ? freeText.trim().substring(0, 200) : f.goal,
       level: f.level, html,
-    }).select("id").single();
+    }).select("id, share_token").single();
     if (insertErr) { setError(`generic:שמירה נכשלה — ${insertErr.message}`); return; }
 
     setBookletId(inserted?.id ?? null);
+    setShareToken(inserted?.share_token ?? null);
     setShowRating(true);
     setHtml(html);
     onSaved?.();
@@ -199,7 +201,7 @@ export default function Create({ onSaved, remaining, isPro }) {
     return () => window.removeEventListener("keydown", h);
   }, [create]);
 
-  const reset = () => { setHtml(null); setF(EMPTY); setFreeText(""); setError(null); setBookletId(null); setShowRating(false); };
+  const reset = () => { setHtml(null); setF(EMPTY); setFreeText(""); setError(null); setBookletId(null); setShareToken(null); setShowRating(false); };
   const set   = (k) => (e) => setF((p) => ({ ...p, [k]: e.target.value }));
   const applyTmpl = (tmpl) => { setF((p) => ({ ...p, ...tmpl.f })); setMode("form"); setTimeout(() => document.getElementById("inp-name")?.focus(), 50); };
 
@@ -286,7 +288,7 @@ export default function Create({ onSaved, remaining, isPro }) {
                 </span>
               )}
             </div>
-            <Preview html={html} onReset={reset} />
+            <Preview html={html} onReset={reset} shareToken={shareToken} />
           </>
         )}
       </section>

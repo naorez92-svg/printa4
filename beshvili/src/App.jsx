@@ -2,8 +2,12 @@ import { useEffect, useState } from "react";
 import { supabase } from "./lib/supabase";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
+import PublicBooklet from "./pages/PublicBooklet";
 
-export default function App() {
+// /b/:token — public booklet share page (no auth needed)
+const shareMatch = window.location.pathname.match(/^\/b\/([0-9a-f-]{36})$/i);
+
+function AuthApp() {
   const [session, setSession] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -18,4 +22,9 @@ export default function App() {
 
   if (loading) return null;
   return session ? <Dashboard /> : <Login />;
+}
+
+export default function App() {
+  if (shareMatch) return <PublicBooklet token={shareMatch[1]} />;
+  return <AuthApp />;
 }
