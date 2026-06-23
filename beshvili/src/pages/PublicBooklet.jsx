@@ -38,7 +38,7 @@ export default function PublicBooklet({ token }) {
         <div className="text-5xl">😕</div>
         <p className="text-ink font-semibold">החוברת לא נמצאה</p>
         <p className="text-ink/40 text-sm">ייתכן שהקישור שגוי או שהחוברת הוסרה</p>
-        <a href="https://beshvili.app" className="text-magic text-sm underline">לבשבילי.app ←</a>
+        <a href="https://printa4-eight.vercel.app" className="text-magic text-sm underline">לבשבילי ←</a>
       </div>
     </div>
   );
@@ -73,7 +73,7 @@ export default function PublicBooklet({ token }) {
             🖨️ הדפס
           </button>
           <a
-            href="https://beshvili.app"
+            href="https://printa4-eight.vercel.app"
             className="border border-ink/15 text-ink/50 rounded-xl px-3 py-2 text-xs hover:text-ink transition-colors"
           >
             צרי גם ✨
@@ -121,10 +121,10 @@ export default function PublicBooklet({ token }) {
           <p className="text-sm font-semibold text-ink">רוצה ליצור חוברות מותאמות אישית?</p>
           <p className="text-xs text-ink/50">בשבילי יוצרת חוברות AI בעברית בתוך דקה — חינם!</p>
           <a
-            href="https://beshvili.app"
+            href="https://printa4-eight.vercel.app"
             className="inline-block bg-gradient-to-l from-brand to-magic text-white rounded-xl px-6 py-2.5 text-sm font-semibold hover:opacity-90 transition-opacity"
           >
-            נסי חינם ← beshvili.app
+            נסי חינם ← בשבילי
           </a>
         </div>
       </div>
