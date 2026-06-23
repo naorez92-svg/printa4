@@ -93,7 +93,7 @@ export default function Dashboard() {
             isPro={isPro}
           />
         )}
-        {tab === "history" && <History bookletCount={bookletCount} />}
+        {tab === "history" && <History />}
       </main>
 
       {showUpgrade && <UpgradeModal onClose={() => setShowUpgrade(false)} />}
