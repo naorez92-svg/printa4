@@ -348,10 +348,19 @@ export default function Create({ onSaved, remaining, isPro }) {
               }
             </div>
           </div>
+        ) : (!isPro && remaining === 0) ? (
+          <a
+            href={UPGRADE_LINK}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="block w-full bg-gradient-to-l from-brand to-magic text-white rounded-xl p-3.5 font-display font-semibold text-center hover:opacity-90 transition-opacity shadow-sm"
+          >
+            💬 שדרג לפרו להמשיך
+          </a>
         ) : (
-          <button onClick={create} disabled={!canSubmit || (!isPro && remaining === 0)}
+          <button onClick={create} disabled={!canSubmit}
             className="w-full bg-gradient-to-l from-brand to-magic text-white rounded-xl p-3.5 font-display font-semibold disabled:opacity-40 hover:opacity-90 transition-opacity shadow-sm">
-            {(!isPro && remaining === 0) ? "🔒 שדרג לפרו להמשיך" : `✨ צור חוברת (${pageCount} עמ')`}
+            ✨ צור חוברת ({pageCount} עמ')
             {canSubmit && <span className="mr-2 text-white/60 text-xs font-normal">Ctrl+Enter</span>}
           </button>
         )}
