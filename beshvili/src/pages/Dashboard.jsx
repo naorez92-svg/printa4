@@ -10,16 +10,13 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-canvas">
-      {/* Sticky header */}
       <header className="sticky top-0 z-10 bg-white/90 backdrop-blur border-b border-ink/5">
         <div className="max-w-2xl mx-auto px-5 py-3 flex justify-between items-center">
           <div className="flex items-center gap-2">
             <span className="text-2xl">📚</span>
             <span className="font-bold text-ink text-lg font-display">בשבילי<span className="text-brand">·</span></span>
           </div>
-
           <div className="flex items-center gap-3">
-            {/* Plan badge */}
             {!loading && (
               isPro ? (
                 <span className="text-xs font-semibold bg-magic/10 text-magic border border-magic/30 rounded-full px-2.5 py-1">
@@ -40,7 +37,6 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Quota bar (free users only) */}
         {!loading && !isPro && (
           <div className="max-w-2xl mx-auto px-5 pb-2">
             <div className="flex items-center gap-2 text-xs text-ink/50">
@@ -55,7 +51,6 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* Tab bar */}
         <div className="max-w-2xl mx-auto px-5 pb-3 flex gap-1">
           {[["create", "✨ צור חוברת"], ["history", "📂 החוברות שלי"]].map(([id, label]) => (
             <button
@@ -84,7 +79,7 @@ export default function Dashboard() {
 
       <footer className="max-w-2xl mx-auto px-5 py-6 border-t border-ink/5 text-center text-xs text-ink/25 space-y-1">
         <div className="flex justify-center gap-4 flex-wrap">
-          <a href="mailto:support@beshvili.co.il" className="hover:text-ink/50 transition-colors">צור קשר</a>
+          <a href="https://wa.me/972509139137" target="_blank" rel="noopener noreferrer" className="hover:text-ink/50 transition-colors">צור קשר</a>
           <span>·</span>
           <a href="/privacy.html" target="_blank" className="hover:text-ink/50 transition-colors">מדיניות פרטיות</a>
           <span>·</span>

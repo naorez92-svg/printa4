@@ -42,9 +42,8 @@ export default function Create({ onSaved, remaining, isPro }) {
   const [loadingMsgIdx, setLoadingMsgIdx] = useState(0);
   const [streamChars, setStreamChars] = useState(0);
   const [html, setHtml]           = useState(null);
-  const [error, setError]         = useState(null); // null | "quota" | "rate:{wait}" | "generic:{msg}"
+  const [error, setError]         = useState(null);
 
-  // Rotate loading messages every 3.5 s while generating
   useEffect(() => {
     if (!loading) { setLoadingMsgIdx(0); setStreamChars(0); return; }
     const id = setInterval(() => setLoadingMsgIdx(i => (i + 1) % LOADING_MSGS.length), 3500);
@@ -94,7 +93,6 @@ export default function Create({ onSaved, remaining, isPro }) {
       return;
     }
 
-    // Read SSE stream — Anthropic sends content_block_delta events with text chunks
     const reader = resp.body.getReader();
     const decoder = new TextDecoder();
     let buffer = "";
@@ -116,7 +114,6 @@ export default function Create({ onSaved, remaining, isPro }) {
             const ev = JSON.parse(raw);
             if (ev.type === "content_block_delta" && ev.delta?.type === "text_delta") {
               htmlAccumulated += ev.delta.text;
-              // Throttle React state updates to ~10fps
               const now = Date.now();
               if (now - updateTimer > 100) {
                 setStreamChars(htmlAccumulated.length);
@@ -167,7 +164,6 @@ export default function Create({ onSaved, remaining, isPro }) {
   const set   = (k) => (e) => setF((p) => ({ ...p, [k]: e.target.value }));
   const applyTmpl = (tmpl) => { setF((p) => ({ ...p, ...tmpl.f })); setMode("form"); setTimeout(() => document.getElementById("inp-name")?.focus(), 50); };
 
-  // ── Quota exceeded screen ──────────────────────────────────────────────────
   if (error === "quota") {
     return (
       <section className="bg-white rounded-2xl p-6 shadow-sm border border-ink/5 text-center space-y-5">
@@ -176,7 +172,6 @@ export default function Create({ onSaved, remaining, isPro }) {
           <h2 className="text-xl font-bold text-ink mb-1">ניצלת את {FREE_LIMIT} החוברות החינמיות!</h2>
           <p className="text-ink/60 text-sm">שדרג לפרו וקבל חוברות ללא הגבלה — 30 ₪/חודש בלבד</p>
         </div>
-
         <div className="bg-canvas rounded-2xl p-4 space-y-2 text-right">
           {["חוברות ללא הגבלה", "עד 20 עמודים בחוברת", "מפתח תשובות אוטומטי", "שמירה בענן — גישה מכל מכשיר", "תמיכה אישית"].map((f) => (
             <div key={f} className="flex items-center gap-2 text-sm text-ink/70">
@@ -184,7 +179,6 @@ export default function Create({ onSaved, remaining, isPro }) {
             </div>
           ))}
         </div>
-
         <a
           href={UPGRADE_LINK}
           target="_blank"
@@ -200,7 +194,6 @@ export default function Create({ onSaved, remaining, isPro }) {
     );
   }
 
-  // ── Generated ──────────────────────────────────────────────────────────────
   if (html) {
     return (
       <section className="space-y-4 bg-white rounded-2xl p-5 shadow-sm border border-green-100">
@@ -216,12 +209,10 @@ export default function Create({ onSaved, remaining, isPro }) {
     );
   }
 
-  // ── Rate limited ───────────────────────────────────────────────────────────
   const rateWait = error?.startsWith("rate:") ? parseInt(error.split(":")[1]) : null;
 
   return (
     <section className="bg-white rounded-2xl shadow-sm border border-ink/5 overflow-hidden">
-      {/* Header */}
       <div className="bg-gradient-to-l from-magic/10 to-brand/10 px-5 pt-5 pb-4">
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-xl font-semibold">✨ חוברת חדשה</h2>
@@ -240,7 +231,6 @@ export default function Create({ onSaved, remaining, isPro }) {
       </div>
 
       <div className="p-5 space-y-4">
-        {/* Templates */}
         <div>
           <p className="text-xs text-ink/40 mb-2 font-medium uppercase tracking-wide">תבניות מהירות</p>
           <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
@@ -255,7 +245,6 @@ export default function Create({ onSaved, remaining, isPro }) {
 
         <div className="border-t border-ink/5" />
 
-        {/* Form mode */}
         {mode === "form" && (
           <div className="space-y-3">
             <input id="inp-name" className="w-full border border-ink/20 rounded-xl p-3 outline-none focus:border-magic text-right bg-canvas/50" placeholder="שם הילד/ה *" value={f.childName} onChange={set("childName")} disabled={loading} />
@@ -275,7 +264,6 @@ export default function Create({ onSaved, remaining, isPro }) {
           </div>
         )}
 
-        {/* Free text mode */}
         {mode === "free" && (
           <textarea
             className="w-full border border-ink/20 rounded-xl p-3 outline-none focus:border-magic text-right resize-none bg-canvas/50 leading-relaxed"
@@ -286,7 +274,6 @@ export default function Create({ onSaved, remaining, isPro }) {
 
         <div className="border-t border-ink/5" />
 
-        {/* Page count selector */}
         <div>
           <p className="text-xs text-ink/40 mb-2 font-medium">כמות עמודים</p>
           <div className="flex gap-2">
@@ -299,7 +286,6 @@ export default function Create({ onSaved, remaining, isPro }) {
           </div>
         </div>
 
-        {/* Answer key toggle */}
         <label className="flex items-center justify-between gap-3 cursor-pointer select-none">
           <div>
             <span className="text-sm font-medium text-ink">מפתח תשובות</span>
@@ -313,21 +299,18 @@ export default function Create({ onSaved, remaining, isPro }) {
           </div>
         </label>
 
-        {/* Rate limit error */}
         {rateWait && (
           <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-amber-700 text-sm text-center">
             ⏳ יש להמתין עוד {rateWait} שניות לפני יצירה נוספת
           </div>
         )}
 
-        {/* Generic error */}
         {error?.startsWith("generic:") && (
           <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-red-600 text-sm">
             {error.replace("generic:", "")}
           </div>
         )}
 
-        {/* Submit / loading */}
         {loading ? (
           <div className="text-center py-8 space-y-3">
             <div className="flex justify-center gap-1">
@@ -348,10 +331,19 @@ export default function Create({ onSaved, remaining, isPro }) {
               }
             </div>
           </div>
+        ) : (!isPro && remaining === 0) ? (
+          <a
+            href={UPGRADE_LINK}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="block w-full bg-gradient-to-l from-brand to-magic text-white rounded-xl p-3.5 font-display font-semibold text-center hover:opacity-90 transition-opacity shadow-sm"
+          >
+            💬 שדרג לפרו להמשיך
+          </a>
         ) : (
-          <button onClick={create} disabled={!canSubmit || (!isPro && remaining === 0)}
+          <button onClick={create} disabled={!canSubmit}
             className="w-full bg-gradient-to-l from-brand to-magic text-white rounded-xl p-3.5 font-display font-semibold disabled:opacity-40 hover:opacity-90 transition-opacity shadow-sm">
-            {(!isPro && remaining === 0) ? "🔒 שדרג לפרו להמשיך" : `✨ צור חוברת (${pageCount} עמ')`}
+            ✨ צור חוברת ({pageCount} עמ')
             {canSubmit && <span className="mr-2 text-white/60 text-xs font-normal">Ctrl+Enter</span>}
           </button>
         )}
