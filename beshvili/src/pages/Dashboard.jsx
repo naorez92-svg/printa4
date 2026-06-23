@@ -5,12 +5,13 @@ import History from "../components/History";
 import Students from "../components/Students";
 import UpgradeModal from "../components/UpgradeModal";
 import FeedbackWidget from "../components/FeedbackWidget";
+import AdminPanel from "../components/AdminPanel";
 import { useProfile, FREE_LIMIT } from "../hooks/useProfile";
 
 export default function Dashboard() {
   const [tab, setTab]             = useState("create");
   const [showUpgrade, setShowUpgrade] = useState(false);
-  const { profile, bookletCount, remaining, isPro, loading, refresh } = useProfile();
+  const { profile, bookletCount, remaining, isPro, isAdmin, loading, refresh } = useProfile();
 
   return (
     <div className="min-h-screen bg-canvas">
@@ -64,7 +65,7 @@ export default function Dashboard() {
 
         {/* Tab bar */}
         <div className="max-w-2xl mx-auto px-5 pb-3 flex gap-1">
-          {[["create", "✨ צור חוברת"], ["students", "👥 תלמידים"], ["history", "📂 החוברות שלי"]].map(([id, label]) => (
+          {[["create", "✨ צור חוברת"], ["students", "👥 תלמידים"], ["history", "📂 החוברות שלי"], ...(isAdmin ? [["admin", "🔐 ניהול"]] : [])].map(([id, label]) => (
             <button
               key={id}
               onClick={() => setTab(id)}
@@ -94,6 +95,7 @@ export default function Dashboard() {
           />
         )}
         {tab === "history" && <History />}
+        {tab === "admin" && isAdmin && <AdminPanel />}
       </main>
 
       {showUpgrade && <UpgradeModal onClose={() => setShowUpgrade(false)} />}

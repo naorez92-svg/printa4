@@ -25,7 +25,8 @@ export function useProfile() {
   useEffect(() => { refresh(); }, [refresh]);
 
   const isPro = profile?.plan === "pro" || profile?.plan === "admin";
+  const isAdmin = profile?.plan === "admin";
   const remaining = isPro ? Infinity : Math.max(0, FREE_LIMIT - bookletCount);
 
-  return { profile, bookletCount, remaining, isPro, loading, refresh };
+  return { profile, bookletCount, remaining, isPro, isAdmin, loading, refresh };
 }
