@@ -9,29 +9,24 @@ export function useProfile() {
   const [loading, setLoading] = useState(true);
 
   const refresh = useCallback(async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) { setLoading(false); return; }
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
 
-      const [{ data: p }, { count }] = await Promise.all([
-        supabase.from("profiles").select("plan, full_name").eq("id", user.id).single(),
-        supabase.from("booklets").select("*", { count: "exact", head: true }).eq("user_id", user.id),
-      ]);
+    const [{ data: p }, { count }] = await Promise.all([
+      supabase.from("profiles").select("plan, full_name").eq("id", user.id).single(),
+      supabase.from("booklets").select("*", { count: "exact", head: true }).eq("user_id", user.id),
+    ]);
 
-      setProfile(p);
-      setBookletCount(count ?? 0);
-    } catch {
-      setProfile(null);
-      setBookletCount(0);
-    } finally {
-      setLoading(false);
-    }
+    setProfile(p);
+    setBookletCount(count ?? 0);
+    setLoading(false);
   }, []);
 
   useEffect(() => { refresh(); }, [refresh]);
 
   const isPro = profile?.plan === "pro" || profile?.plan === "admin";
+  const isAdmin = profile?.plan === "admin";
   const remaining = isPro ? Infinity : Math.max(0, FREE_LIMIT - bookletCount);
 
-  return { profile, bookletCount, remaining, isPro, loading, refresh };
+  return { profile, bookletCount, remaining, isPro, isAdmin, loading, refresh };
 }

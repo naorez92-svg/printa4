@@ -1,0 +1,23 @@
+name: Daily Follow-up Emails
+
+on:
+  schedule:
+    - cron: '0 7 * * *'  # 9:00am Israel time (UTC+2)
+  workflow_dispatch:
+
+jobs:
+  send-followup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger send-followup Edge Function
+        run: |
+          RESPONSE=$(curl -sS -w "\n%{http_code}" -X POST \
+            "https://gywpdzkvkdisonuzhsib.supabase.co/functions/v1/send-followup" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
+            -H "Content-Type: application/json" \
+            -d '{}')
+          HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+          BODY=$(echo "$RESPONSE" | head -n -1)
+          echo "Response: $BODY"
+          echo "Status: $HTTP_CODE"
+          [ "$HTTP_CODE" -eq 200 ] || exit 1
