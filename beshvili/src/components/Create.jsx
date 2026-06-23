@@ -203,12 +203,18 @@ export default function Create({ onSaved, remaining, isPro }) {
   // ── Generated ──────────────────────────────────────────────────────────────
   if (html) {
     return (
-      <section className="space-y-4 bg-white rounded-2xl p-5 shadow-sm border border-green-100">
-        <div className="flex items-center gap-2 text-green-700 font-medium">
-          <span className="text-xl">✅</span>
-          <span>החוברת נוצרה ונשמרה בענן!</span>
+      <section className="space-y-4">
+        {/* Success banner */}
+        <div className="bg-gradient-to-l from-grow/15 to-brand/10 border border-grow/20 rounded-2xl px-5 py-4 flex items-center gap-3">
+          <span className="text-3xl">🎉</span>
+          <div className="flex-1">
+            <p className="font-bold text-ink text-base">החוברת מוכנה!</p>
+            <p className="text-xs text-ink/50 mt-0.5">נשמרה בענן · מוכנה להדפסה או שיתוף</p>
+          </div>
           {!isPro && remaining !== undefined && (
-            <span className="mr-auto text-xs text-ink/40">{remaining} חוברות חינם נותרו</span>
+            <span className="text-xs text-ink/40 bg-white rounded-full px-2.5 py-1 border border-ink/10">
+              {remaining} נותרו
+            </span>
           )}
         </div>
         <Preview html={html} onReset={reset} />
