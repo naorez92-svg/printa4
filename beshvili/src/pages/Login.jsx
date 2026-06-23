@@ -140,41 +140,68 @@ export default function Login() {
 
       {/* ── Pricing ── */}
       <section className="py-14 px-5 bg-canvas">
-        <div className="max-w-2xl mx-auto text-center">
+        <div className="max-w-3xl mx-auto text-center">
           <h2 className="text-2xl font-bold text-ink mb-2 font-display">מחירים שקופים</h2>
           <p className="text-ink/50 mb-10 text-sm">מתחילים חינם, משדרגים כשרוצים</p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+
+            {/* Free */}
             <div className="bg-white rounded-2xl p-6 border border-ink/10 shadow-sm text-right">
               <div className="text-2xl mb-2">🌱 חינמי</div>
               <div className="text-3xl font-bold text-ink mb-1 font-display">₪0</div>
               <div className="text-xs text-ink/40 mb-4">לתמיד</div>
-              <ul className="space-y-2 text-sm text-ink/70">
+              <ul className="space-y-2 text-sm text-ink/70 mb-5">
                 {["2 חוברות להתנסות", "עד 10 עמודים", "שמירה בענן"].map((f) => (
                   <li key={f} className="flex items-center gap-2"><span className="text-grow">✓</span>{f}</li>
                 ))}
               </ul>
-            </div>
-            <div className="bg-gradient-to-br from-brand/10 to-magic/10 rounded-2xl p-6 border border-magic/20 shadow-sm text-right relative overflow-hidden flex flex-col gap-4">
-              <div className="absolute top-3 left-3 bg-magic text-white text-xs rounded-full px-2.5 py-1 font-semibold">הכי פופולרי</div>
-              <div>
-                <div className="text-2xl mb-2">🚀 פרו</div>
-                <div className="text-3xl font-bold text-ink mb-1 font-display">₪30<span className="text-sm font-normal text-ink/40">/חודש</span></div>
-                <div className="text-xs text-ink/40 mb-4">ביטול בכל עת</div>
-                <ul className="space-y-2 text-sm text-ink/70">
-                  {["חוברות ללא הגבלה", "עד 20 עמודים", "מפתח תשובות אוטומטי", "שמירה בענן", "תמיכה אישית"].map((f) => (
-                    <li key={f} className="flex items-center gap-2"><span className="text-magic">✓</span>{f}</li>
-                  ))}
-                </ul>
-              </div>
-              <a
-                href={"https://wa.me/972509139137?text=" + encodeURIComponent("שלום! אני רוצה לשדרג לבשבילי פרו 🚀")}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="block w-full bg-[#25D366] text-white rounded-xl px-4 py-2.5 text-sm font-semibold text-center hover:opacity-90 transition-opacity shadow-sm"
+              <button
+                onClick={() => scrollTo("login-form")}
+                className="block w-full border border-ink/20 text-ink/60 rounded-xl px-4 py-2.5 text-sm font-semibold text-center hover:border-magic/40 hover:text-magic transition-colors"
               >
-                💬 שדרגי לפרו
+                התחל חינם ✨
+              </button>
+            </div>
+
+            {/* Parent */}
+            <div className="bg-white rounded-2xl p-6 border border-brand/30 shadow-sm text-right">
+              <div className="text-2xl mb-2">🌟 הורה</div>
+              <div className="text-3xl font-bold text-brand mb-1 font-display">₪19<span className="text-sm font-normal text-ink/40">/חודש</span></div>
+              <div className="text-xs text-ink/40 mb-4">ביטול בכל עת</div>
+              <ul className="space-y-2 text-sm text-ink/70 mb-5">
+                {["5 חוברות לחודש", "עד 10 עמודים", "מפתח תשובות", "שמירה בענן"].map((f) => (
+                  <li key={f} className="flex items-center gap-2"><span className="text-brand">✓</span>{f}</li>
+                ))}
+              </ul>
+              <a
+                href={"https://wa.me/972509139137?text=" + encodeURIComponent("שלום! אני רוצה לשדרג לתוכנית הורה בבשבילי 🌟")}
+                target="_blank" rel="noopener noreferrer"
+                className="block w-full bg-brand text-white rounded-xl px-4 py-2.5 text-sm font-semibold text-center hover:opacity-90 transition-opacity shadow-sm"
+              >
+                💙 שדרגי — ₪19
               </a>
             </div>
+
+            {/* Teacher */}
+            <div className="bg-gradient-to-br from-brand/10 to-magic/10 rounded-2xl p-6 border border-magic/20 shadow-sm text-right relative overflow-hidden flex flex-col">
+              <div className="absolute top-3 left-3 bg-magic text-white text-xs rounded-full px-2.5 py-1 font-semibold">הכי פופולרי</div>
+              <div className="text-2xl mb-2">🚀 מורה</div>
+              <div className="text-3xl font-bold text-magic mb-1 font-display">₪59<span className="text-sm font-normal text-ink/40">/חודש</span></div>
+              <div className="text-xs text-ink/40 mb-4">ביטול בכל עת</div>
+              <ul className="space-y-2 text-sm text-ink/70 mb-5 flex-1">
+                {["20 חוברות לחודש", "עד 20 עמודים", "מפתח תשובות אוטומטי", "שמירה בענן", "תמיכה אישית"].map((f) => (
+                  <li key={f} className="flex items-center gap-2"><span className="text-magic">✓</span>{f}</li>
+                ))}
+              </ul>
+              <a
+                href={"https://wa.me/972509139137?text=" + encodeURIComponent("שלום! אני רוצה לשדרג לתוכנית מורה בבשבילי 🚀")}
+                target="_blank" rel="noopener noreferrer"
+                className="block w-full bg-[#25D366] text-white rounded-xl px-4 py-2.5 text-sm font-semibold text-center hover:opacity-90 transition-opacity shadow-sm"
+              >
+                💬 שדרגי — ₪59
+              </a>
+            </div>
+
           </div>
         </div>
       </section>
