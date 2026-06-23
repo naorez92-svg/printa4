@@ -23,9 +23,9 @@ export default function FeedbackWidget() {
     if (!text) return;
     setSending(true);
     const { data: { user } } = await supabase.auth.getUser();
-    await supabase.from("feedback").insert({ user_id: user?.id ?? null, message: text });
+    const { error } = await supabase.from("feedback").insert({ user_id: user?.id ?? null, message: text });
     setSending(false);
-    setDone(true);
+    if (!error) setDone(true);
   };
 
   const reset = () => { setOpen(false); setDone(false); setSelected(""); setMessage(""); };
