@@ -5,7 +5,7 @@ import BookletRating from "./BookletRating";
 import UpgradeModal from "./UpgradeModal";
 import { FREE_LIMIT } from "../hooks/useProfile";
 
-const WORLDS = ["כדורגל", "גיימינג", "חיות", "חלל", "בישול", "מוזיקה", "סוסים", "נינג'ה", "פוקימון", "מינקראפט"];
+const WORLDS = ["כדורגל", "גיימינג", "חיות", "חלל", "בישול", "מוזיקה", "סוסים", "נינג'א", "פוקימון", "מינקראפט"];
 const LEVELS = [["basic", "🌱 בסיסי"], ["medium", "⚡ בינוני"], ["advanced", "🚀 מתקדם"]];
 const TEMPLATES = [
   { icon: "📖", label: "הבנת הנקרא ג-ד",   f: { grade: "כיתה ג",  world: "כדורגל",  goal: "הבנת הנקרא: טקסט ספרותי, שאלות הבנה ואוצר מילים",            level: "basic"    } },
@@ -30,7 +30,7 @@ const GOAL_PICKS = [
   { icon: "📝", label: "כתיבה יוצרת",      goal: "כתיבה יוצרת: בניית סיפור, תיאור דמויות וסצנה" },
   { icon: "📐", label: "שטח והיקף",        goal: "שטח והיקף: ריבוע, מלבן, משולש" },
   { icon: "🔤", label: "דקדוק עברי",       goal: "דקדוק עברי: פועל, שם עצם, שם תואר, זמנים" },
-  { icon: "🔡", label: "קריאה בניקוד",     goal: "קריאה בניקוד: פענוח, הבנת המילה, קריאת משפטים" },
+  { icon: "🕡", label: "קריאה בניקוד",     goal: "קריאה בניקוד: פענוח, הבנת המילה, קריאת משפטים" },
   { icon: "🔢", label: "חיבור וחיסור",     goal: "חיבור וחיסור: אלגוריתמים, מעבר עשרת, בעיות" },
 ];
 const EMPTY = { childName: "", grade: "", world: "כדורגל", goal: "", level: "medium" };
@@ -90,16 +90,20 @@ export default function Create({ onSaved, remaining, isPro }) {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) {
       setLoading(false);
-      setError("generic:אתה לא מחובר — נסה להתחבר מחדש");
+      setError("גון:אתה לא מחובר — נסה להתחבר מחדש");
       return;
     }
 
-    const fnUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-booklet?apikey=${import.meta.env.VITE_SUPABASE_ANON_KEY}`;
+    const fnUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-booklet`;
     let resp;
     try {
       resp = await fetch(fnUrl, {
         method: "POST",
-        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${session.access_token}` },
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${session.access_token}`,
+          "apikey": import.meta.env.VITE_SUPABASE_ANON_KEY,
+        },
         body: JSON.stringify(body),
       });
     } catch (e) {
@@ -112,8 +116,11 @@ export default function Create({ onSaved, remaining, isPro }) {
       const errData = await resp.json().catch(() => ({}));
       const code = errData?.error;
       setLoading(false);
-      if (code === "quota_exceeded") { setError("quota"); return; }
-      if (code === "rate_limited")   { setError(`rate:${errData?.wait ?? 60}`); return; }
+      if (code === "quota_exceeded") {
+        setError(errData?.period === "monthly" ? "quota_monthly" : "quota");
+        return;
+      }
+      if (code === "rate_limited") { setError(`rate:${errData?.wait ?? 60}`); return; }
       setError(`generic:${code || `שגיאת שרת ${resp.status}`}`);
       return;
     }
@@ -157,7 +164,7 @@ export default function Create({ onSaved, remaining, isPro }) {
     setLoading(false);
 
     const html = htmlAccumulated.trim();
-    if (!html || !html.includes("<")) { setError("generic:לא התקבל HTML תקין מהשרת"); return; }
+    if (!html || !html.includes("<")) { setError("גנריק:לא התקבל HTML תקין מהשרת"); return; }
 
     const title = mode === "free"
       ? freeText.trim().substring(0, 60) + (freeText.length > 60 ? "…" : "")
@@ -166,7 +173,7 @@ export default function Create({ onSaved, remaining, isPro }) {
       : `${f.childName} — ${f.goal}`;
 
     const { data: u } = await supabase.auth.getUser();
-    if (!u?.user) { setError("generic:שגיאת משתמש — נסה להתחבר מחדש"); return; }
+    if (!u?.user) { setError("גנריק:שגיאת משתמש — נסה להתחבר מחדש"); return; }
 
     const { data: inserted, error: insertErr } = await supabase.from("booklets").insert({
       user_id: u.user.id, title,
@@ -193,6 +200,31 @@ export default function Create({ onSaved, remaining, isPro }) {
   const set   = (k) => (e) => setF((p) => ({ ...p, [k]: e.target.value }));
   const applyTmpl = (tmpl) => { setF((p) => ({ ...p, ...tmpl.f })); setMode("form"); setTimeout(() => document.getElementById("inp-name")?.focus(), 50); };
 
+  // ── Pro monthly quota exceeded ───────────────────────────────────────────
+  if (error === "quota_monthly") {
+    return (
+      <section className="bg-white rounded-2xl p-6 shadow-sm border border-ink/5 text-center space-y-5">
+        <div className="text-5xl">📅</div>
+        <div>
+          <h2 className="text-xl font-bold text-ink mb-1">הגעת ל-20 חוברות החודש!</h2>
+          <p className="text-ink/60 text-sm">המכסה החודשית של פרו מתחדשת בתחילת כל חודש</p>
+          <p className="text-ink/40 text-xs mt-1">צריך יותר? שלחי הודעה ונרחיב את המכסה</p>
+        </div>
+        <a
+          href={`https://wa.me/972509139137?text=${encodeURIComponent("שלום! הגעתי ל-20 חוברות החודש — אפשר להרחיב?")}`}
+          target="_blank" rel="noopener noreferrer"
+          className="block w-full bg-[#25D366] text-white rounded-xl p-3.5 font-display font-semibold hover:opacity-90 transition-opacity shadow-sm"
+        >
+          💬 שלחי הודעה
+        </a>
+        <button onClick={() => setError(null)} className="text-xs text-ink/30 hover:text-ink/50 underline">
+          חזרה
+        </button>
+      </section>
+    );
+  }
+
+  // ── Quota exceeded screen ───────────────────────────────────────────────────────
   if (error === "quota") {
     return (
       <>
@@ -226,6 +258,7 @@ export default function Create({ onSaved, remaining, isPro }) {
     );
   }
 
+  // ── Generated ──────────────────────────────────────────────────────────────
   if (html) {
     return (
       <section className="space-y-4">
