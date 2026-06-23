@@ -211,8 +211,8 @@ export default function Create({ onSaved, remaining, isPro }) {
       <section className="bg-white rounded-2xl p-6 shadow-sm border border-ink/5 text-center space-y-5">
         <div className="text-5xl">📅</div>
         <div>
-          <h2 className="text-xl font-bold text-ink mb-1">הגעת ל-20 חוברות החודש!</h2>
-          <p className="text-ink/60 text-sm">המכסה החודשית של פרו מתחדשת בתחילת כל חודש</p>
+          <h2 className="text-xl font-bold text-ink mb-1">הגעת למכסה החודשית!</h2>
+          <p className="text-ink/60 text-sm">המכסה מתחדשת בתחילת כל חודש</p>
           <p className="text-ink/40 text-xs mt-1">צריך יותר? שלחי הודעה ונרחיב את המכסה</p>
         </div>
         <a
@@ -238,22 +238,27 @@ export default function Create({ onSaved, remaining, isPro }) {
           <div className="text-5xl">🔒</div>
           <div>
             <h2 className="text-xl font-bold text-ink mb-1">ניצלת את {FREE_LIMIT} החוברות החינמיות!</h2>
-            <p className="text-ink/60 text-sm">שדרגי לפרו וקבלי חוברות ללא הגבלה — 30 ₪/חודש בלבד</p>
+            <p className="text-ink/60 text-sm">שדרגי וקבלי עוד חוברות — מ-19 ₪/חודש בלבד</p>
           </div>
 
-          <div className="bg-canvas rounded-2xl p-4 space-y-2 text-right">
-            {["חוברות ללא הגבלה", "עד 20 עמודים בחוברת", "מפתח תשובות אוטומטי", "שמירה בענן — גישה מכל מכשיר", "תמיכה אישית"].map((f) => (
-              <div key={f} className="flex items-center gap-2 text-sm text-ink/70">
-                <span className="text-grow">✓</span> {f}
-              </div>
-            ))}
+          <div className="grid grid-cols-2 gap-3 text-right">
+            <div className="bg-blue-50 border border-blue-100 rounded-2xl p-3 space-y-1">
+              <p className="font-bold text-blue-700 text-sm">🌟 הורה</p>
+              <p className="text-2xl font-bold text-blue-700">₪19<span className="text-xs font-normal text-blue-400">/חודש</span></p>
+              <p className="text-xs text-blue-500">5 חוברות · 10 עמודים</p>
+            </div>
+            <div className="bg-purple-50 border border-purple-100 rounded-2xl p-3 space-y-1">
+              <p className="font-bold text-magic text-sm">🚀 מורה</p>
+              <p className="text-2xl font-bold text-magic">₪59<span className="text-xs font-normal text-magic/50">/חודש</span></p>
+              <p className="text-xs text-magic/60">20 חוברות · 20 עמודים</p>
+            </div>
           </div>
 
           <button
             onClick={() => setShowUpgrade(true)}
             className="block w-full bg-gradient-to-l from-brand to-magic text-white rounded-xl p-3.5 font-display font-semibold hover:opacity-90 transition-opacity shadow-sm"
           >
-            🚀 שדרגי עכשיו — 30 ₪/חודש
+            🚀 שדרגי עכשיו
           </button>
           <button onClick={() => setError(null)} className="text-xs text-ink/30 hover:text-ink/50 underline">
             חזרה (למי שכבר שדרגה)

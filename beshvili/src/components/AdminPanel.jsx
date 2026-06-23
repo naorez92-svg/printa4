@@ -4,6 +4,12 @@ import { supabase } from "../lib/supabase";
 const fmt = (iso) => iso ? new Date(iso).toLocaleDateString("he-IL", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) : "—";
 const fmtDate = (iso) => iso ? new Date(iso).toLocaleDateString("he-IL", { day: "2-digit", month: "2-digit" }) : "—";
 
+// P&L constants — prices in NIS
+const PLAN_PRICE = { parent: 19, teacher: 59, pro: 30 }; // pro = legacy
+const COST_PER_BOOKLET_NIS = 0.80; // ~$0.22/booklet at claude-opus-4-8 rates (3.7 NIS/$)
+const SUPABASE_MONTHLY_NIS = 0;    // on free tier currently
+const VERCEL_MONTHLY_NIS   = 0;    // on free tier currently
+
 export default function AdminPanel() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -44,6 +50,17 @@ export default function AdminPanel() {
   if (error) return <div className="text-center py-12 text-red-500 text-sm">{error}</div>;
   if (!data) return null;
 
+  // P&L calculation
+  const revenueLines = Object.entries(data.planBreakdown ?? {})
+    .filter(([plan]) => PLAN_PRICE[plan] != null)
+    .map(([plan, count]) => ({ plan, count, price: PLAN_PRICE[plan], total: count * PLAN_PRICE[plan] }));
+  const totalMRR      = revenueLines.reduce((s, r) => s + r.total, 0);
+  const apiCostNIS    = (data.bookletsThisMonth ?? 0) * COST_PER_BOOKLET_NIS;
+  const fixedCostNIS  = SUPABASE_MONTHLY_NIS + VERCEL_MONTHLY_NIS;
+  const totalCostNIS  = apiCostNIS + fixedCostNIS;
+  const netProfitNIS  = totalMRR - totalCostNIS;
+  const paidUsers     = revenueLines.reduce((s, r) => s + r.count, 0);
+
   const statCards = [
     { label: "סה״כ משתמשים", value: data.totalUsers, icon: "👥" },
     { label: "השבוע", value: data.usersThisWeek, icon: "📅" },
@@ -66,17 +83,88 @@ export default function AdminPanel() {
         ))}
       </div>
 
+      {/* Economics / P&L */}
+      <div className="bg-white rounded-2xl p-4 border border-ink/5 shadow-sm">
+        <h3 className="font-bold text-ink mb-3 text-sm">💰 כלכלה — חודש נוכחי</h3>
+
+        {/* Revenue rows */}
+        <div className="space-y-1.5 mb-3">
+          {revenueLines.length === 0 && (
+            <p className="text-xs text-ink/30">אין מנויים פעילים עדיין</p>
+          )}
+          {revenueLines.map(({ plan, count, price, total }) => (
+            <div key={plan} className="flex justify-between items-center text-xs">
+              <span className="text-ink/50">
+                {plan === "teacher" ? "מורה" : plan === "parent" ? "הורה" : "פרו (ישן)"} × {count} ({price} ₪)
+              </span>
+              <span className="font-semibold text-grow">+{total} ₪</span>
+            </div>
+          ))}
+          <div className="flex justify-between items-center text-sm border-t border-ink/5 pt-1.5 mt-1">
+            <span className="font-bold text-ink">הכנסות (MRR)</span>
+            <span className="font-bold text-grow">+{totalMRR} ₪</span>
+          </div>
+        </div>
+
+        {/* Cost rows */}
+        <div className="space-y-1.5 mb-3">
+          <div className="flex justify-between items-center text-xs">
+            <span className="text-ink/50">API אנתרופיק ({data.bookletsThisMonth ?? 0} חוברות × {COST_PER_BOOKLET_NIS} ₪)</span>
+            <span className="font-semibold text-red-400">−{apiCostNIS.toFixed(1)} ₪</span>
+          </div>
+          {fixedCostNIS > 0 && (
+            <div className="flex justify-between items-center text-xs">
+              <span className="text-ink/50">תשתיות (Supabase, Vercel)</span>
+              <span className="font-semibold text-red-400">−{fixedCostNIS} ₪</span>
+            </div>
+          )}
+          <div className="flex justify-between items-center text-sm border-t border-ink/5 pt-1.5 mt-1">
+            <span className="font-bold text-ink">הוצאות (הערכה)</span>
+            <span className="font-bold text-red-400">−{totalCostNIS.toFixed(1)} ₪</span>
+          </div>
+        </div>
+
+        {/* Net */}
+        <div className={`flex justify-between items-center rounded-xl px-3 py-2 ${netProfitNIS >= 0 ? "bg-grow/10" : "bg-red-50"}`}>
+          <span className="font-bold text-sm text-ink">רווח נקי</span>
+          <span className={`font-bold text-lg ${netProfitNIS >= 0 ? "text-grow" : "text-red-500"}`}>
+            {netProfitNIS >= 0 ? "+" : ""}{netProfitNIS.toFixed(1)} ₪
+          </span>
+        </div>
+
+        {/* KPIs */}
+        <div className="grid grid-cols-3 gap-2 mt-3">
+          <div className="text-center bg-canvas rounded-xl p-2">
+            <div className="text-lg font-bold text-ink font-display">{paidUsers}</div>
+            <div className="text-[10px] text-ink/40">מנויים פעילים</div>
+          </div>
+          <div className="text-center bg-canvas rounded-xl p-2">
+            <div className="text-lg font-bold text-ink font-display">{data.bookletsThisMonth ?? 0}</div>
+            <div className="text-[10px] text-ink/40">חוברות החודש</div>
+          </div>
+          <div className="text-center bg-canvas rounded-xl p-2">
+            <div className="text-lg font-bold text-ink font-display">
+              {paidUsers > 0 ? (totalMRR / paidUsers).toFixed(0) : 0}₪
+            </div>
+            <div className="text-[10px] text-ink/40">ARPU</div>
+          </div>
+        </div>
+        <p className="text-[10px] text-ink/25 mt-2 text-center">עלות API מחושבת לפי הערכה — ~0.80 ₪/חוברת</p>
+      </div>
+
       {/* Plan breakdown */}
       <div className="bg-white rounded-2xl p-4 border border-ink/5 shadow-sm">
         <h3 className="font-bold text-ink mb-3 text-sm">פילוח תוכניות</h3>
         <div className="flex gap-4 text-sm">
           {Object.entries(data.planBreakdown ?? {}).map(([plan, count]) => (
             <span key={plan} className={`px-3 py-1 rounded-full text-xs font-medium ${
+              plan === "teacher" ? "bg-magic/10 text-magic" :
+              plan === "parent" ? "bg-brand/10 text-brand" :
               plan === "pro" ? "bg-magic/10 text-magic" :
-              plan === "admin" ? "bg-brand/10 text-brand" :
+              plan === "admin" ? "bg-grow/10 text-grow" :
               "bg-canvas text-ink/50"
             }`}>
-              {plan}: {count}
+              {plan === "teacher" ? "מורה" : plan === "parent" ? "הורה" : plan}: {count}
             </span>
           ))}
         </div>
@@ -170,10 +258,13 @@ export default function AdminPanel() {
                   </td>
                   <td className="py-1.5 pr-1">
                     <span className={`px-1.5 py-0.5 rounded text-xs ${
-                      u.plan === "pro" ? "bg-magic/10 text-magic" :
-                      u.plan === "admin" ? "bg-brand/10 text-brand" :
+                      u.plan === "teacher" || u.plan === "pro" ? "bg-magic/10 text-magic" :
+                      u.plan === "parent" ? "bg-brand/10 text-brand" :
+                      u.plan === "admin" ? "bg-grow/10 text-grow" :
                       "bg-canvas text-ink/40"
-                    }`}>{u.plan}</span>
+                    }`}>
+                      {u.plan === "teacher" ? "מורה" : u.plan === "parent" ? "הורה" : u.plan}
+                    </span>
                   </td>
                   <td className="py-1.5 pr-1 text-ink/30">{u.followupSent ? "✓" : "—"}</td>
                 </tr>

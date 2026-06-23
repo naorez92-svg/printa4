@@ -11,7 +11,7 @@ import { useProfile, FREE_LIMIT } from "../hooks/useProfile";
 export default function Dashboard() {
   const [tab, setTab]             = useState("create");
   const [showUpgrade, setShowUpgrade] = useState(false);
-  const { profile, bookletCount, remaining, isPro, isAdmin, loading, refresh } = useProfile();
+  const { profile, plan, bookletCount, remaining, isPro, isAdmin, loading, refresh } = useProfile();
 
   return (
     <div className="min-h-screen bg-canvas">
@@ -28,7 +28,7 @@ export default function Dashboard() {
             {!loading && (
               isPro ? (
                 <span className="text-xs font-semibold bg-magic/10 text-magic border border-magic/30 rounded-full px-2.5 py-1">
-                  ✓ פרו
+                  ✓ {plan === "teacher" || plan === "pro" ? "מורה" : plan === "parent" ? "הורה" : "פרו"}
                 </span>
               ) : (
                 <button

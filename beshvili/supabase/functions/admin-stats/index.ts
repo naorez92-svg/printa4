@@ -31,6 +31,7 @@ Deno.serve(async (req) => {
   const now = new Date();
   const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
   const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
 
   // Fetch all in parallel
   const [
@@ -38,6 +39,7 @@ Deno.serve(async (req) => {
     { count: totalBooklets },
     { count: bookletsThisWeek },
     { count: bookletsToday },
+    { count: bookletsThisMonth },
     { data: allProfiles },
     { data: recentFeedback },
     { data: recentLeads },
@@ -47,6 +49,7 @@ Deno.serve(async (req) => {
     admin.from("booklets").select("*", { count: "exact", head: true }),
     admin.from("booklets").select("*", { count: "exact", head: true }).gte("created_at", weekAgo),
     admin.from("booklets").select("*", { count: "exact", head: true }).gte("created_at", todayStart),
+    admin.from("booklets").select("*", { count: "exact", head: true }).gte("created_at", monthStart),
     admin.from("profiles").select("id, plan, full_name, created_at, followup_sent_at"),
     admin.from("feedback").select("message, created_at, user_id").order("created_at", { ascending: false }).limit(15),
     admin.from("leads").select("name, phone, created_at").order("created_at", { ascending: false }).limit(15),
@@ -108,6 +111,7 @@ Deno.serve(async (req) => {
     totalBooklets: totalBooklets ?? 0,
     bookletsThisWeek: bookletsThisWeek ?? 0,
     bookletsToday: bookletsToday ?? 0,
+    bookletsThisMonth: bookletsThisMonth ?? 0,
     planBreakdown,
     topTopics,
     recentUsers,

@@ -24,9 +24,11 @@ export function useProfile() {
 
   useEffect(() => { refresh(); }, [refresh]);
 
-  const isPro = profile?.plan === "pro" || profile?.plan === "admin";
-  const isAdmin = profile?.plan === "admin";
+  const plan    = profile?.plan ?? "free";
+  const isAdmin = plan === "admin";
+  // "pro" is legacy teacher-level plan
+  const isPro   = plan === "parent" || plan === "teacher" || plan === "pro" || isAdmin;
   const remaining = isPro ? Infinity : Math.max(0, FREE_LIMIT - bookletCount);
 
-  return { profile, bookletCount, remaining, isPro, isAdmin, loading, refresh };
+  return { profile, plan, bookletCount, remaining, isPro, isAdmin, loading, refresh };
 }

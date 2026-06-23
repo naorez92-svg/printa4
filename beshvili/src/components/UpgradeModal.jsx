@@ -3,31 +3,46 @@ import { supabase } from "../lib/supabase";
 
 const WA = "972509139137";
 const BIT_PHONE = "0509139137";
-// Replace with your actual PayBox payment link from payboxapp.com dashboard
-const PAYBOX_LINK = "https://payboxapp.page.link/YOUR_PAYBOX_LINK";
 
-const FEATURES = [
-  "חוברות ללא הגבלה (עד 20 בחודש)",
-  "עד 20 עמודים לחוברת",
-  "מפתח תשובות אוטומטי",
-  "שמירה בענן לצמיתות",
-  "תמיכה אישית ישירה",
+const PLANS = [
+  {
+    id: "parent",
+    icon: "🌟",
+    title: "הורה",
+    price: 19,
+    booklets: 5,
+    pages: 10,
+    color: "blue",
+    features: ["5 חוברות לחודש", "עד 10 עמודים לחוברת", "מפתח תשובות", "שמירה בענן"],
+  },
+  {
+    id: "teacher",
+    icon: "🚀",
+    title: "מורה",
+    price: 59,
+    booklets: 20,
+    pages: 20,
+    color: "purple",
+    badge: "הכי פופולרי",
+    features: ["20 חוברות לחודש", "עד 20 עמודים לחוברת", "מפתח תשובות", "שמירה בענן לצמיתות", "תמיכה אישית ישירה"],
+  },
 ];
 
 export default function UpgradeModal({ onClose }) {
+  const [selectedPlan, setSelectedPlan] = useState("teacher");
   const [name, setName]   = useState("");
-  const [phone, setPhone] = useState("");
   const [sent, setSent]   = useState(false);
+
+  const plan = PLANS.find(p => p.id === selectedPlan);
 
   const saveLead = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      const { error } = await supabase.from("leads").insert({
+      await supabase.from("leads").insert({
         user_id: user?.id ?? null,
-        name:    name.trim()  || null,
-        phone:   phone.trim() || null,
+        name:    name.trim() || null,
+        phone:   null,
       });
-      if (error) console.error("leads insert failed:", error.message);
     } catch (e) {
       console.error("leads insert error:", e);
     }
@@ -35,25 +50,21 @@ export default function UpgradeModal({ onClose }) {
 
   const payWithBit = async () => {
     await saveLead();
-    const msg = encodeURIComponent(`שלום! אני רוצה לשדרג לבשבילי פרו 🚀\nשלחתי 30 ₪ בביט${name.trim() ? `\nשם: ${name.trim()}` : ""}`);
-    // Open Bit app deep link, fallback to WhatsApp instructions
+    const planLabel = plan.id === "teacher" ? "מורה" : "הורה";
+    const msg = encodeURIComponent(
+      `שלום! אני רוצה לשדרג לתוכנית ${planLabel} בבשבילי ${plan.icon}\nשלחתי ${plan.price} ₪ בביט${name.trim() ? `\nשם: ${name.trim()}` : ""}`
+    );
     window.open(`https://wa.me/${WA}?text=${msg}`, "_blank");
-    setSent("bit");
-  };
-
-  const payWithPayBox = async () => {
-    await saveLead();
-    window.open(PAYBOX_LINK, "_blank");
-    setSent("paybox");
+    setSent(true);
   };
 
   const sendWhatsApp = async () => {
     await saveLead();
-    const parts = ["שלום! אני רוצה לשדרג לבשבילי פרו 🚀"];
-    if (name.trim())  parts.push(`שם: ${name.trim()}`);
-    if (phone.trim()) parts.push(`טלפון: ${phone.trim()}`);
+    const planLabel = plan.id === "teacher" ? "מורה" : "הורה";
+    const parts = [`שלום! אני רוצה לשדרג לתוכנית ${planLabel} בבשבילי ${plan.icon}`];
+    if (name.trim()) parts.push(`שם: ${name.trim()}`);
     window.open(`https://wa.me/${WA}?text=${encodeURIComponent(parts.join("\n"))}`, "_blank");
-    setSent("wa");
+    setSent(true);
   };
 
   return (
@@ -61,42 +72,64 @@ export default function UpgradeModal({ onClose }) {
       className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-ink/40 backdrop-blur-sm"
       onClick={e => e.target === e.currentTarget && onClose()}
     >
-      <div className="bg-white rounded-3xl w-full max-w-sm shadow-2xl p-6 space-y-5">
+      <div className="bg-white rounded-3xl w-full max-w-sm shadow-2xl p-6 space-y-4">
         {/* Header */}
         <div className="flex justify-between items-start">
           <div>
-            <div className="text-4xl mb-1">🚀</div>
-            <h2 className="text-xl font-bold text-ink font-display">שדרגי לפרו</h2>
-            <p className="text-sm text-ink/50">₪30/חודש · ביטול בכל עת</p>
+            <h2 className="text-xl font-bold text-ink font-display">שדרגי את החוברות</h2>
+            <p className="text-sm text-ink/50">2 חוברות ראשונות חינם לכולם</p>
           </div>
           <button onClick={onClose} className="text-ink/30 hover:text-ink text-3xl leading-none">×</button>
         </div>
 
-        {/* Features */}
-        <ul className="bg-canvas rounded-2xl p-4 space-y-2">
-          {FEATURES.map(f => (
+        {/* Plan cards */}
+        <div className="grid grid-cols-2 gap-3">
+          {PLANS.map(p => (
+            <button
+              key={p.id}
+              onClick={() => setSelectedPlan(p.id)}
+              className={`relative rounded-2xl border-2 p-3 text-right transition-all ${
+                selectedPlan === p.id
+                  ? p.color === "purple"
+                    ? "border-magic bg-magic/5"
+                    : "border-brand bg-brand/5"
+                  : "border-ink/10 hover:border-ink/20"
+              }`}
+            >
+              {p.badge && (
+                <span className="absolute -top-2 right-2 bg-magic text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
+                  {p.badge}
+                </span>
+              )}
+              <div className="text-2xl mb-1">{p.icon}</div>
+              <div className="font-bold text-ink text-sm">{p.title}</div>
+              <div className={`font-bold text-lg ${p.color === "purple" ? "text-magic" : "text-brand"}`}>
+                ₪{p.price}
+                <span className="text-xs font-normal text-ink/40">/חודש</span>
+              </div>
+              <div className="text-xs text-ink/40 mt-0.5">{p.booklets} חוברות</div>
+            </button>
+          ))}
+        </div>
+
+        {/* Selected plan features */}
+        <ul className="bg-canvas rounded-2xl p-3 space-y-1.5">
+          {plan.features.map(f => (
             <li key={f} className="flex items-center gap-2 text-sm text-ink/70">
-              <span className="text-magic font-bold text-base">✓</span>{f}
+              <span className={`font-bold text-base ${plan.color === "purple" ? "text-magic" : "text-brand"}`}>✓</span>
+              {f}
             </li>
           ))}
         </ul>
 
         {sent ? (
           <div className="text-center py-3 space-y-3">
-            <div className="text-4xl">{sent === "bit" ? "💙" : "🎉"}</div>
-            <p className="font-semibold text-ink">
-              {sent === "bit" ? "תשלחי 30 ₪ בביט למספר:" : "תודה! העברנו אותך לתשלום"}
-            </p>
-            {sent === "bit" && (
-              <p className="text-2xl font-bold text-brand tracking-widest">{BIT_PHONE}</p>
-            )}
-            <p className="text-sm text-ink/50">
-              {sent === "bit"
-                ? "אחרי ששלחת — שלחי לנו וואטסאפ ונפעיל תוך שעה"
-                : "אחרי התשלום שלחי לנו וואטסאפ ונפעיל תוך שעה"}
-            </p>
+            <div className="text-4xl">💙</div>
+            <p className="font-semibold text-ink">תשלחי {plan.price} ₪ בביט למספר:</p>
+            <p className="text-2xl font-bold text-brand tracking-widest">{BIT_PHONE}</p>
+            <p className="text-sm text-ink/50">אחרי ששלחת — שלחי לנו וואטסאפ ונפעיל תוך שעה</p>
             <a
-              href={`https://wa.me/${WA}?text=${encodeURIComponent("שלום! שלחתי 30 ₪, אפשר להפעיל פרו? 🙏")}`}
+              href={`https://wa.me/${WA}?text=${encodeURIComponent(`שלום! שלחתי ${plan.price} ₪ בביט לתוכנית ${plan.title}, אפשר להפעיל? 🙏`)}`}
               target="_blank" rel="noopener noreferrer"
               className="block w-full bg-[#25D366] text-white rounded-xl p-3 font-semibold text-sm hover:opacity-90 transition-opacity text-center"
             >
@@ -106,37 +139,24 @@ export default function UpgradeModal({ onClose }) {
           </div>
         ) : (
           <div className="space-y-3">
-            <p className="text-sm font-medium text-ink/70">השאירי שם (אופציונלי):</p>
             <input
               className="w-full border border-ink/20 rounded-xl p-3 text-right bg-canvas/50 outline-none focus:border-magic text-sm"
-              placeholder="שם"
+              placeholder="שם (אופציונלי)"
               value={name}
               onChange={e => setName(e.target.value)}
             />
 
-            <p className="text-xs text-ink/40 font-medium text-center pt-1">בחרי אמצעי תשלום:</p>
+            <p className="text-xs text-ink/40 font-medium text-center">בחרי אמצעי תשלום:</p>
 
-            {/* Bit */}
             <button
               onClick={payWithBit}
               className="w-full bg-[#0095FF] text-white rounded-xl p-3.5 font-semibold text-sm hover:opacity-90 transition-opacity shadow-sm flex items-center justify-center gap-2"
             >
               <span className="text-lg">💙</span>
-              <span>ביט — ₪30</span>
+              <span>ביט — ₪{plan.price}</span>
               <span className="text-white/60 text-xs font-normal mr-1">הכי פשוט</span>
             </button>
 
-            {/* PayBox */}
-            {PAYBOX_LINK !== "https://payboxapp.page.link/YOUR_PAYBOX_LINK" && (
-              <button
-                onClick={payWithPayBox}
-                className="w-full bg-gradient-to-l from-brand to-magic text-white rounded-xl p-3.5 font-semibold text-sm hover:opacity-90 transition-opacity shadow-sm flex items-center justify-center gap-2"
-              >
-                💳 PayBox — ₪30
-              </button>
-            )}
-
-            {/* WhatsApp fallback */}
             <button
               onClick={sendWhatsApp}
               className="w-full border border-[#25D366] text-[#25D366] rounded-xl p-3 font-semibold text-sm hover:bg-[#25D366]/5 transition-colors flex items-center justify-center gap-2"
@@ -144,7 +164,7 @@ export default function UpgradeModal({ onClose }) {
               💬 תיצרי קשר בוואטסאפ
             </button>
 
-            <p className="text-xs text-ink/30 text-center">תשלום מאובטח · ביטול בכל עת · פעילה תוך שעה</p>
+            <p className="text-xs text-ink/30 text-center">ביטול בכל עת · פעילה תוך שעה</p>
           </div>
         )}
       </div>
