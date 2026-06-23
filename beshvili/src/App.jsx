@@ -2,8 +2,12 @@ import { useEffect, useState } from "react";
 import { supabase } from "./lib/supabase";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
+import PublicBooklet from "./pages/PublicBooklet";
 
-export default function App() {
+// /b/:token — public booklet share page (no auth needed)
+const shareMatch = window.location.pathname.match(/^\/b\/([0-9a-f-]{36})$/i);
+
+function AuthApp() {
   const [session, setSession] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -11,16 +15,16 @@ export default function App() {
     supabase.auth.getSession().then(({ data }) => {
       setSession(data.session);
       setLoading(false);
-    }).catch(() => setLoading(false));
+    });
     const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => setSession(s));
     return () => sub.subscription.unsubscribe();
   }, []);
 
-  if (loading) return (
-    <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#F7F6FB" }}>
-      <div style={{ textAlign: "center", color: "#6C5CE7", fontSize: 32 }}>📚</div>
-    </div>
-  );
-
+  if (loading) return null;
   return session ? <Dashboard /> : <Login />;
+}
+
+export default function App() {
+  if (shareMatch) return <PublicBooklet token={shareMatch[1]} />;
+  return <AuthApp />;
 }

@@ -21,13 +21,15 @@ jobs:
           supabase functions deploy generate-booklet --project-ref gywpdzkvkdisonuzhsib
           supabase functions deploy admin-stats --project-ref gywpdzkvkdisonuzhsib
           supabase functions deploy send-followup --project-ref gywpdzkvkdisonuzhsib
+          supabase functions deploy send-renewal-reminder --project-ref gywpdzkvkdisonuzhsib
+          supabase functions deploy view-booklet --project-ref gywpdzkvkdisonuzhsib
         working-directory: beshvili
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
 
       - name: Set secrets
         run: |
-          supabase secrets set ANTHROPIC_API_KEY="${{ secrets.ANTHROPIC_API_KEY }}" \
+          supabase secrets set ANTHROPIC_API_KEY="${{ secrets.ANTHROPIC_API_KEY2 }}" \
             --project-ref gywpdzkvkdisonuzhsib
           supabase secrets set RESEND_API_KEY="${{ secrets.RESEND_API_KEY }}" \
             --project-ref gywpdzkvkdisonuzhsib

@@ -16,7 +16,6 @@ Deno.serve(async (req) => {
     { auth: { persistSession: false } }
   );
 
-  // Verify caller is admin
   const jwt = req.headers.get("authorization")?.replace("Bearer ", "");
   if (!jwt) return new Response(JSON.stringify({ error: "unauthorized" }), { status: 401, headers: cors });
 
@@ -32,7 +31,6 @@ Deno.serve(async (req) => {
   const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
   const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
 
-  // Fetch all in parallel
   const [
     { data: authData },
     { count: totalBooklets },
@@ -50,18 +48,16 @@ Deno.serve(async (req) => {
     admin.from("profiles").select("id, plan, full_name, created_at, followup_sent_at"),
     admin.from("feedback").select("message, created_at, user_id").order("created_at", { ascending: false }).limit(15),
     admin.from("leads").select("name, phone, created_at").order("created_at", { ascending: false }).limit(15),
-    admin.from("booklets").select("user_id, title, world, created_at").order("created_at", { ascending: false }).limit(50),
+    admin.from("booklets").select("user_id, title, world, goal, created_at").order("created_at", { ascending: false }).limit(200),
   ]);
 
   const users = authData?.users ?? [];
   const usersThisWeek = users.filter(u => u.created_at >= weekAgo).length;
   const usersToday = users.filter(u => u.created_at >= todayStart).length;
 
-  // Profile map
   const profileMap: Record<string, { plan: string; full_name: string | null; followup_sent_at: string | null }> = {};
   (allProfiles ?? []).forEach(p => { profileMap[p.id] = p; });
 
-  // Booklet count per user
   const bookletsByUser: Record<string, number> = {};
   (allBookletRows ?? []).forEach(b => {
     bookletsByUser[b.user_id] = (bookletsByUser[b.user_id] ?? 0) + 1;
@@ -72,6 +68,18 @@ Deno.serve(async (req) => {
     const plan = p.plan ?? "free";
     planBreakdown[plan] = (planBreakdown[plan] ?? 0) + 1;
   });
+
+  const topicCount: Record<string, number> = {};
+  (allBookletRows ?? []).forEach(b => {
+    const raw = (b.goal ?? b.world ?? "").trim();
+    if (!raw) return;
+    const label = raw.length > 40 ? raw.substring(0, 40).replace(/\s\S*$/, "") + "…" : raw;
+    topicCount[label] = (topicCount[label] ?? 0) + 1;
+  });
+  const topTopics = Object.entries(topicCount)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 10)
+    .map(([topic, count]) => ({ topic, count }));
 
   const recentUsers = users
     .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
@@ -95,6 +103,7 @@ Deno.serve(async (req) => {
     bookletsThisWeek: bookletsThisWeek ?? 0,
     bookletsToday: bookletsToday ?? 0,
     planBreakdown,
+    topTopics,
     recentUsers,
     recentFeedback: recentFeedback ?? [],
     recentLeads: recentLeads ?? [],

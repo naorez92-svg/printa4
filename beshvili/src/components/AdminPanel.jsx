@@ -10,6 +10,8 @@ export default function AdminPanel() {
   const [error, setError] = useState("");
   const [sending, setSending] = useState(false);
   const [sendResult, setSendResult] = useState("");
+  const [sendingRenewal, setSendingRenewal] = useState(false);
+  const [renewalResult, setRenewalResult] = useState("");
 
   useEffect(() => {
     (async () => {
@@ -19,6 +21,15 @@ export default function AdminPanel() {
       setLoading(false);
     })();
   }, []);
+
+  const triggerRenewal = async () => {
+    setSendingRenewal(true);
+    setRenewalResult("");
+    const { data: res, error: err } = await supabase.functions.invoke("send-renewal-reminder", { body: {} });
+    setSendingRenewal(false);
+    if (err) setRenewalResult(`שגיאה: ${err.message}`);
+    else setRenewalResult(`נשלחו ${res?.sent ?? 0} תזכורות מתוך ${res?.total ?? 0}`);
+  };
 
   const triggerFollowup = async () => {
     setSending(true);
@@ -34,17 +45,16 @@ export default function AdminPanel() {
   if (!data) return null;
 
   const statCards = [
-    { label: "סהךכ משתמשים", value: data.totalUsers, icon: "👥" },
+    { label: "סה״כ משתמשים", value: data.totalUsers, icon: "👥" },
     { label: "השבוע", value: data.usersThisWeek, icon: "📅" },
     { label: "היום", value: data.usersToday, icon: "⚡" },
-    { label: "סהךכ חוברות", value: data.totalBooklets, icon: "📚" },
+    { label: "סה״כ חוברות", value: data.totalBooklets, icon: "📚" },
     { label: "חוברות השבוע", value: data.bookletsThisWeek, icon: "📊" },
     { label: "חוברות היום", value: data.bookletsToday, icon: "🔥" },
   ];
 
   return (
     <div className="space-y-6">
-      {/* Stats grid */}
       <div className="grid grid-cols-3 gap-3">
         {statCards.map(({ label, value, icon }) => (
           <div key={label} className="bg-white rounded-2xl p-4 border border-ink/5 text-center shadow-sm">
@@ -55,7 +65,6 @@ export default function AdminPanel() {
         ))}
       </div>
 
-      {/* Plan breakdown */}
       <div className="bg-white rounded-2xl p-4 border border-ink/5 shadow-sm">
         <h3 className="font-bold text-ink mb-3 text-sm">פילוח תוכניות</h3>
         <div className="flex gap-4 text-sm">
@@ -71,21 +80,62 @@ export default function AdminPanel() {
         </div>
       </div>
 
-      {/* Follow-up trigger */}
-      <div className="bg-canvas rounded-2xl p-4 border border-ink/5">
-        <h3 className="font-bold text-ink mb-1 text-sm">מייל פולואפ D+2</h3>
-        <p className="text-xs text-ink/40 mb-3">שולח אוטומטי כל בוקר דרך GitHub Actions. אפשר להפעיל ידנית כאן.</p>
-        <button
-          onClick={triggerFollowup}
-          disabled={sending}
-          className="bg-magic text-white rounded-xl px-4 py-2 text-sm font-medium disabled:opacity-50 hover:opacity-90 transition-opacity"
-        >
-          {sending ? "שולח…" : "שלח פולואפ עכשיו ✉️"}
-        </button>
-        {sendResult && <p className="text-xs text-grow mt-2">{sendResult}</p>}
+      {data.topTopics?.length > 0 && (
+        <div className="bg-white rounded-2xl p-4 border border-ink/5 shadow-sm">
+          <h3 className="font-bold text-ink mb-3 text-sm">נושאים פופולריים 🔥 (200 אחרונים)</h3>
+          <div className="space-y-1.5">
+            {data.topTopics.map(({ topic, count }, i) => {
+              const max = data.topTopics[0].count;
+              return (
+                <div key={i} className="flex items-center gap-2">
+                  <span className="text-xs text-ink/30 w-4 text-left">{i + 1}</span>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between mb-0.5">
+                      <span className="text-xs text-ink/80 truncate">{topic}</span>
+                      <span className="text-xs text-ink/40 mr-2 flex-shrink-0">{count}</span>
+                    </div>
+                    <div className="h-1.5 bg-canvas rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-gradient-to-r from-brand to-magic rounded-full"
+                        style={{ width: `${(count / max) * 100}%` }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      <div className="grid grid-cols-2 gap-3">
+        <div className="bg-canvas rounded-2xl p-4 border border-ink/5">
+          <h3 className="font-bold text-ink mb-1 text-sm">פולואפ D+2</h3>
+          <p className="text-xs text-ink/40 mb-3">אוטומטי דרך GitHub Actions. אפשר ידנית.</p>
+          <button
+            onClick={triggerFollowup}
+            disabled={sending}
+            className="bg-magic text-white rounded-xl px-3 py-2 text-xs font-medium disabled:opacity-50 hover:opacity-90 transition-opacity w-full"
+          >
+            {sending ? "שולח…" : "שלח עכשיו ✉️"}
+          </button>
+          {sendResult && <p className="text-xs text-grow mt-2">{sendResult}</p>}
+        </div>
+
+        <div className="bg-canvas rounded-2xl p-4 border border-ink/5">
+          <h3 className="font-bold text-ink mb-1 text-sm">תזכורת חידוש D+25</h3>
+          <p className="text-xs text-ink/40 mb-3">מזכיר לפרו לחדש 5 ימים לפני הסוף.</p>
+          <button
+            onClick={triggerRenewal}
+            disabled={sendingRenewal}
+            className="bg-brand text-white rounded-xl px-3 py-2 text-xs font-medium disabled:opacity-50 hover:opacity-90 transition-opacity w-full"
+          >
+            {sendingRenewal ? "שולח…" : "שלח עכשיו 🔄"}
+          </button>
+          {renewalResult && <p className="text-xs text-grow mt-2">{renewalResult}</p>}
+        </div>
       </div>
 
-      {/* Recent users */}
       <div className="bg-white rounded-2xl p-4 border border-ink/5 shadow-sm">
         <h3 className="font-bold text-ink mb-3 text-sm">משתמשים אחרונים ({data.recentUsers?.length})</h3>
         <div className="overflow-x-auto">
@@ -126,7 +176,6 @@ export default function AdminPanel() {
         </div>
       </div>
 
-      {/* Recent feedback */}
       {data.recentFeedback?.length > 0 && (
         <div className="bg-white rounded-2xl p-4 border border-ink/5 shadow-sm">
           <h3 className="font-bold text-ink mb-3 text-sm">פידבקים אחרונים ({data.recentFeedback.length})</h3>
@@ -141,7 +190,6 @@ export default function AdminPanel() {
         </div>
       )}
 
-      {/* Recent leads */}
       {data.recentLeads?.length > 0 && (
         <div className="bg-white rounded-2xl p-4 border border-ink/5 shadow-sm">
           <h3 className="font-bold text-ink mb-3 text-sm">ליידים — בקשות שדרוג ({data.recentLeads.length})</h3>
