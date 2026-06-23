@@ -20,11 +20,10 @@ export default function Login() {
     setLoading(false);
     if (err) {
       const msg = err.message || "";
-      const waitMatch = msg.match(/after (\d+) second/);
-      if (waitMatch) {
-        setError(`שלחנו מייל לאחרונה — המתן ${waitMatch[1]} שניות ונסה שנית`);
-      } else if (msg.toLowerCase().includes("rate") || msg.toLowerCase().includes("security")) {
-        setError("שלחנו מייל לאחרונה — המתן דקה ונסה שנית");
+      const isRateLimit = msg.match(/after (\d+) second/) || msg.toLowerCase().includes("rate") || msg.toLowerCase().includes("security");
+      if (isRateLimit) {
+        // OTP was already sent in a previous attempt — show success state
+        setSent(true);
       } else {
         setError(msg || "שגיאה בשליחה — נסה שנית");
       }
