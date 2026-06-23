@@ -1,9 +1,8 @@
 import { useState, useCallback, useEffect } from "react";
 import { supabase } from "../lib/supabase";
 import Preview from "./Preview";
+import UpgradeModal from "./UpgradeModal";
 import { FREE_LIMIT } from "../hooks/useProfile";
-
-const UPGRADE_LINK = "https://wa.me/972509139137?text=" + encodeURIComponent("שלום! אני רוצה לשדרג לבשבילי פרו 🎉");
 
 const SUBJECTS = [
   ["חשבון", "➕"],
@@ -28,6 +27,7 @@ const LOADING_MSGS = [
 ];
 
 export default function QuickCreate({ student, onClose, onSaved, remaining, isPro, initialSubject = "", initialWorld = "כדורגל" }) {
+  const [showUpgrade, setShowUpgrade] = useState(false);
   const [subject, setSubject]       = useState(initialSubject);
   const [world, setWorld]           = useState(initialWorld);
   const [specificGoal, setSpecificGoal] = useState("");
@@ -167,6 +167,8 @@ export default function QuickCreate({ student, onClose, onSaved, remaining, isPr
   }
 
   return (
+    <>
+    {showUpgrade && <UpgradeModal onClose={() => setShowUpgrade(false)} />}
     <div className="bg-white rounded-2xl shadow-sm border border-ink/5 overflow-hidden">
       {/* Header */}
       <div className="bg-gradient-to-l from-magic/10 to-brand/10 px-5 pt-5 pb-4">
@@ -261,14 +263,12 @@ export default function QuickCreate({ student, onClose, onSaved, remaining, isPr
         {error === "quota" && (
           <div className="space-y-3">
             <p className="text-ink/60 text-sm text-center">ניצלת את {FREE_LIMIT} החוברות החינמיות</p>
-            <a
-              href={UPGRADE_LINK}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="block w-full bg-gradient-to-l from-brand to-magic text-white rounded-xl p-3.5 font-semibold text-center hover:opacity-90 transition-opacity"
+            <button
+              onClick={() => setShowUpgrade(true)}
+              className="w-full bg-gradient-to-l from-brand to-magic text-white rounded-xl p-3.5 font-semibold text-center hover:opacity-90 transition-opacity"
             >
-              💬 שדרג לפרו — 30 ₪/חודש
-            </a>
+              🚀 שדרגי לפרו — 30 ₪/חודש
+            </button>
           </div>
         )}
 
@@ -307,5 +307,6 @@ export default function QuickCreate({ student, onClose, onSaved, remaining, isPr
         )}
       </div>
     </div>
+    </>
   );
 }

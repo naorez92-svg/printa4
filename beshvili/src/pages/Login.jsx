@@ -155,16 +155,26 @@ export default function Login() {
                 ))}
               </ul>
             </div>
-            <div className="bg-gradient-to-br from-brand/10 to-magic/10 rounded-2xl p-6 border border-magic/20 shadow-sm text-right relative overflow-hidden">
+            <div className="bg-gradient-to-br from-brand/10 to-magic/10 rounded-2xl p-6 border border-magic/20 shadow-sm text-right relative overflow-hidden flex flex-col gap-4">
               <div className="absolute top-3 left-3 bg-magic text-white text-xs rounded-full px-2.5 py-1 font-semibold">הכי פופולרי</div>
-              <div className="text-2xl mb-2">🚀 פרו</div>
-              <div className="text-3xl font-bold text-ink mb-1 font-display">₪30<span className="text-sm font-normal text-ink/40">/חודש</span></div>
-              <div className="text-xs text-ink/40 mb-4">ביטול בכל עת</div>
-              <ul className="space-y-2 text-sm text-ink/70">
-                {["חוברות ללא הגבלה", "עד 20 עמודים", "מפתח תשובות אוטומטי", "שמירה בענן", "תמיכה אישית"].map((f) => (
-                  <li key={f} className="flex items-center gap-2"><span className="text-magic">✓</span>{f}</li>
-                ))}
-              </ul>
+              <div>
+                <div className="text-2xl mb-2">🚀 פרו</div>
+                <div className="text-3xl font-bold text-ink mb-1 font-display">₪30<span className="text-sm font-normal text-ink/40">/חודש</span></div>
+                <div className="text-xs text-ink/40 mb-4">ביטול בכל עת</div>
+                <ul className="space-y-2 text-sm text-ink/70">
+                  {["חוברות ללא הגבלה", "עד 20 עמודים", "מפתח תשובות אוטומטי", "שמירה בענן", "תמיכה אישית"].map((f) => (
+                    <li key={f} className="flex items-center gap-2"><span className="text-magic">✓</span>{f}</li>
+                  ))}
+                </ul>
+              </div>
+              <a
+                href={"https://wa.me/972509139137?text=" + encodeURIComponent("שלום! אני רוצה לשדרג לבשבילי פרו 🚀")}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="block w-full bg-[#25D366] text-white rounded-xl px-4 py-2.5 text-sm font-semibold text-center hover:opacity-90 transition-opacity shadow-sm"
+              >
+                💬 שדרגי לפרו
+              </a>
             </div>
           </div>
         </div>

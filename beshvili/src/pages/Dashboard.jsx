@@ -3,10 +3,13 @@ import { supabase } from "../lib/supabase";
 import Create from "../components/Create";
 import History from "../components/History";
 import Students from "../components/Students";
+import UpgradeModal from "../components/UpgradeModal";
+import FeedbackWidget from "../components/FeedbackWidget";
 import { useProfile, FREE_LIMIT } from "../hooks/useProfile";
 
 export default function Dashboard() {
-  const [tab, setTab] = useState("create");
+  const [tab, setTab]             = useState("create");
+  const [showUpgrade, setShowUpgrade] = useState(false);
   const { profile, bookletCount, remaining, isPro, loading, refresh } = useProfile();
 
   return (
@@ -27,9 +30,12 @@ export default function Dashboard() {
                   ✓ פרו
                 </span>
               ) : (
-                <span className="text-xs font-medium text-ink/50 bg-canvas border border-ink/10 rounded-full px-2.5 py-1">
-                  {remaining}/{FREE_LIMIT} חינם
-                </span>
+                <button
+                  onClick={() => setShowUpgrade(true)}
+                  className="text-xs font-medium text-ink/50 bg-canvas border border-ink/10 rounded-full px-2.5 py-1 hover:border-magic/40 hover:text-magic transition-colors"
+                >
+                  {remaining}/{FREE_LIMIT} חינם ↑
+                </button>
               )
             )}
             <button
@@ -89,6 +95,9 @@ export default function Dashboard() {
         )}
         {tab === "history" && <History bookletCount={bookletCount} />}
       </main>
+
+      {showUpgrade && <UpgradeModal onClose={() => setShowUpgrade(false)} />}
+      <FeedbackWidget />
 
       <footer className="max-w-2xl mx-auto px-5 py-6 border-t border-ink/5 text-center text-xs text-ink/25 space-y-1">
         <div className="flex justify-center gap-4 flex-wrap">

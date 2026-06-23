@@ -1,10 +1,8 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "../lib/supabase";
 import Preview from "./Preview";
+import UpgradeModal from "./UpgradeModal";
 import { FREE_LIMIT } from "../hooks/useProfile";
-
-// Contact link for upgrade — replace with actual WhatsApp/payment link
-const UPGRADE_LINK = "https://wa.me/972509139137?text=" + encodeURIComponent("שלום! אני רוצה לשדרג לבשבילי פרו 🎉");
 
 const WORLDS = ["כדורגל", "גיימינג", "חיות", "חלל", "בישול", "מוזיקה", "סוסים", "נינג'ה", "פוקימון", "מינקראפט"];
 const LEVELS = [["basic", "🌱 בסיסי"], ["medium", "⚡ בינוני"], ["advanced", "🚀 מתקדם"]];
@@ -33,6 +31,7 @@ const LOADING_MSGS = [
 ];
 
 export default function Create({ onSaved, remaining, isPro }) {
+  const [showUpgrade, setShowUpgrade] = useState(false);
   const [mode, setMode]           = useState("form");
   const [f, setF]                 = useState(EMPTY);
   const [freeText, setFreeText]   = useState("");
@@ -180,33 +179,34 @@ export default function Create({ onSaved, remaining, isPro }) {
   // ── Quota exceeded screen ──────────────────────────────────────────────────
   if (error === "quota") {
     return (
-      <section className="bg-white rounded-2xl p-6 shadow-sm border border-ink/5 text-center space-y-5">
-        <div className="text-5xl">🔒</div>
-        <div>
-          <h2 className="text-xl font-bold text-ink mb-1">ניצלת את {FREE_LIMIT} החוברות החינמיות!</h2>
-          <p className="text-ink/60 text-sm">שדרג לפרו וקבל חוברות ללא הגבלה — 30 ₪/חודש בלבד</p>
-        </div>
+      <>
+        {showUpgrade && <UpgradeModal onClose={() => setShowUpgrade(false)} />}
+        <section className="bg-white rounded-2xl p-6 shadow-sm border border-ink/5 text-center space-y-5">
+          <div className="text-5xl">🔒</div>
+          <div>
+            <h2 className="text-xl font-bold text-ink mb-1">ניצלת את {FREE_LIMIT} החוברות החינמיות!</h2>
+            <p className="text-ink/60 text-sm">שדרגי לפרו וקבלי חוברות ללא הגבלה — 30 ₪/חודש בלבד</p>
+          </div>
 
-        <div className="bg-canvas rounded-2xl p-4 space-y-2 text-right">
-          {["חוברות ללא הגבלה", "עד 20 עמודים בחוברת", "מפתח תשובות אוטומטי", "שמירה בענן — גישה מכל מכשיר", "תמיכה אישית"].map((f) => (
-            <div key={f} className="flex items-center gap-2 text-sm text-ink/70">
-              <span className="text-grow">✓</span> {f}
-            </div>
-          ))}
-        </div>
+          <div className="bg-canvas rounded-2xl p-4 space-y-2 text-right">
+            {["חוברות ללא הגבלה", "עד 20 עמודים בחוברת", "מפתח תשובות אוטומטי", "שמירה בענן — גישה מכל מכשיר", "תמיכה אישית"].map((f) => (
+              <div key={f} className="flex items-center gap-2 text-sm text-ink/70">
+                <span className="text-grow">✓</span> {f}
+              </div>
+            ))}
+          </div>
 
-        <a
-          href={UPGRADE_LINK}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="block w-full bg-gradient-to-l from-brand to-magic text-white rounded-xl p-3.5 font-display font-semibold hover:opacity-90 transition-opacity shadow-sm"
-        >
-          💬 שדרג עכשיו — 30 ₪/חודש
-        </a>
-        <button onClick={() => setError(null)} className="text-xs text-ink/30 hover:text-ink/50 underline">
-          חזור (למי שכבר שדרג)
-        </button>
-      </section>
+          <button
+            onClick={() => setShowUpgrade(true)}
+            className="block w-full bg-gradient-to-l from-brand to-magic text-white rounded-xl p-3.5 font-display font-semibold hover:opacity-90 transition-opacity shadow-sm"
+          >
+            🚀 שדרגי עכשיו — 30 ₪/חודש
+          </button>
+          <button onClick={() => setError(null)} className="text-xs text-ink/30 hover:text-ink/50 underline">
+            חזרה (למי שכבר שדרגה)
+          </button>
+        </section>
+      </>
     );
   }
 
@@ -236,6 +236,8 @@ export default function Create({ onSaved, remaining, isPro }) {
   const rateWait = error?.startsWith("rate:") ? parseInt(error.split(":")[1]) : null;
 
   return (
+    <>
+    {showUpgrade && <UpgradeModal onClose={() => setShowUpgrade(false)} />}
     <section className="bg-white rounded-2xl shadow-sm border border-ink/5 overflow-hidden">
       {/* Header */}
       <div className="bg-gradient-to-l from-magic/10 to-brand/10 px-5 pt-5 pb-4">
@@ -406,14 +408,12 @@ export default function Create({ onSaved, remaining, isPro }) {
             </div>
           </div>
         ) : (!isPro && remaining === 0) ? (
-          <a
-            href={UPGRADE_LINK}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="block w-full bg-gradient-to-l from-brand to-magic text-white rounded-xl p-3.5 font-display font-semibold text-center hover:opacity-90 transition-opacity shadow-sm"
+          <button
+            onClick={() => setShowUpgrade(true)}
+            className="w-full bg-gradient-to-l from-brand to-magic text-white rounded-xl p-3.5 font-display font-semibold hover:opacity-90 transition-opacity shadow-sm"
           >
-            💬 שדרג לפרו להמשיך
-          </a>
+            🚀 שדרגי לפרו להמשיך
+          </button>
         ) : (
           <button onClick={create} disabled={!canSubmit}
             className="w-full bg-gradient-to-l from-brand to-magic text-white rounded-xl p-3.5 font-display font-semibold disabled:opacity-40 hover:opacity-90 transition-opacity shadow-sm">
@@ -423,5 +423,6 @@ export default function Create({ onSaved, remaining, isPro }) {
         )}
       </div>
     </section>
+    </>
   );
 }
