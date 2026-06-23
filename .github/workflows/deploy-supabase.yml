@@ -44,6 +44,7 @@ jobs:
 
       - name: Link project
         run: supabase link --project-ref gywpdzkvkdisonuzhsib
+        working-directory: beshvili
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
 
