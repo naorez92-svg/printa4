@@ -33,8 +33,8 @@ Deno.serve(async (req) => {
 
   const { data: pendingProfiles } = await admin
     .from("profiles")
-    .select("id, pro_since")
-    .eq("plan", "pro")
+    .select("id, pro_since, plan")
+    .in("plan", ["pro", "parent", "teacher"])
     .is("renewal_reminder_sent_at", null)
     .lte("pro_since", d25)
     .gte("pro_since", d32);
@@ -61,25 +61,24 @@ Deno.serve(async (req) => {
 <body style="font-family:Arial,sans-serif;background:#F7F6FB;margin:0;padding:20px;">
   <div style="max-width:500px;margin:0 auto;background:white;border-radius:16px;padding:32px;border:1px solid #eee;">
     <div style="font-size:32px;text-align:center;margin-bottom:16px;">🚀</div>
-    <h2 style="color:#20184A;text-align:center;margin:0 0 16px;">חידוש מנוי פרו — 5 ימים נשארו</h2>
+    <h2 style="color:#20184A;text-align:center;margin:0 0 16px;">חידוש המנוי — 5 ימים נשארו</h2>
     <p style="color:#555;line-height:1.7;margin:0 0 16px;">
       שלום!<br><br>
-      המנוי שלך לבשבילי פרו מסתיים בעוד ~5 ימים.<br>
-      כדי להמשיך ליצור חוברות ללא הגבלה, שלחי 30 ₪ בביט למספר <strong>050-913-9137</strong> ואז וואטסאפ לאישור.
+      המנוי שלך לבשבילי מסתיים בעוד ~5 ימים.<br>
+      כדי להמשיך ליצור חוברות, שלחי ${profile.plan === "parent" ? "19" : profile.plan === "teacher" ? "59" : "30"} ₪ בביט למספר <strong>050-913-9137</strong> ואז וואטסאפ לאישור.
     </p>
     <div style="background:#F7F6FB;border-radius:12px;padding:16px;margin-bottom:24px;">
-      <p style="margin:0 0 8px;font-weight:bold;color:#20184A;font-size:14px;">מה כלול בפרו:</p>
+      <p style="margin:0 0 8px;font-weight:bold;color:#20184A;font-size:14px;">התוכנית שלך — ${profile.plan === "parent" ? "הורה 🌟" : profile.plan === "teacher" ? "מורה 🚀" : "פרו 🚀"}:</p>
       <ul style="margin:0;padding-right:20px;color:#555;font-size:14px;line-height:2;">
-        <li>20 חוברות לחודש (ללא הגבלה בפועל)</li>
-        <li>עד 20 עמודים לחוברת</li>
+        ${profile.plan === "parent" ? "<li>5 חוברות לחודש</li><li>עד 10 עמודים לחוברת</li>" : "<li>20 חוברות לחודש</li><li>עד 20 עמודים לחוברת</li>"}
         <li>מפתח תשובות אוטומטי</li>
         <li>שמירה בענן לצמיתות</li>
       </ul>
     </div>
     <div style="text-align:center;margin-bottom:24px;">
-      <a href="https://wa.me/972509139137?text=${encodeURIComponent("שלום! אני רוצה לחדש את מנוי הפרו שלי 🚀 שלחתי 30 ₪ בביט")}"
+      <a href="https://wa.me/972509139137?text=${encodeURIComponent(`שלום! אני רוצה לחדש את המנוי שלי בבשבילי 🚀 שלחתי ${profile.plan === "parent" ? "19" : profile.plan === "teacher" ? "59" : "30"} ₪ בביט`)}"
          style="display:inline-block;background:linear-gradient(to left,#F4A02C,#6C5CE7);color:white;padding:14px 32px;border-radius:12px;text-decoration:none;font-weight:bold;font-size:16px;">
-        💙 חדשי עכשיו — 30 ₪/חודש
+        💙 חדשי עכשיו
       </a>
     </div>
     <p style="color:#aaa;font-size:11px;text-align:center;margin:0;">
@@ -98,7 +97,7 @@ Deno.serve(async (req) => {
       body: JSON.stringify({
         from: "בשבילי <hello@beshvili.app>",
         to: [email],
-        subject: "חידוש מנוי פרו — 5 ימים נשארו 🚀",
+        subject: "חידוש המנוי שלך — 5 ימים נשארו 🚀",
         html,
       }),
     });
