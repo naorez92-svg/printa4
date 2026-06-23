@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "../lib/supabase";
 import Preview from "./Preview";
+import BookletRating from "./BookletRating";
 import UpgradeModal from "./UpgradeModal";
 import { FREE_LIMIT } from "../hooks/useProfile";
 
@@ -41,6 +42,8 @@ export default function Create({ onSaved, remaining, isPro }) {
   const [loadingMsgIdx, setLoadingMsgIdx] = useState(0);
   const [streamChars, setStreamChars] = useState(0);
   const [html, setHtml]           = useState(null);
+  const [bookletId, setBookletId] = useState(null);
+  const [showRating, setShowRating] = useState(false);
   const [error, setError]         = useState(null); // null | "quota" | "rate:{wait}" | "generic:{msg}"
 
   // Rotate loading messages every 3.5 s while generating
@@ -153,15 +156,17 @@ export default function Create({ onSaved, remaining, isPro }) {
     const { data: u } = await supabase.auth.getUser();
     if (!u?.user) { setError("generic:שגיאת משתמש — נסה להתחבר מחדש"); return; }
 
-    const { error: insertErr } = await supabase.from("booklets").insert({
+    const { data: inserted, error: insertErr } = await supabase.from("booklets").insert({
       user_id: u.user.id, title,
       child_name: f.childName || null, grade: f.grade || null,
       world: f.world || null,
       goal: mode === "free" ? freeText.trim().substring(0, 200) : f.goal,
       level: f.level, html,
-    });
+    }).select("id").single();
     if (insertErr) { setError(`generic:שמירה נכשלה — ${insertErr.message}`); return; }
 
+    setBookletId(inserted?.id ?? null);
+    setShowRating(true);
     setHtml(html);
     onSaved?.();
   }, [canSubmit, mode, freeText, f, pageCount, withAnswerKey, onSaved]);
@@ -172,7 +177,7 @@ export default function Create({ onSaved, remaining, isPro }) {
     return () => window.removeEventListener("keydown", h);
   }, [create]);
 
-  const reset = () => { setHtml(null); setF(EMPTY); setFreeText(""); setError(null); };
+  const reset = () => { setHtml(null); setF(EMPTY); setFreeText(""); setError(null); setBookletId(null); setShowRating(false); };
   const set   = (k) => (e) => setF((p) => ({ ...p, [k]: e.target.value }));
   const applyTmpl = (tmpl) => { setF((p) => ({ ...p, ...tmpl.f })); setMode("form"); setTimeout(() => document.getElementById("inp-name")?.focus(), 50); };
 
@@ -214,20 +219,30 @@ export default function Create({ onSaved, remaining, isPro }) {
   if (html) {
     return (
       <section className="space-y-4">
-        {/* Success banner */}
-        <div className="bg-gradient-to-l from-grow/15 to-brand/10 border border-grow/20 rounded-2xl px-5 py-4 flex items-center gap-3">
-          <span className="text-3xl">🎉</span>
-          <div className="flex-1">
-            <p className="font-bold text-ink text-base">החוברת מוכנה!</p>
-            <p className="text-xs text-ink/50 mt-0.5">נשמרה בענן · מוכנה להדפסה או שיתוף</p>
-          </div>
-          {!isPro && remaining !== undefined && (
-            <span className="text-xs text-ink/40 bg-white rounded-full px-2.5 py-1 border border-ink/10">
-              {remaining} נותרו
-            </span>
-          )}
-        </div>
-        <Preview html={html} onReset={reset} />
+        {showRating && bookletId ? (
+          <BookletRating
+            bookletId={bookletId}
+            studentName={f.childName || null}
+            onDone={() => setShowRating(false)}
+          />
+        ) : (
+          <>
+            {/* Success banner */}
+            <div className="bg-gradient-to-l from-grow/15 to-brand/10 border border-grow/20 rounded-2xl px-5 py-4 flex items-center gap-3">
+              <span className="text-3xl">🎉</span>
+              <div className="flex-1">
+                <p className="font-bold text-ink text-base">החוברת מוכנה!</p>
+                <p className="text-xs text-ink/50 mt-0.5">נשמרה בענן · מוכנה להדפסה או שיתוף</p>
+              </div>
+              {!isPro && remaining !== undefined && (
+                <span className="text-xs text-ink/40 bg-white rounded-full px-2.5 py-1 border border-ink/10">
+                  {remaining} נותרו
+                </span>
+              )}
+            </div>
+            <Preview html={html} onReset={reset} />
+          </>
+        )}
       </section>
     );
   }
