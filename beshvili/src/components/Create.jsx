@@ -51,7 +51,11 @@ export default function Create({ onSaved, remaining, isPro }) {
     return () => clearInterval(id);
   }, [loading]);
 
-  const canSubmit = !loading && (mode === "free" ? freeText.trim().length > 5 : f.childName.trim() && f.goal.trim());
+  const canSubmit = !loading && (
+    mode === "free"  ? freeText.trim().length > 5 :
+    mode === "quick" ? f.goal.trim().length > 2 :
+    f.childName.trim() && f.goal.trim()
+  );
 
   const create = useCallback(async () => {
     if (!canSubmit) return;
@@ -59,8 +63,12 @@ export default function Create({ onSaved, remaining, isPro }) {
     setHtml(null);
     setError(null);
 
+    const quickText = `דף תרגיל מהיר${f.childName ? ` עבור ${f.childName.trim()}` : ""}${f.grade ? `, כיתה ${f.grade}` : ""}. נושא: ${f.goal.trim()}${f.world ? `, עולם תוכן: ${f.world}` : ""}. צור עמוד A4 אחד עם 8–12 תרגילים מגוונים ומהנים. ללא שער ורפלקציה. קוד HTML גולמי בלבד.`;
+
     const body = mode === "free"
       ? { freeText: freeText.trim(), pageCount, withAnswerKey }
+      : mode === "quick"
+      ? { freeText: quickText, pageCount: 1, withAnswerKey: false }
       : { ...f, pageCount, withAnswerKey };
 
     const { data: { session } } = await supabase.auth.getSession();
@@ -139,6 +147,8 @@ export default function Create({ onSaved, remaining, isPro }) {
 
     const title = mode === "free"
       ? freeText.trim().substring(0, 60) + (freeText.length > 60 ? "…" : "")
+      : mode === "quick"
+      ? `⚡ ${f.goal.trim().substring(0, 50)}`
       : `${f.childName} — ${f.goal}`;
 
     const { data: u } = await supabase.auth.getUser();
@@ -236,7 +246,7 @@ export default function Create({ onSaved, remaining, isPro }) {
           )}
         </div>
         <div className="flex gap-1 bg-white/70 rounded-xl p-1 w-fit">
-          {[["form", "📋 טופס"], ["free", "✍️ טקסט חופשי"]].map(([m, label]) => (
+          {[["form", "📋 טופס"], ["quick", "⚡ דף מהיר"], ["free", "✍️ חופשי"]].map(([m, label]) => (
             <button key={m} onClick={() => setMode(m)}
               className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all ${mode === m ? "bg-white shadow text-ink" : "text-ink/50 hover:text-ink"}`}>
               {label}
@@ -281,6 +291,46 @@ export default function Create({ onSaved, remaining, isPro }) {
           </div>
         )}
 
+        {/* Quick mode */}
+        {mode === "quick" && (
+          <div className="space-y-3">
+            <div className="bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 text-xs text-amber-700 flex items-center gap-2">
+              <span>⚡</span>
+              <span>דף תרגיל אחד · ~30 שניות · מושלם לשיעורי בית מהירים</span>
+            </div>
+            <input
+              className="w-full border border-ink/20 rounded-xl p-3 outline-none focus:border-magic text-right bg-canvas/50"
+              placeholder="שם הילד/ה (אופציונלי)"
+              value={f.childName}
+              onChange={set("childName")}
+              disabled={loading}
+            />
+            <input
+              className="w-full border border-ink/20 rounded-xl p-3 outline-none focus:border-magic text-right bg-canvas/50"
+              placeholder="כיתה (אופציונלי) — כיתה ב, כיתה ד..."
+              value={f.grade}
+              onChange={set("grade")}
+              disabled={loading}
+            />
+            <input
+              className="w-full border border-ink/20 rounded-xl p-3 outline-none focus:border-magic text-right bg-canvas/50"
+              placeholder="מה לתרגל? * — למשל: חיבור וחיסור עד 100, קריאה בניקוד..."
+              value={f.goal}
+              onChange={set("goal")}
+              disabled={loading}
+              autoFocus
+            />
+            <select
+              className="w-full border border-ink/20 rounded-xl p-3 outline-none focus:border-magic bg-canvas/50 text-right"
+              value={f.world}
+              onChange={set("world")}
+              disabled={loading}
+            >
+              {WORLDS.map((w) => <option key={w}>{w}</option>)}
+            </select>
+          </div>
+        )}
+
         {/* Free text mode */}
         {mode === "free" && (
           <textarea
@@ -292,8 +342,8 @@ export default function Create({ onSaved, remaining, isPro }) {
 
         <div className="border-t border-ink/5" />
 
-        {/* Page count selector */}
-        <div>
+        {/* Page count selector — hidden in quick mode */}
+        {mode !== "quick" && <div>
           <p className="text-xs text-ink/40 mb-2 font-medium">כמות עמודים</p>
           <div className="flex gap-2">
             {PAGE_OPTIONS.map((n) => (
@@ -303,9 +353,10 @@ export default function Create({ onSaved, remaining, isPro }) {
               </button>
             ))}
           </div>
-        </div>
+        </div>}
 
-        {/* Answer key toggle */}
+        {/* Answer key toggle — hidden in quick mode */}
+        {mode === "quick" && null}
         <label className="flex items-center justify-between gap-3 cursor-pointer select-none">
           <div>
             <span className="text-sm font-medium text-ink">מפתח תשובות</span>
@@ -344,7 +395,7 @@ export default function Create({ onSaved, remaining, isPro }) {
             <p className="text-ink/60 text-sm font-medium">{LOADING_MSGS[loadingMsgIdx]}</p>
             {streamChars > 0
               ? <p className="text-magic text-xs font-mono">{streamChars.toLocaleString("he-IL")} תווים נכתבו...</p>
-              : <p className="text-ink/30 text-xs">{pageCount} עמודי A4 · 30–90 שניות</p>
+              : <p className="text-ink/30 text-xs">{mode === "quick" ? "עמוד A4 אחד · ~30 שניות" : `${pageCount} עמודי A4 · 30–90 שניות`}</p>
             }
             <div className="w-full bg-canvas rounded-full h-1.5 overflow-hidden">
               {streamChars > 0
@@ -366,7 +417,7 @@ export default function Create({ onSaved, remaining, isPro }) {
         ) : (
           <button onClick={create} disabled={!canSubmit}
             className="w-full bg-gradient-to-l from-brand to-magic text-white rounded-xl p-3.5 font-display font-semibold disabled:opacity-40 hover:opacity-90 transition-opacity shadow-sm">
-            ✨ צור חוברת ({pageCount} עמ')
+            {mode === "quick" ? "⚡ צור דף מהיר (עמוד אחד)" : `✨ צור חוברת (${pageCount} עמ')`}
             {canSubmit && <span className="mr-2 text-white/60 text-xs font-normal">Ctrl+Enter</span>}
           </button>
         )}

@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { supabase } from "../lib/supabase";
 import QuickCreate from "./QuickCreate";
+import StudentHistory from "./StudentHistory";
 
 const GRADES = [
   "גן חובה", "כיתה א", "כיתה ב", "כיתה ג", "כיתה ד",
@@ -17,6 +18,7 @@ export default function Students({ onBookletSaved, remaining, isPro }) {
   const [form, setForm]           = useState(EMPTY);
   const [saving, setSaving]       = useState(false);
   const [quickCreate, setQuickCreate] = useState(null);
+  const [history, setHistory]         = useState(null);
 
   const fetchStudents = async () => {
     const { data } = await supabase
@@ -65,6 +67,17 @@ export default function Students({ onBookletSaved, remaining, isPro }) {
         student={quickCreate}
         onClose={() => setQuickCreate(null)}
         onSaved={() => { setQuickCreate(null); onBookletSaved?.(); }}
+        remaining={remaining}
+        isPro={isPro}
+      />
+    );
+  }
+
+  if (history) {
+    return (
+      <StudentHistory
+        student={history}
+        onBack={() => setHistory(null)}
         remaining={remaining}
         isPro={isPro}
       />
@@ -190,6 +203,14 @@ export default function Students({ onBookletSaved, remaining, isPro }) {
                   )}
                 </div>
               </div>
+
+              <button
+                onClick={() => setHistory(student)}
+                className="border border-ink/15 text-ink/50 rounded-xl px-3 py-2 text-sm hover:text-ink hover:border-ink/30 transition-colors whitespace-nowrap"
+                title="ביומן החוברות"
+              >
+                📅
+              </button>
 
               <button
                 onClick={() => setQuickCreate(student)}

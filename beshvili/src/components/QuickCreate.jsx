@@ -27,9 +27,9 @@ const LOADING_MSGS = [
   "כמעט מוכן! עוד רגע...",
 ];
 
-export default function QuickCreate({ student, onClose, onSaved, remaining, isPro }) {
-  const [subject, setSubject]       = useState("");
-  const [world, setWorld]           = useState("כדורגל");
+export default function QuickCreate({ student, onClose, onSaved, remaining, isPro, initialSubject = "", initialWorld = "כדורגל" }) {
+  const [subject, setSubject]       = useState(initialSubject);
+  const [world, setWorld]           = useState(initialWorld);
   const [specificGoal, setSpecificGoal] = useState("");
   const [pageCount, setPageCount]   = useState(5);
   const [loading, setLoading]       = useState(false);
