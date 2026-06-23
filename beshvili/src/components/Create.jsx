@@ -8,15 +8,30 @@ import { FREE_LIMIT } from "../hooks/useProfile";
 const WORLDS = ["כדורגל", "גיימינג", "חיות", "חלל", "בישול", "מוזיקה", "סוסים", "נינג'ה", "פוקימון", "מינקראפט"];
 const LEVELS = [["basic", "🌱 בסיסי"], ["medium", "⚡ בינוני"], ["advanced", "🚀 מתקדם"]];
 const TEMPLATES = [
-  { icon: "📖", label: "כיתה א — קריאה",    f: { grade: "כיתה א", world: "חיות",    goal: "קריאת מילים בניקוד מלא ומשפטים פשוטים",             level: "basic"    } },
-  { icon: "➕", label: "כיתה ב — חיבור",   f: { grade: "כיתה ב", world: "כדורגל", goal: "חיבור וחיסור עד 100 ללא מעבר עשרת",                level: "medium"   } },
-  { icon: "✖️", label: "כיתה ג — כפל",     f: { grade: "כיתה ג", world: "גיימינג", goal: "לוח כפל 6, 7, 8 — שינון ויישום",                  level: "medium"   } },
-  { icon: "½",  label: "כיתה ד — שברים",   f: { grade: "כיתה ד", world: "חלל",    goal: "שברים: חצי, שליש, רבע — זיהוי, חיבור, השוואה",    level: "medium"   } },
-  { icon: "📐", label: "כיתה ה — שטח",     f: { grade: "כיתה ה", world: "בישול",  goal: "שטח והיקף: ריבוע, מלבן, משולש",                    level: "advanced" } },
-  { icon: "%",  label: "כיתה ו — אחוזים",  f: { grade: "כיתה ו", world: "מוזיקה", goal: "אחוזים: חישוב, הסקה, בעיות מילוליות",              level: "advanced" } },
-  { icon: "📝", label: "מבחן חצי שנתי",    f: { grade: "",        world: "כללי",   goal: "מבחן חצי שנתי: חשבון, שפה, הבנת הנקרא",            level: "advanced" } },
-  { icon: "🔄", label: "חזרה לפני בחינה",  f: { grade: "",        world: "גיימינג",goal: "חזרה כללית: ארבע פעולות, שברים, אחוזים, בעיות",   level: "medium"   } },
-  { icon: "🌟", label: "העשרה מתקדמת",     f: { grade: "",        world: "חלל",    goal: "חשיבה מתמטית: פאזלים, לוגיקה, חשיבה מחוץ לקופסה", level: "advanced" } },
+  { icon: "📖", label: "הבנת הנקרא ג-ד",   f: { grade: "כיתה ג",  world: "כדורגל",  goal: "הבנת הנקרא: טקסט ספרותי, שאלות הבנה ואוצר מילים",            level: "basic"    } },
+  { icon: "📖", label: "הבנת הנקרא ה-ו",   f: { grade: "כיתה ה",  world: "כדורגל",  goal: "הבנת הנקרא: טקסט ספרותי, שאלות הבנה ואסטרטגיות קריאה",       level: "medium"   } },
+  { icon: "🔢", label: "מספרים עשרוניים",   f: { grade: "כיתה ה",  world: "גיימינג", goal: "מספרים עשרוניים: קריאה, כתיבה, השוואה, חיבור וחיסור",          level: "medium"   } },
+  { icon: "📖", label: "כיתה א — קריאה",   f: { grade: "כיתה א",  world: "חיות",    goal: "קריאת מילים בניקוד מלא ומשפטים פשוטים",                        level: "basic"    } },
+  { icon: "➕", label: "כיתה ב — חיבור",   f: { grade: "כיתה ב",  world: "כדורגל",  goal: "חיבור וחיסור עד 100 ללא מעבר עשרת",                            level: "medium"   } },
+  { icon: "✖️", label: "כיתה ג — כפל",     f: { grade: "כיתה ג",  world: "גיימינג", goal: "לוח כפל 6, 7, 8 — שינון ויישום",                               level: "medium"   } },
+  { icon: "½",  label: "כיתה ד — שברים",   f: { grade: "כיתה ד",  world: "חלל",     goal: "שברים: חצי, שליש, רבע — זיהוי, חיבור, השוואה",                 level: "medium"   } },
+  { icon: "📐", label: "כיתה ה — שטח",     f: { grade: "כיתה ה",  world: "בישול",   goal: "שטח והיקף: ריבוע, מלבן, משולש",                                level: "advanced" } },
+  { icon: "%",  label: "כיתה ו — אחוזים",  f: { grade: "כיתה ו",  world: "מוזיקה",  goal: "אחוזים: חישוב, הסקה, בעיות מילוליות",                          level: "advanced" } },
+  { icon: "📝", label: "מבחן חצי שנתי",    f: { grade: "",         world: "כללי",    goal: "מבחן חצי שנתי: חשבון, שפה, הבנת הנקרא",                        level: "advanced" } },
+  { icon: "🔄", label: "חזרה לפני בחינה",  f: { grade: "",         world: "גיימינג", goal: "חזרה כללית: ארבע פעולות, שברים, אחוזים, בעיות",                level: "medium"   } },
+  { icon: "🌟", label: "העשרה מתקדמת",     f: { grade: "",         world: "חלל",     goal: "חשיבה מתמטית: פאזלים, לוגיקה, חשיבה מחוץ לקופסה",             level: "advanced" } },
+];
+const GOAL_PICKS = [
+  { icon: "📖", label: "הבנת הנקרא",       goal: "הבנת הנקרא: טקסט ספרותי, שאלות הבנה ואוצר מילים" },
+  { icon: "🔢", label: "מספרים עשרוניים",  goal: "מספרים עשרוניים: קריאה, כתיבה, השוואה, חיבור וחיסור" },
+  { icon: "½",  label: "שברים",            goal: "שברים: חיבור, חיסור, השוואה ומספר מעורב" },
+  { icon: "✖️", label: "כפל וחילוק",       goal: "לוח כפל וחילוק: שינון, יישום ובעיות מילוליות" },
+  { icon: "%",  label: "אחוזים",           goal: "אחוזים: מציאת האחוז, מציאת הכמות, בעיות מילוליות" },
+  { icon: "📝", label: "כתיבה יוצרת",      goal: "כתיבה יוצרת: בניית סיפור, תיאור דמויות וסצנה" },
+  { icon: "📐", label: "שטח והיקף",        goal: "שטח והיקף: ריבוע, מלבן, משולש" },
+  { icon: "🔤", label: "דקדוק עברי",       goal: "דקדוק עברי: פועל, שם עצם, שם תואר, זמנים" },
+  { icon: "🔡", label: "קריאה בניקוד",     goal: "קריאה בניקוד: פענוח, הבנת המילה, קריאת משפטים" },
+  { icon: "🔢", label: "חיבור וחיסור",     goal: "חיבור וחיסור: אלגוריתמים, מעבר עשרת, בעיות" },
 ];
 const EMPTY = { childName: "", grade: "", world: "כדורגל", goal: "", level: "medium" };
 const PAGE_OPTIONS = [3, 5, 7, 10];
@@ -296,7 +311,17 @@ export default function Create({ onSaved, remaining, isPro }) {
             <select className="w-full border border-ink/20 rounded-xl p-3 outline-none focus:border-magic bg-canvas/50 text-right" value={f.world} onChange={set("world")} disabled={loading}>
               {WORLDS.map((w) => <option key={w}>{w}</option>)}
             </select>
-            <textarea className="w-full border border-ink/20 rounded-xl p-3 outline-none focus:border-magic text-right resize-none bg-canvas/50" placeholder="יעד פדגוגי *" rows={2} value={f.goal} onChange={set("goal")} disabled={loading} />
+            <div>
+              <textarea className="w-full border border-ink/20 rounded-xl p-3 outline-none focus:border-magic text-right resize-none bg-canvas/50" placeholder="יעד פדגוגי *" rows={2} value={f.goal} onChange={set("goal")} disabled={loading} />
+              <div className="flex flex-wrap gap-1.5 mt-2">
+                {GOAL_PICKS.map(({ icon, label, goal }) => (
+                  <button key={label} type="button" onClick={() => setF(p => ({ ...p, goal }))} disabled={loading}
+                    className={`text-xs border rounded-full px-2.5 py-1 transition-colors disabled:opacity-30 ${f.goal === goal ? "border-magic text-magic bg-magic/5" : "border-ink/15 text-ink/50 hover:border-magic hover:text-magic"}`}>
+                    {icon} {label}
+                  </button>
+                ))}
+              </div>
+            </div>
             <div className="flex gap-2">
               {LEVELS.map(([v, t]) => (
                 <button key={v} onClick={() => setF((p) => ({ ...p, level: v }))} disabled={loading}
@@ -329,14 +354,24 @@ export default function Create({ onSaved, remaining, isPro }) {
               onChange={set("grade")}
               disabled={loading}
             />
-            <input
-              className="w-full border border-ink/20 rounded-xl p-3 outline-none focus:border-magic text-right bg-canvas/50"
-              placeholder="מה לתרגל? * — למשל: חיבור וחיסור עד 100, קריאה בניקוד..."
-              value={f.goal}
-              onChange={set("goal")}
-              disabled={loading}
-              autoFocus
-            />
+            <div>
+              <input
+                className="w-full border border-ink/20 rounded-xl p-3 outline-none focus:border-magic text-right bg-canvas/50"
+                placeholder="מה לתרגל? * — למשל: חיבור וחיסור עד 100, קריאה בניקוד..."
+                value={f.goal}
+                onChange={set("goal")}
+                disabled={loading}
+                autoFocus
+              />
+              <div className="flex flex-wrap gap-1.5 mt-2">
+                {GOAL_PICKS.map(({ icon, label, goal }) => (
+                  <button key={label} type="button" onClick={() => setF(p => ({ ...p, goal }))} disabled={loading}
+                    className={`text-xs border rounded-full px-2.5 py-1 transition-colors disabled:opacity-30 ${f.goal === goal ? "border-magic text-magic bg-magic/5" : "border-ink/15 text-ink/50 hover:border-magic hover:text-magic"}`}>
+                    {icon} {label}
+                  </button>
+                ))}
+              </div>
+            </div>
             <select
               className="w-full border border-ink/20 rounded-xl p-3 outline-none focus:border-magic bg-canvas/50 text-right"
               value={f.world}
