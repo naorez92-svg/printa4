@@ -4,6 +4,7 @@ import Preview from "./Preview";
 import BookletRating from "./BookletRating";
 import UpgradeModal from "./UpgradeModal";
 import { FREE_LIMIT } from "../hooks/useProfile";
+import { useChildren } from "../hooks/useChildren";
 
 const WORLDS = ["כדורגל", "גיימינג", "חיות", "חלל", "בישול", "מוזיקה", "סוסים", "נינג'ה", "פוקימון", "מינקראפט"];
 const LEVELS = [["basic", "🌱 בסיסי"], ["medium", "⚡ בינוני"], ["advanced", "🚀 מתקדם"]];
@@ -62,6 +63,8 @@ export default function Create({ onSaved, remaining, isPro }) {
   const [showRating, setShowRating] = useState(false);
   const [error, setError]         = useState(null); // null | "quota" | "quota_monthly" | "rate:{wait}" | "generic:{msg}"
   const [rateCountdown, setRateCountdown] = useState(null);
+  const [childSaved, setChildSaved] = useState(false);
+  const { children: savedChildren, loaded: childrenLoaded, save: saveChild } = useChildren();
 
   // Rotate loading messages every 3.5 s while generating
   useEffect(() => {
@@ -222,7 +225,7 @@ export default function Create({ onSaved, remaining, isPro }) {
     return () => window.removeEventListener("keydown", h);
   }, [create]);
 
-  const reset = () => { setHtml(null); setF(EMPTY); setFreeText(""); setError(null); setBookletId(null); setShareToken(null); setShowRating(false); };
+  const reset = () => { setHtml(null); setF(EMPTY); setFreeText(""); setError(null); setBookletId(null); setShareToken(null); setShowRating(false); setChildSaved(false); };
   const set   = (k) => (e) => setF((p) => ({ ...p, [k]: e.target.value }));
   const applyTmpl = (tmpl) => { setF((p) => ({ ...p, ...tmpl.f })); setMode("form"); setTimeout(() => document.getElementById("inp-name")?.focus(), 50); };
 
@@ -332,6 +335,23 @@ export default function Create({ onSaved, remaining, isPro }) {
             onDone={() => setShowRating(false)}
           />
         )}
+
+        {/* Save child profile prompt */}
+        {mode === "form" && f.childName.trim() && childrenLoaded && !childSaved && !savedChildren.some(c => c.name === f.childName.trim()) && (
+          <button
+            onClick={async () => {
+              const saved = await saveChild({ name: f.childName, grade: f.grade, world: f.world, level: f.level });
+              if (saved) setChildSaved(true);
+            }}
+            className="w-full flex items-center justify-center gap-2 border border-grow/40 text-grow rounded-xl p-3 text-sm font-semibold hover:bg-grow/5 transition-colors"
+          >
+            <span>💾</span>
+            <span>שמור את {f.childName.trim()} לפעם הבאה</span>
+          </button>
+        )}
+        {childSaved && (
+          <p className="text-center text-xs text-grow py-1">✓ {f.childName.trim()} נשמר/ה לפרופילים שלך</p>
+        )}
       </section>
     );
   }
@@ -377,6 +397,33 @@ export default function Create({ onSaved, remaining, isPro }) {
         {/* Form mode */}
         {mode === "form" && (
           <div className="space-y-3">
+            {/* Saved children selector */}
+            {childrenLoaded && savedChildren.length > 0 && (
+              <div>
+                <p className="text-xs text-ink/40 mb-1.5 font-medium">תלמידים שלי</p>
+                <div className="flex gap-2 flex-wrap">
+                  {savedChildren.map((c) => (
+                    <button
+                      key={c.id}
+                      type="button"
+                      disabled={loading}
+                      onClick={() => setF(p => ({
+                        ...p,
+                        childName: c.name,
+                        grade: c.grade || p.grade,
+                        world: c.worlds?.[0] || p.world,
+                        level: c.level || p.level,
+                      }))}
+                      className={`flex items-center gap-1.5 border rounded-full px-3 py-1 text-xs transition-colors disabled:opacity-40 ${f.childName === c.name ? "border-magic text-magic bg-magic/5" : "border-ink/15 text-ink/70 hover:border-magic hover:text-magic bg-canvas/50"}`}
+                    >
+                      <span>👤</span>
+                      <span>{c.name}</span>
+                      {c.grade && <span className="text-ink/30">· {c.grade}</span>}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
             <input id="inp-name" className="w-full border border-ink/20 rounded-xl p-3 outline-none focus:border-magic text-right bg-canvas/50" placeholder="שם הילד/ה *" value={f.childName} onChange={set("childName")} disabled={loading} />
             <input className="w-full border border-ink/20 rounded-xl p-3 outline-none focus:border-magic text-right bg-canvas/50" placeholder="גיל / כיתה" value={f.grade} onChange={set("grade")} disabled={loading} />
             <div>
