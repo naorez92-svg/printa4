@@ -113,7 +113,7 @@ export default function Create({ onSaved, remaining, isPro }) {
       return;
     }
 
-    const fnUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-booklet`;
+    const fnUrl = `${import.meta.env.VITE_SUPABASE_URL ?? "https://gywpdzkvkdisonuzhsib.supabase.co"}/functions/v1/generate-booklet`;
     let resp;
     try {
       resp = await fetch(fnUrl, {
