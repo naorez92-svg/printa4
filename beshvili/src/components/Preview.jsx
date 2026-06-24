@@ -7,10 +7,17 @@ function isMobileDevice() {
   return typeof navigator !== "undefined" && /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
 }
 
+function extractText(html) {
+  const doc = new DOMParser().parseFromString(html, "text/html");
+  doc.querySelectorAll("script, style, .no-print").forEach(el => el.remove());
+  return (doc.body.textContent || "").replace(/\s+/g, " ").trim();
+}
+
 export default function Preview({ html, onReset, shareToken }) {
   const wrapperRef = useRef(null);
   const [scale, setScale]   = useState(1);
   const [copied, setCopied] = useState(false);
+  const [reading, setReading] = useState(false);
   const isMobile = isMobileDevice();
 
   useEffect(() => {
@@ -24,6 +31,9 @@ export default function Preview({ html, onReset, shareToken }) {
     return () => ro.disconnect();
   }, []);
 
+  // Cancel speech when component unmounts
+  useEffect(() => () => window.speechSynthesis?.cancel(), []);
+
   const scaledHeight = Math.round(A4_H * scale);
 
   const getPrintHtml = () =>
@@ -34,7 +44,6 @@ export default function Preview({ html, onReset, shareToken }) {
           "<style>@page{size:A4;margin:0}*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}</style></head>"
         );
 
-  // Opens in a new tab — used for both "view full screen" and mobile print flow
   const openInNewTab = () => {
     const w = window.open("", "_blank");
     if (!w) { alert("אפשרי חלונות קופצים בדפדפן"); return; }
@@ -42,8 +51,6 @@ export default function Preview({ html, onReset, shareToken }) {
     w.document.close();
   };
 
-  // On desktop: opens new tab + triggers print dialog
-  // On mobile: just opens in new tab (print dialog from the browser's share menu)
   const handlePrint = () => {
     if (isMobile) { openInNewTab(); return; }
     const w = window.open("", "_blank");
@@ -59,12 +66,42 @@ export default function Preview({ html, onReset, shareToken }) {
     return () => window.removeEventListener("keydown", h);
   }, [html]);
 
+  const toggleRead = useCallback(() => {
+    const synth = window.speechSynthesis;
+    if (!synth) return;
+
+    if (synth.speaking) {
+      synth.cancel();
+      setReading(false);
+      return;
+    }
+
+    const text = extractText(html);
+    if (!text) return;
+
+    const utter = new SpeechSynthesisUtterance(text);
+    utter.lang = "he-IL";
+    utter.rate = 0.88;
+    utter.pitch = 1.05;
+
+    // Pick a Hebrew voice if available
+    const voices = synth.getVoices();
+    const heVoice = voices.find(v => v.lang.startsWith("he"));
+    if (heVoice) utter.voice = heVoice;
+
+    utter.onstart  = () => setReading(true);
+    utter.onend    = () => setReading(false);
+    utter.onerror  = () => setReading(false);
+    utter.onpause  = () => setReading(false);
+
+    synth.speak(utter);
+  }, [html]);
+
   const shareWhatsApp = () => {
     const link = shareToken
       ? `${window.location.origin}/b/${shareToken}`
       : window.location.origin;
-    const msg = encodeURIComponent(`יצרתי חוברת לימוד מותאמת אישית עם בשבילי AI 📚
-${link}`);
+    const msg = encodeURIComponent(`יצרתי חוברת לימוד מותאמת אישית עם בשבילי AI 📚\n${link}`);
     window.open("https://wa.me/?text=" + msg, "_blank");
   };
 
@@ -130,7 +167,7 @@ ${link}`);
 
       <p className="text-center text-xs text-ink/30">גלול בתוך התצוגה לצפייה בכל העמודים</p>
 
-      {/* WhatsApp — primary share CTA (most mobile-friendly action) */}
+      {/* WhatsApp — primary share CTA */}
       <button
         onClick={shareWhatsApp}
         className="w-full flex items-center justify-center gap-2.5 bg-[#25D366] text-white rounded-2xl p-4 font-display font-semibold text-base hover:opacity-90 transition-opacity shadow-md"
@@ -145,8 +182,28 @@ ${link}`);
         className="w-full flex items-center justify-center gap-2 bg-gradient-to-l from-grow to-grow/80 text-white rounded-2xl p-4 font-display font-semibold text-base hover:opacity-90 transition-opacity shadow-md"
       >
         <span className="text-xl">🖨️</span>
-        <span>{isMobile ? "פתחי לצפייה ושמירה כו-PDF" : "הדפס / שמור PDF"}</span>
+        <span>{isMobile ? "פתחי לצפייה ושמירה כ-PDF" : "הדפס / שמור PDF"}</span>
         {!isMobile && <span className="text-white/50 text-xs font-normal mr-1">Ctrl+P</span>}
+      </button>
+
+      {/* Read aloud */}
+      <button
+        onClick={toggleRead}
+        className={`w-full flex items-center justify-center gap-2.5 rounded-2xl p-4 font-display font-semibold text-base transition-all shadow-sm ${
+          reading
+            ? "bg-magic text-white hover:opacity-90"
+            : "bg-magic/8 border border-magic/25 text-magic hover:bg-magic/15"
+        }`}
+      >
+        <span className="text-xl">{reading ? "⏹" : "🔊"}</span>
+        <span>{reading ? "עצור הקראה" : "הקרא את החוברת"}</span>
+        {reading && (
+          <span className="flex gap-0.5 mr-1">
+            {[0,1,2].map(i => (
+              <span key={i} className="w-1 h-4 bg-white/70 rounded-full animate-bounce inline-block" style={{ animationDelay: `${i * 0.15}s` }} />
+            ))}
+          </span>
+        )}
       </button>
 
       {/* Mobile PDF instructions */}
@@ -154,7 +211,7 @@ ${link}`);
         <div className="bg-blue-50 border border-blue-100 rounded-xl px-4 py-3 text-xs text-blue-700 text-right space-y-1">
           <p className="font-semibold">איך שומרים PDF בטלפון?</p>
           <p>iOS Safari: לחצי שתף ← "הדפס" ← פרגני ← שמור PDF</p>
-          <p>Android Chrome: לחצי ⋮ ← "הדפס" ← שנה יעד → "שמור כו-PDF"</p>
+          <p>Android Chrome: לחצי ⋮ ← "הדפס" ← שנה יעד → "שמור כ-PDF"</p>
         </div>
       )}
 
@@ -193,7 +250,7 @@ ${link}`);
 
       {!isMobile && (
         <p className="text-center text-xs text-ink/25">
-          לחץ "הדפס / שמור PDF" ← בחר <strong className="text-ink/40">שמור כו-PDF</strong> בחלון ההדפסה
+          לחץ "הדפס / שמור PDF" ← בחר <strong className="text-ink/40">שמור כ-PDF</strong> בחלון ההדפסה
         </p>
       )}
     </div>
