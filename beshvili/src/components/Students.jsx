@@ -9,7 +9,8 @@ const GRADES = [
 ];
 const LEVELS = [["basic", "🌱 בסיסי"], ["medium", "⚡ בינוני"], ["advanced", "🚀 מתקדם"]];
 const LEVEL_LABELS = { basic: "🌱 בסיסי", medium: "⚡ בינוני", advanced: "🚀 מתקדם" };
-const EMPTY = { name: "", grade: "כיתה א", level: "medium", special_needs: "" };
+const WORLDS = ["כדורגל", "גיימינג", "חיות", "חלל", "בישול", "מוזיקה", "סוסים", "נינג'ה", "פוקימון", "מינקראפט"];
+const EMPTY = { name: "", grade: "כיתה א", level: "medium", special_needs: "", world: "כדורגל" };
 
 export default function Students({ onBookletSaved, remaining, isPro }) {
   const [students, setStudents]   = useState([]);
@@ -19,6 +20,8 @@ export default function Students({ onBookletSaved, remaining, isPro }) {
   const [saving, setSaving]       = useState(false);
   const [quickCreate, setQuickCreate] = useState(null);
   const [history, setHistory]         = useState(null);
+  const [editId, setEditId]           = useState(null);
+  const [editForm, setEditForm]       = useState(null);
 
   const fetchStudents = async () => {
     const { data } = await supabase
@@ -42,10 +45,38 @@ export default function Students({ onBookletSaved, remaining, isPro }) {
       grade: form.grade,
       level: form.level,
       special_needs: form.special_needs.trim() || null,
+      worlds: [form.world],
     });
     setSaving(false);
     setShowAdd(false);
     setForm(EMPTY);
+    fetchStudents();
+  };
+
+  const startEdit = (student) => {
+    setEditId(student.id);
+    setEditForm({
+      name: student.name,
+      grade: student.grade,
+      level: student.level || "medium",
+      special_needs: student.special_needs || "",
+      world: student.worlds?.[0] || "כדורגל",
+    });
+  };
+
+  const saveEdit = async () => {
+    if (!editForm.name.trim()) return;
+    setSaving(true);
+    await supabase.from("children").update({
+      name: editForm.name.trim(),
+      grade: editForm.grade,
+      level: editForm.level,
+      special_needs: editForm.special_needs.trim() || null,
+      worlds: [editForm.world],
+    }).eq("id", editId);
+    setSaving(false);
+    setEditId(null);
+    setEditForm(null);
     fetchStudents();
   };
 
@@ -132,6 +163,17 @@ export default function Students({ onBookletSaved, remaining, isPro }) {
             ))}
           </div>
 
+          <div>
+            <p className="text-xs text-ink/40 mb-1.5 font-medium">עולם תוכן מועדף</p>
+            <select
+              className="w-full border border-ink/20 rounded-xl p-3 bg-canvas/50 text-right outline-none focus:border-magic"
+              value={form.world}
+              onChange={e => setForm(p => ({ ...p, world: e.target.value }))}
+            >
+              {WORLDS.map(w => <option key={w}>{w}</option>)}
+            </select>
+          </div>
+
           <textarea
             className="w-full border border-ink/20 rounded-xl p-3 outline-none focus:border-magic text-right resize-none bg-canvas/50 text-sm"
             placeholder="הערות (אופציונלי) — קשיים, חוזקות, הנחיות מיוחדות..."
@@ -185,47 +227,97 @@ export default function Students({ onBookletSaved, remaining, isPro }) {
         <div key={grade} className="space-y-2">
           <p className="text-xs font-semibold text-ink/35 uppercase tracking-wider px-1">{grade} · {list.length} תלמידים</p>
           {list.map(student => (
-            <div
-              key={student.id}
-              className="bg-white rounded-2xl px-4 py-3.5 shadow-sm border border-ink/5 flex items-center gap-3"
-            >
-              <div className="flex-1 min-w-0">
-                <p className="font-semibold text-ink">{student.name}</p>
-                <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                  <span className="text-xs text-ink/40">{LEVEL_LABELS[student.level] || student.level}</span>
-                  {student.special_needs && (
-                    <span
-                      className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5 cursor-help"
-                      title={student.special_needs}
-                    >
-                      📌 הערות
-                    </span>
-                  )}
+            <div key={student.id}>
+              {editId === student.id ? (
+                /* ── Inline edit form ── */
+                <div className="bg-white rounded-2xl px-4 py-4 shadow-sm border border-magic/30 space-y-3">
+                  <p className="font-semibold text-ink text-sm">✏️ עריכת {student.name}</p>
+                  <input
+                    autoFocus
+                    className="w-full border border-ink/20 rounded-xl p-3 outline-none focus:border-magic text-right bg-canvas/50 text-sm"
+                    value={editForm.name}
+                    onChange={e => setEditForm(p => ({ ...p, name: e.target.value }))}
+                    placeholder="שם *"
+                  />
+                  <select
+                    className="w-full border border-ink/20 rounded-xl p-3 bg-canvas/50 text-right outline-none focus:border-magic text-sm"
+                    value={editForm.grade}
+                    onChange={e => setEditForm(p => ({ ...p, grade: e.target.value }))}
+                  >
+                    {GRADES.map(g => <option key={g}>{g}</option>)}
+                  </select>
+                  <div className="flex gap-2">
+                    {LEVELS.map(([v, t]) => (
+                      <button key={v} onClick={() => setEditForm(p => ({ ...p, level: v }))}
+                        className={`flex-1 rounded-xl p-2 text-xs font-medium border transition-colors ${editForm.level === v ? "bg-magic text-white border-magic" : "bg-canvas/50 border-ink/15 text-ink/60"}`}>
+                        {t}
+                      </button>
+                    ))}
+                  </div>
+                  <select
+                    className="w-full border border-ink/20 rounded-xl p-3 bg-canvas/50 text-right outline-none focus:border-magic text-sm"
+                    value={editForm.world}
+                    onChange={e => setEditForm(p => ({ ...p, world: e.target.value }))}
+                  >
+                    {WORLDS.map(w => <option key={w}>{w}</option>)}
+                  </select>
+                  <textarea
+                    className="w-full border border-ink/20 rounded-xl p-3 outline-none focus:border-magic text-right resize-none bg-canvas/50 text-xs"
+                    placeholder="הערות (אופציונלי)"
+                    rows={2}
+                    value={editForm.special_needs}
+                    onChange={e => setEditForm(p => ({ ...p, special_needs: e.target.value }))}
+                  />
+                  <div className="flex gap-2">
+                    <button onClick={saveEdit} disabled={saving || !editForm.name.trim()}
+                      className="flex-1 bg-magic text-white rounded-xl p-2.5 text-sm font-medium disabled:opacity-40 hover:opacity-90">
+                      {saving ? "שומר..." : "💾 שמור"}
+                    </button>
+                    <button onClick={() => { setEditId(null); setEditForm(null); }}
+                      className="px-5 border border-ink/15 rounded-xl text-ink/50 hover:text-ink text-sm">
+                      ביטול
+                    </button>
+                  </div>
                 </div>
-              </div>
+              ) : (
+                /* ── Normal card ── */
+                <div className="bg-white rounded-2xl px-4 py-3.5 shadow-sm border border-ink/5 flex items-center gap-3">
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-ink">{student.name}</p>
+                    <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                      <span className="text-xs text-ink/40">{LEVEL_LABELS[student.level] || student.level}</span>
+                      {student.worlds?.[0] && (
+                        <span className="text-xs text-magic/70 bg-magic/8 rounded-full px-2 py-0.5">{student.worlds[0]}</span>
+                      )}
+                      {student.special_needs && (
+                        <span className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5 cursor-help" title={student.special_needs}>
+                          📌 הערות
+                        </span>
+                      )}
+                    </div>
+                  </div>
 
-              <button
-                onClick={() => setHistory(student)}
-                className="border border-ink/15 text-ink/50 rounded-xl px-3 py-2 text-sm hover:text-ink hover:border-ink/30 transition-colors whitespace-nowrap"
-                title="ביומן החוברות"
-              >
-                📅
-              </button>
+                  <button onClick={() => setHistory(student)}
+                    className="border border-ink/15 text-ink/50 rounded-xl px-3 py-2 text-sm hover:text-ink hover:border-ink/30 transition-colors whitespace-nowrap" title="היסטוריה">
+                    📅
+                  </button>
 
-              <button
-                onClick={() => setQuickCreate(student)}
-                className="bg-gradient-to-l from-brand to-magic text-white rounded-xl px-4 py-2 text-sm font-semibold hover:opacity-90 transition-opacity shadow-sm whitespace-nowrap"
-              >
-                ✨ צור
-              </button>
+                  <button onClick={() => startEdit(student)}
+                    className="border border-ink/15 text-ink/50 rounded-xl px-3 py-2 text-sm hover:text-magic hover:border-magic/40 transition-colors whitespace-nowrap" title="עריכה">
+                    ✏️
+                  </button>
 
-              <button
-                onClick={() => deleteStudent(student.id)}
-                className="text-ink/20 hover:text-red-400 transition-colors text-xl leading-none flex-shrink-0"
-                title="מחק"
-              >
-                ×
-              </button>
+                  <button onClick={() => setQuickCreate(student)}
+                    className="bg-gradient-to-l from-brand to-magic text-white rounded-xl px-4 py-2 text-sm font-semibold hover:opacity-90 transition-opacity shadow-sm whitespace-nowrap">
+                    ✨ צור
+                  </button>
+
+                  <button onClick={() => deleteStudent(student.id)}
+                    className="text-ink/20 hover:text-red-400 transition-colors text-xl leading-none flex-shrink-0" title="מחק">
+                    ×
+                  </button>
+                </div>
+              )}
             </div>
           ))}
         </div>
