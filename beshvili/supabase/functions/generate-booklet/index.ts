@@ -1,6 +1,6 @@
 import { createClient } from "jsr:@supabase/supabase-js@2";
 
-// v5 — two-tier pricing (parent 19₪/5 booklets, teacher 59₪/20 booklets) + pedagogical prompt upgrade
+// v6 — fresh deploy after gateway reset
 // ── Commercial limits ────────────────────────────────────────────────────────
 const FREE_BOOKLET_LIMIT     = 2;   // free-tier total (lifetime)
 const PARENT_MONTHLY_LIMIT   = 5;   // parent tier (19₪) per calendar month
