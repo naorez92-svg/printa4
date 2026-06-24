@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { supabase } from "../lib/supabase";
 
 const GoogleIcon = () => (
@@ -13,6 +13,7 @@ const GoogleIcon = () => (
 const scrollTo = (id) => document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
 
 export default function Login() {
+  useEffect(() => { window.scrollTo(0, 0); }, []);
   const [email, setEmail] = useState("");
   const [step, setStep]   = useState("email"); // "email" | "verify"
   const [loading, setLoading] = useState(false);
