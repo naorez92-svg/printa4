@@ -265,16 +265,23 @@ export default function Create({ onSaved, remaining, isPro }) {
             <p className="text-ink/60 text-sm">שדרגי וקבלי עוד חוברות — מ-19 ₪/חודש בלבד</p>
           </div>
 
+          {/* Value hook */}
+          <div className="bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 text-right text-xs text-amber-800">
+            מורה פרטית = ₪120/שעה · חוברת מותאמת אישית = <strong>₪3 בלבד</strong>
+          </div>
+
           <div className="grid grid-cols-2 gap-3 text-right">
             <div className="bg-blue-50 border border-blue-100 rounded-2xl p-3 space-y-1">
               <p className="font-bold text-blue-700 text-sm">🌟 הורה</p>
               <p className="text-2xl font-bold text-blue-700">₪19<span className="text-xs font-normal text-blue-400">/חודש</span></p>
               <p className="text-xs text-blue-500">5 חוברות · 10 עמודים</p>
+              <p className="text-xs font-semibold text-blue-600">≈ ₪4 לחוברת</p>
             </div>
             <div className="bg-purple-50 border border-purple-100 rounded-2xl p-3 space-y-1">
               <p className="font-bold text-magic text-sm">🚀 מורה</p>
               <p className="text-2xl font-bold text-magic">₪59<span className="text-xs font-normal text-magic/50">/חודש</span></p>
               <p className="text-xs text-magic/60">20 חוברות · 20 עמודים</p>
+              <p className="text-xs font-semibold text-magic">≈ ₪3 לחוברת</p>
             </div>
           </div>
 
