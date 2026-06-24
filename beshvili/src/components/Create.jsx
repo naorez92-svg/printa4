@@ -293,42 +293,44 @@ export default function Create({ onSaved, remaining, isPro }) {
   if (html) {
     return (
       <section className="space-y-4">
-        {showRating && bookletId ? (
+        {/* Success banner — always visible */}
+        <div className="bg-gradient-to-l from-grow/15 to-brand/10 border border-grow/20 rounded-2xl px-5 py-4 flex items-center gap-3">
+          <span className="text-3xl">🎉</span>
+          <div className="flex-1">
+            <p className="font-bold text-ink text-base">החוברת מוכנה!</p>
+            <p className="text-xs text-ink/50 mt-0.5">נשמרה בענן · מוכנה להדפסה או שיתוף</p>
+          </div>
+          {!isPro && remaining !== undefined && (
+            <span className="text-xs text-ink/40 bg-white rounded-full px-2.5 py-1 border border-ink/10">
+              {remaining} נותרו
+            </span>
+          )}
+        </div>
+
+        {/* Upgrade nudge — shown when one free booklet left */}
+        {!isPro && remaining === 1 && (
+          <div className="bg-gradient-to-l from-magic/10 to-brand/10 border border-magic/20 rounded-2xl px-5 py-4 flex items-center gap-3">
+            <span className="text-2xl">⭐</span>
+            <div className="flex-1">
+              <p className="font-semibold text-ink text-sm">אהבת? נשארה לך עוד חוברת אחת חינמית</p>
+              <p className="text-xs text-ink/50 mt-0.5">שדרגי ל-₪19/חודש וצור 5 חוברות בחודש</p>
+            </div>
+            <button onClick={() => setShowUpgrade(true)} className="flex-shrink-0 bg-gradient-to-l from-brand to-magic text-white text-xs rounded-xl px-3 py-2 font-semibold hover:opacity-90 transition-opacity">
+              שדרגי
+            </button>
+          </div>
+        )}
+
+        {/* Booklet preview — shown immediately, always first */}
+        <Preview html={html} onReset={reset} shareToken={shareToken} />
+
+        {/* Rating widget — shown below the booklet, optional */}
+        {showRating && bookletId && (
           <BookletRating
             bookletId={bookletId}
             studentName={f.childName || null}
             onDone={() => setShowRating(false)}
           />
-        ) : (
-          <>
-            {/* Success banner */}
-            <div className="bg-gradient-to-l from-grow/15 to-brand/10 border border-grow/20 rounded-2xl px-5 py-4 flex items-center gap-3">
-              <span className="text-3xl">🎉</span>
-              <div className="flex-1">
-                <p className="font-bold text-ink text-base">החוברת מוכנה!</p>
-                <p className="text-xs text-ink/50 mt-0.5">נשמרה בענן · מוכנה להדפסה או שיתוף</p>
-              </div>
-              {!isPro && remaining !== undefined && (
-                <span className="text-xs text-ink/40 bg-white rounded-full px-2.5 py-1 border border-ink/10">
-                  {remaining} נותרו
-                </span>
-              )}
-            </div>
-            {/* Upgrade nudge after first booklet */}
-            {!isPro && remaining === 1 && (
-              <div className="bg-gradient-to-l from-magic/10 to-brand/10 border border-magic/20 rounded-2xl px-5 py-4 flex items-center gap-3">
-                <span className="text-2xl">⭐</span>
-                <div className="flex-1">
-                  <p className="font-semibold text-ink text-sm">אהבת? נשארה לך עוד חוברת אחת חינמית</p>
-                  <p className="text-xs text-ink/50 mt-0.5">שדרגי ל-₪19/חודש וצור 5 חוברות בחודש</p>
-                </div>
-                <button onClick={() => setShowUpgrade(true)} className="flex-shrink-0 bg-gradient-to-l from-brand to-magic text-white text-xs rounded-xl px-3 py-2 font-semibold hover:opacity-90 transition-opacity">
-                  שדרגי
-                </button>
-              </div>
-            )}
-            <Preview html={html} onReset={reset} shareToken={shareToken} />
-          </>
         )}
       </section>
     );
