@@ -82,6 +82,12 @@ export default function UpgradeModal({ onClose }) {
           <button onClick={onClose} className="text-ink/30 hover:text-ink text-3xl leading-none">×</button>
         </div>
 
+        {/* Value hook */}
+        <div className="bg-amber-50 border border-amber-200 rounded-2xl px-3 py-2.5 text-right">
+          <p className="text-xs font-semibold text-amber-800">מורה פרטית = ₪120 לשעה</p>
+          <p className="text-xs text-amber-700 mt-0.5">חוברת מותאמת אישית שחוסכת שעת הכנה — <strong>₪3 בלבד</strong></p>
+        </div>
+
         {/* Plan cards */}
         <div className="grid grid-cols-2 gap-3">
           {PLANS.map(p => (
@@ -108,6 +114,9 @@ export default function UpgradeModal({ onClose }) {
                 <span className="text-xs font-normal text-ink/40">/חודש</span>
               </div>
               <div className="text-xs text-ink/40 mt-0.5">{p.booklets} חוברות</div>
+              <div className={`text-[11px] font-semibold mt-1 ${p.color === "purple" ? "text-magic/70" : "text-brand/70"}`}>
+                ≈ ₪{(p.price / p.booklets).toFixed(0)} לחוברת
+              </div>
             </button>
           ))}
         </div>
