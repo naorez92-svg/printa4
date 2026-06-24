@@ -1,0 +1,116 @@
+name: Daily Stats Report
+
+on:
+  schedule:
+    - cron: '0 5 * * *'  # 8:00 Israel time (UTC+3)
+  workflow_dispatch:
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fetch stats from admin-stats Edge Function
+        id: stats
+        run: |
+          RESPONSE=$(curl -s -w "\n%{http_code}" -X GET \
+            "https://gywpdzkvkdisonuzhsib.supabase.co/functions/v1/admin-stats" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
+            -H "Content-Type: application/json")
+          HTTP_CODE=$(echo "$RESPONSE" | tail -1)
+          BODY=$(echo "$RESPONSE" | head -n -1)
+          echo "http_code=$HTTP_CODE" >> $GITHUB_OUTPUT
+          echo "body<<EOF" >> $GITHUB_OUTPUT
+          echo "$BODY" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Create daily report issue
+        uses: actions/github-script@v7
+        env:
+          STATS_BODY: ${{ steps.stats.outputs.body }}
+          HTTP_CODE: ${{ steps.stats.outputs.http_code }}
+        with:
+          script: |
+            const raw = process.env.STATS_BODY || '{}';
+            const httpCode = process.env.HTTP_CODE;
+            let s = {};
+            try { s = JSON.parse(raw); } catch {}
+
+            const now = new Date();
+            const dateStr = now.toLocaleDateString('he-IL', { timeZone: 'Asia/Jerusalem' });
+            const timeStr = now.toLocaleTimeString('he-IL', { timeZone: 'Asia/Jerusalem', hour: '2-digit', minute: '2-digit' });
+
+            if (httpCode !== '200' || s.error) {
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: `⚠️ דוח יומי נכשל — ${dateStr}`,
+                body: `## שגיאה בדוח היומי\n\n- HTTP: ${httpCode}\n- שגיאה: ${s.error || raw.substring(0, 200)}\n\nבדוק את Edge Function admin-stats.`,
+                labels: ['daily-report', 'bug'],
+              });
+              return;
+            }
+
+            const planMap = {
+              free: 'חינם',
+              pro: 'פרו',
+              parent: 'הורה',
+              teacher: 'מורה',
+              admin: 'אדמין',
+            };
+            const planLines = Object.entries(s.planBreakdown || {})
+              .map(([p, n]) => `| ${planMap[p] || p} | ${n} |`)
+              .join('\n');
+
+            const topicLines = (s.topTopics || []).slice(0, 5)
+              .map((t, i) => `${i + 1}. ${t.topic} (${t.count})`)
+              .join('\n');
+
+            const feedbackLines = (s.recentFeedback || []).slice(0, 5)
+              .map(f => `- ${f.message.substring(0, 80)}`)
+              .join('\n') || '_אין פידבק חדש_';
+
+            const leadLines = (s.recentLeads || []).slice(0, 5)
+              .map(l => `- ${l.name || 'ללא שם'} · ${l.phone || '—'}`)
+              .join('\n') || '_אין לידים חדשים_';
+
+            const body = `## 📊 דוח יומי — ${dateStr} בשעה ${timeStr}
+
+### משתמשים
+| מדד | ערך |
+|---|---|
+| סה"כ משתמשים | **${s.totalUsers ?? '—'}** |
+| חדשים היום | **${s.usersToday ?? '—'}** |
+| חדשים השבוע | ${s.usersThisWeek ?? '—'} |
+
+### חוברות
+| מדד | ערך |
+|---|---|
+| סה"כ | **${s.totalBooklets ?? '—'}** |
+| היום | **${s.bookletsToday ?? '—'}** |
+| השבוע | ${s.bookletsThisWeek ?? '—'} |
+| החודש | ${s.bookletsThisMonth ?? '—'} |
+
+### פילוח תוכניות
+| תוכנית | משתמשים |
+|---|---|
+${planLines || '_אין נתונים_'}
+
+### 5 הנושאים הפופולריים
+${topicLines || '_אין נתונים_'}
+
+### פידבק אחרון
+${feedbackLines}
+
+### לידים אחרונים
+${leadLines}
+
+---
+_נוצר אוטומטית על ידי GitHub Actions · [admin panel](https://beshvili.com)_`;
+
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `📊 דוח יומי — ${dateStr} | ${s.usersToday ?? 0} משתמשים חדשים · ${s.bookletsToday ?? 0} חוברות`,
+              body,
+              labels: ['daily-report'],
+            });
