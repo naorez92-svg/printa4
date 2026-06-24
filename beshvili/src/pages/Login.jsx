@@ -21,7 +21,6 @@ export default function Login() {
     setLoading(false);
     if (err) {
       const msg = err.message || "";
-      // Rate limited = OTP probably sent already → go to verify step
       const alreadySent = /after \d+ second/i.test(msg) || /rate|security/i.test(msg);
       if (alreadySent) {
         setStep("verify");
@@ -42,7 +41,6 @@ export default function Login() {
     if (err) {
       setError(/expired/i.test(err.message) ? "הקוד פג תוקף — שלח שוב" : "קוד שגוי — נסה שנית");
     }
-    // on success → App.jsx onAuthStateChange fires → Dashboard renders
   };
 
   return (
@@ -65,25 +63,28 @@ export default function Login() {
       </nav>
 
       {/* ── Hero ── */}
-      <section className="bg-gradient-to-br from-brand/10 via-magic/5 to-grow/10 py-16 px-5 text-center">
-        <div className="max-w-2xl mx-auto space-y-6">
-          <div className="text-7xl">📚</div>
-          <h1 className="text-4xl font-bold text-ink font-display leading-tight">
+      <section className="relative bg-ink py-20 px-5 text-center overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-br from-magic/30 to-brand/20 pointer-events-none" />
+        <div className="absolute -top-40 left-1/2 -translate-x-1/2 w-[500px] h-[500px] bg-magic/15 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute bottom-0 right-0 w-80 h-80 bg-brand/20 rounded-full blur-3xl pointer-events-none" />
+        <div className="relative max-w-2xl mx-auto space-y-6">
+          <div className="text-6xl">📚</div>
+          <h1 className="text-4xl sm:text-5xl font-bold text-white font-display leading-tight">
             חוברת לימוד מותאמת אישית<br />
-            <span className="text-transparent bg-clip-text bg-gradient-to-l from-brand to-magic">
+            <span className="text-transparent bg-clip-text bg-gradient-to-l from-brand to-[#A78BFA]">
               בפחות מ-60 שניות
             </span>
           </h1>
-          <p className="text-xl text-ink/60 leading-relaxed max-w-lg mx-auto">
+          <p className="text-xl text-white/65 leading-relaxed max-w-lg mx-auto">
             AI חכם שיוצר חוברת עבודה לפי שם הילד, העולם שלו, והיעד הפדגוגי — מוכנה להדפסה ישר מהדפדפן
           </p>
           <button
             onClick={() => scrollTo("login-form")}
-            className="inline-block bg-gradient-to-l from-brand to-magic text-white rounded-2xl px-8 py-4 text-lg font-display font-semibold hover:opacity-90 transition-opacity shadow-md"
+            className="inline-block bg-gradient-to-l from-brand to-magic text-white rounded-2xl px-10 py-4 text-xl font-display font-semibold hover:scale-105 transition-all shadow-2xl shadow-magic/30 active:scale-100"
           >
             ✨ התחל חינם — 2 חוברות במתנה
           </button>
-          <p className="text-xs text-ink/30">ללא כרטיס אשראי · ללא סיסמה · כניסה קלה במייל</p>
+          <p className="text-xs text-white/30">ללא כרטיס אשראי · ללא סיסמה · כניסה קלה במייל</p>
         </div>
       </section>
 
@@ -94,11 +95,11 @@ export default function Login() {
           <p className="text-ink/50 mb-10 text-sm">כלי העבודה שכל מי שמלמד ילדים חיכה לו</p>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
             {[
-              { icon: "🎓", title: "מורה פרטית", desc: "חוברת ייחודית לכל תלמיד, בדיוק לפי הקשיים שלו — לא עוד דפי צילום גנריים" },
-              { icon: "👩‍👧", title: "הורה", desc: "תרגול בעולם שהילד אוהב — כדורגל, גיימינג, חיות. לומד בלי להרגיש שהוא לומד" },
-              { icon: "🏫", title: "מחנכת", desc: "חוברת חזרה לפני מבחן, מבחן חצי שנתי, חוברת העשרה — בקלות ובמהירות" },
-            ].map(({ icon, title, desc }) => (
-              <div key={title} className="bg-canvas rounded-2xl p-6 text-center border border-ink/5">
+              { icon: "🎓", title: "מורה פרטית", desc: "חוברת ייחודית לכל תלמיד, בדיוק לפי הקשיים שלו — לא עוד דפי צילום גנריים", bg: "bg-gradient-to-br from-magic/10 to-magic/5", border: "border-magic/20" },
+              { icon: "👩‍👧", title: "הורה", desc: "תרגול בעולם שהילד אוהב — כדורגל, גיימינג, חיות. לומד בלי להרגיש שהוא לומד", bg: "bg-gradient-to-br from-brand/15 to-brand/5", border: "border-brand/20" },
+              { icon: "🏫", title: "מחנכת", desc: "חוברת חזרה לפני מבחן, מבחן חצי שנתי, חוברת העשרה — בקלות ובמהירות", bg: "bg-gradient-to-br from-grow/10 to-grow/5", border: "border-grow/20" },
+            ].map(({ icon, title, desc, bg, border }) => (
+              <div key={title} className={`${bg} rounded-2xl p-6 text-center border ${border} shadow-sm`}>
                 <div className="text-4xl mb-3">{icon}</div>
                 <h3 className="font-bold text-ink mb-2 font-display">{title}</h3>
                 <p className="text-ink/60 text-sm leading-relaxed">{desc}</p>
@@ -120,7 +121,7 @@ export default function Login() {
               { num: "03", icon: "🖨️", title: "הדפס ומסור", desc: "לחץ הדפס → שמור כ-PDF — מקבל קובץ A4 מוכן, חסכוני בדיו" },
             ].map(({ num, icon, title, desc }) => (
               <div key={num} className="relative bg-white rounded-2xl p-6 border border-ink/5 shadow-sm">
-                <div className="absolute -top-3 right-4 text-xs font-bold text-brand bg-brand/10 rounded-full px-2.5 py-0.5">{num}</div>
+                <div className="absolute -top-3 right-4 text-xs font-bold text-white bg-gradient-to-l from-brand to-magic rounded-full px-2.5 py-1">{num}</div>
                 <div className="text-3xl mb-3 mt-2">{icon}</div>
                 <h3 className="font-bold text-ink mb-2">{title}</h3>
                 <p className="text-ink/60 text-sm leading-relaxed">{desc}</p>
