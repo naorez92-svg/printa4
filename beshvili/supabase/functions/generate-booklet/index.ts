@@ -1,6 +1,6 @@
 import { createClient } from "jsr:@supabase/supabase-js@2";
 
-// v7 — force re-upload after cache miss
+// v8 — diagnostic deploy
 // ── Commercial limits ────────────────────────────────────────────────────────
 const FREE_BOOKLET_LIMIT     = 2;   // free-tier total (lifetime)
 const PARENT_MONTHLY_LIMIT   = 5;   // parent tier (19₪) per calendar month
