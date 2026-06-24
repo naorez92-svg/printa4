@@ -12,10 +12,11 @@ jobs:
       - name: Fetch stats from admin-stats Edge Function
         id: stats
         run: |
-          RESPONSE=$(curl -s -w "\n%{http_code}" -X GET \
+          RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
             "https://gywpdzkvkdisonuzhsib.supabase.co/functions/v1/admin-stats" \
             -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
-            -H "Content-Type: application/json")
+            -H "Content-Type: application/json" \
+            -d '{"generateProposals":true}')
           HTTP_CODE=$(echo "$RESPONSE" | tail -1)
           BODY=$(echo "$RESPONSE" | head -n -1)
           echo "http_code=$HTTP_CODE" >> $GITHUB_OUTPUT

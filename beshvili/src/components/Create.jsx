@@ -5,6 +5,7 @@ import BookletRating from "./BookletRating";
 import UpgradeModal from "./UpgradeModal";
 import { FREE_LIMIT } from "../hooks/useProfile";
 import { useChildren } from "../hooks/useChildren";
+import { track } from "../hooks/useEvents";
 
 const WORLDS = ["כדורגל", "גיימינג", "חיות", "חלל", "בישול", "מוזיקה", "סוסים", "נינג'ה", "פוקימון", "מינקראפט"];
 const LEVELS = [["basic", "🌱 בסיסי"], ["medium", "⚡ בינוני"], ["advanced", "🚀 מתקדם"]];
@@ -61,28 +62,26 @@ export default function Create({ onSaved, remaining, isPro }) {
   const [bookletId, setBookletId] = useState(null);
   const [shareToken, setShareToken] = useState(null);
   const [showRating, setShowRating] = useState(false);
-  const [error, setError]         = useState(null); // null | "quota" | "quota_monthly" | "rate:{wait}" | "generic:{msg}"
+  const [error, setError]         = useState(null);
   const [rateCountdown, setRateCountdown] = useState(null);
   const [childSaved, setChildSaved] = useState(false);
   const { children: savedChildren, loaded: childrenLoaded, save: saveChild } = useChildren();
   const [photoUrl, setPhotoUrl] = useState(null);
   const [photoUploading, setPhotoUploading] = useState(false);
   const photoInputRef = useRef(null);
+  const [recentTmpl, setRecentTmpl] = useState(null);
 
-  // Rotate loading messages every 3.5 s while generating
   useEffect(() => {
     if (!loading) { setLoadingMsgIdx(0); setStreamChars(0); return; }
     const id = setInterval(() => setLoadingMsgIdx(i => (i + 1) % LOADING_MSGS.length), 3500);
     return () => clearInterval(id);
   }, [loading]);
 
-  // Start countdown when rate-limited
   useEffect(() => {
     const match = error?.match(/^rate:(\d+)$/);
     setRateCountdown(match ? parseInt(match[1]) : null);
   }, [error]);
 
-  // Tick countdown and auto-clear at 0
   useEffect(() => {
     if (!rateCountdown || rateCountdown <= 0) {
       if (rateCountdown === 0) setError(null);
@@ -103,6 +102,7 @@ export default function Create({ onSaved, remaining, isPro }) {
     setLoading(true);
     setHtml(null);
     setError(null);
+    track("booklet_started", { mode, goal: f.goal, grade: f.grade, world: f.world });
 
     const quickText = `דף תרגיל מהיר${f.childName ? ` עבור ${f.childName.trim()}` : ""}${f.grade ? `, כיתה ${f.grade}` : ""}. נושא: ${f.goal.trim()}${f.world ? `, עולם תוכן: ${f.world}` : ""}. צור עמוד A4 אחד עם 8–12 תרגילים מגוונים ומהנים. ללא שער ורפלקציה. קוד HTML גולמי בלבד.`;
 
@@ -154,7 +154,6 @@ export default function Create({ onSaved, remaining, isPro }) {
       return;
     }
 
-    // Read SSE stream — Anthropic sends content_block_delta events with text chunks
     const reader = resp.body.getReader();
     const decoder = new TextDecoder();
     let buffer = "";
@@ -176,7 +175,6 @@ export default function Create({ onSaved, remaining, isPro }) {
             const ev = JSON.parse(raw);
             if (ev.type === "content_block_delta" && ev.delta?.type === "text_delta") {
               htmlAccumulated += ev.delta.text;
-              // Throttle React state updates to ~10fps
               const now = Date.now();
               if (now - updateTimer > 100) {
                 setStreamChars(htmlAccumulated.length);
@@ -219,8 +217,9 @@ export default function Create({ onSaved, remaining, isPro }) {
     setShareToken(inserted?.share_token ?? null);
     setShowRating(true);
     setHtml(html);
+    track("booklet_completed", { booklet_id: inserted?.id, pages: pageCount, mode });
     onSaved?.();
-  }, [canSubmit, mode, freeText, f, pageCount, withAnswerKey, onSaved]);
+  }, [canSubmit, mode, freeText, f, pageCount, withAnswerKey, onSaved, photoUrl]);
 
   useEffect(() => {
     const h = (e) => { if ((e.ctrlKey || e.metaKey) && e.key === "Enter") create(); };
@@ -247,9 +246,14 @@ export default function Create({ onSaved, remaining, isPro }) {
 
   const reset = () => { setHtml(null); setF(EMPTY); setFreeText(""); setError(null); setBookletId(null); setShareToken(null); setShowRating(false); setChildSaved(false); setPhotoUrl(null); };
   const set   = (k) => (e) => setF((p) => ({ ...p, [k]: e.target.value }));
-  const applyTmpl = (tmpl) => { setF((p) => ({ ...p, ...tmpl.f })); setMode("form"); setTimeout(() => document.getElementById("inp-name")?.focus(), 50); };
+  const applyTmpl = (tmpl) => {
+    setF((p) => ({ ...p, ...tmpl.f }));
+    setMode("form");
+    setRecentTmpl(tmpl.label);
+    setTimeout(() => setRecentTmpl(null), 1500);
+    setTimeout(() => document.getElementById("inp-goal")?.scrollIntoView({ behavior: "smooth", block: "nearest" }), 80);
+  };
 
-  // ── Pro monthly quota exceeded ────────────────────────────────────────────
   if (error === "quota_monthly") {
     return (
       <section className="bg-white rounded-2xl p-6 shadow-sm border border-ink/5 text-center space-y-5">
@@ -273,7 +277,6 @@ export default function Create({ onSaved, remaining, isPro }) {
     );
   }
 
-  // ── Quota exceeded screen ──────────────────────────────────────────────────
   if (error === "quota") {
     return (
       <>
@@ -284,12 +287,9 @@ export default function Create({ onSaved, remaining, isPro }) {
             <h2 className="text-xl font-bold text-ink mb-1">ניצלת את {FREE_LIMIT} החוברות החינמיות!</h2>
             <p className="text-ink/60 text-sm">שדרגי וקבלי עוד חוברות — מ-19 ₪/חודש בלבד</p>
           </div>
-
-          {/* Value hook */}
           <div className="bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 text-right text-xs text-amber-800">
             מורה פרטית = ₪120/שעה · חוברת מותאמת אישית = <strong>₪3 בלבד</strong>
           </div>
-
           <div className="grid grid-cols-2 gap-3 text-right">
             <div className="bg-blue-50 border border-blue-100 rounded-2xl p-3 space-y-1">
               <p className="font-bold text-blue-700 text-sm">🌟 הורה</p>
@@ -304,7 +304,6 @@ export default function Create({ onSaved, remaining, isPro }) {
               <p className="text-xs font-semibold text-magic">≈ ₪3 לחוברת</p>
             </div>
           </div>
-
           <button
             onClick={() => setShowUpgrade(true)}
             className="block w-full bg-gradient-to-l from-brand to-magic text-white rounded-xl p-3.5 font-display font-semibold hover:opacity-90 transition-opacity shadow-sm"
@@ -319,11 +318,9 @@ export default function Create({ onSaved, remaining, isPro }) {
     );
   }
 
-  // ── Generated ──────────────────────────────────────────────────────────────
   if (html) {
     return (
       <section className="space-y-4">
-        {/* Success banner — always visible */}
         <div className="bg-gradient-to-l from-grow/15 to-brand/10 border border-grow/20 rounded-2xl px-5 py-4 flex items-center gap-3">
           <span className="text-3xl">🎉</span>
           <div className="flex-1">
@@ -336,8 +333,6 @@ export default function Create({ onSaved, remaining, isPro }) {
             </span>
           )}
         </div>
-
-        {/* Upgrade nudge — shown when one free booklet left */}
         {!isPro && remaining === 1 && (
           <div className="bg-gradient-to-l from-magic/10 to-brand/10 border border-magic/20 rounded-2xl px-5 py-4 flex items-center gap-3">
             <span className="text-2xl">⭐</span>
@@ -350,11 +345,7 @@ export default function Create({ onSaved, remaining, isPro }) {
             </button>
           </div>
         )}
-
-        {/* Booklet preview — shown immediately, always first */}
         <Preview html={html} onReset={reset} shareToken={shareToken} />
-
-        {/* Rating widget — shown below the booklet, optional */}
         {showRating && bookletId && (
           <BookletRating
             bookletId={bookletId}
@@ -362,12 +353,10 @@ export default function Create({ onSaved, remaining, isPro }) {
             onDone={() => setShowRating(false)}
           />
         )}
-
-        {/* Save child profile prompt */}
         {mode === "form" && f.childName.trim() && childrenLoaded && !childSaved && !savedChildren.some(c => c.name === f.childName.trim()) && (
           <button
             onClick={async () => {
-              const saved = await saveChild({ name: f.childName, grade: f.grade, world: f.world, level: f.level });
+              const saved = await saveChild({ name: f.childName, grade: f.grade, world: f.world, level: f.level, photo_url: photoUrl });
               if (saved) setChildSaved(true);
             }}
             className="w-full flex items-center justify-center gap-2 border border-grow/40 text-grow rounded-xl p-3 text-sm font-semibold hover:bg-grow/5 transition-colors"
@@ -387,7 +376,6 @@ export default function Create({ onSaved, remaining, isPro }) {
     <>
     {showUpgrade && <UpgradeModal onClose={() => setShowUpgrade(false)} />}
     <section className="bg-white rounded-2xl shadow-sm border border-ink/5 overflow-hidden">
-      {/* Header */}
       <div className="bg-gradient-to-l from-magic/10 to-brand/10 px-5 pt-5 pb-4">
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-xl font-semibold">✨ חוברת חדשה</h2>
@@ -406,13 +394,12 @@ export default function Create({ onSaved, remaining, isPro }) {
       </div>
 
       <div className="p-5 space-y-4">
-        {/* Templates */}
         <div>
           <p className="text-xs text-ink/40 mb-2 font-medium uppercase tracking-wide">תבניות מהירות</p>
           <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
             {TEMPLATES.map((t) => (
               <button key={t.label} onClick={() => applyTmpl(t)}
-                className="flex-shrink-0 border border-ink/15 rounded-full px-3 py-1 text-xs text-ink/70 hover:border-magic hover:text-magic transition-colors whitespace-nowrap">
+                className={`flex-shrink-0 border rounded-full px-3 py-1 text-xs transition-colors whitespace-nowrap ${recentTmpl === t.label ? "border-magic bg-magic/10 text-magic font-semibold" : "border-ink/15 text-ink/70 hover:border-magic hover:text-magic"}`}>
                 {t.icon} {t.label}
               </button>
             ))}
@@ -421,10 +408,8 @@ export default function Create({ onSaved, remaining, isPro }) {
 
         <div className="border-t border-ink/5" />
 
-        {/* Form mode */}
         {mode === "form" && (
           <div className="space-y-3">
-            {/* Saved children selector */}
             {childrenLoaded && savedChildren.length > 0 && (
               <div>
                 <p className="text-xs text-ink/40 mb-1.5 font-medium">תלמידים שלי</p>
@@ -434,13 +419,16 @@ export default function Create({ onSaved, remaining, isPro }) {
                       key={c.id}
                       type="button"
                       disabled={loading}
-                      onClick={() => setF(p => ({
-                        ...p,
-                        childName: c.name,
-                        grade: c.grade || p.grade,
-                        world: c.worlds?.[0] || p.world,
-                        level: c.level || p.level,
-                      }))}
+                      onClick={() => {
+                        setF(p => ({
+                          ...p,
+                          childName: c.name,
+                          grade: c.grade || p.grade,
+                          world: c.worlds?.[0] || p.world,
+                          level: c.level || p.level,
+                        }));
+                        setPhotoUrl(c.photo_url || null);
+                      }}
                       className={`flex items-center gap-1.5 border rounded-full px-3 py-1 text-xs transition-colors disabled:opacity-40 ${f.childName === c.name ? "border-magic text-magic bg-magic/5" : "border-ink/15 text-ink/70 hover:border-magic hover:text-magic bg-canvas/50"}`}
                     >
                       <span>👤</span>
@@ -452,8 +440,6 @@ export default function Create({ onSaved, remaining, isPro }) {
               </div>
             )}
             <input id="inp-name" className="w-full border border-ink/20 rounded-xl p-3 outline-none focus:border-magic text-right bg-canvas/50" placeholder="שם הילד/ה *" value={f.childName} onChange={set("childName")} disabled={loading} />
-
-            {/* Child photo upload */}
             <input type="file" ref={photoInputRef} accept="image/*" onChange={handlePhotoUpload} className="hidden" />
             <div className="flex items-center gap-3">
               <div
@@ -484,7 +470,6 @@ export default function Create({ onSaved, remaining, isPro }) {
                 )}
               </div>
             </div>
-
             <input className="w-full border border-ink/20 rounded-xl p-3 outline-none focus:border-magic text-right bg-canvas/50" placeholder="גיל / כיתה" value={f.grade} onChange={set("grade")} disabled={loading} />
             <div>
               <p className="text-xs text-ink/40 mb-1.5 font-medium">מה הילד/ה אוהב? (עולם התוכן)</p>
@@ -493,7 +478,7 @@ export default function Create({ onSaved, remaining, isPro }) {
               </select>
             </div>
             <div>
-              <textarea className="w-full border border-ink/20 rounded-xl p-3 outline-none focus:border-magic text-right resize-none bg-canvas/50" placeholder="מה לתרגל? * — למשל: חיבור וחיסור עד 100, הבנת הנקרא..." rows={2} value={f.goal} onChange={set("goal")} disabled={loading} />
+              <textarea id="inp-goal" className="w-full border border-ink/20 rounded-xl p-3 outline-none focus:border-magic text-right resize-none bg-canvas/50" placeholder="מה לתרגל? * — למשל: חיבור וחיסור עד 100, הבנת הנקרא..." rows={2} value={f.goal} onChange={set("goal")} disabled={loading} />
               <div className="flex flex-wrap gap-1.5 mt-2">
                 {GOAL_PICKS.map(({ icon, label, goal }) => (
                   <button key={label} type="button" onClick={() => setF(p => ({ ...p, goal }))} disabled={loading}
@@ -514,36 +499,16 @@ export default function Create({ onSaved, remaining, isPro }) {
           </div>
         )}
 
-        {/* Quick mode */}
         {mode === "quick" && (
           <div className="space-y-3">
             <div className="bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 text-xs text-amber-700 flex items-center gap-2">
               <span>⚡</span>
               <span>דף תרגיל אחד · ~30 שניות · מושלם לשיעורי בית מהירים</span>
             </div>
-            <input
-              className="w-full border border-ink/20 rounded-xl p-3 outline-none focus:border-magic text-right bg-canvas/50"
-              placeholder="שם הילד/ה (אופציונלי)"
-              value={f.childName}
-              onChange={set("childName")}
-              disabled={loading}
-            />
-            <input
-              className="w-full border border-ink/20 rounded-xl p-3 outline-none focus:border-magic text-right bg-canvas/50"
-              placeholder="כיתה (אופציונלי) — כיתה ב, כיתה ד..."
-              value={f.grade}
-              onChange={set("grade")}
-              disabled={loading}
-            />
+            <input className="w-full border border-ink/20 rounded-xl p-3 outline-none focus:border-magic text-right bg-canvas/50" placeholder="שם הילד/ה (אופציונלי)" value={f.childName} onChange={set("childName")} disabled={loading} />
+            <input className="w-full border border-ink/20 rounded-xl p-3 outline-none focus:border-magic text-right bg-canvas/50" placeholder="כיתה (אופציונלי) — כיתה ב, כיתה ד..." value={f.grade} onChange={set("grade")} disabled={loading} />
             <div>
-              <input
-                className="w-full border border-ink/20 rounded-xl p-3 outline-none focus:border-magic text-right bg-canvas/50"
-                placeholder="מה לתרגל? * — למשל: חיבור וחיסור עד 100, קריאה בניקוד..."
-                value={f.goal}
-                onChange={set("goal")}
-                disabled={loading}
-                autoFocus
-              />
+              <input className="w-full border border-ink/20 rounded-xl p-3 outline-none focus:border-magic text-right bg-canvas/50" placeholder="מה לתרגל? * — למשל: חיבור וחיסור עד 100, קריאה בניקוד..." value={f.goal} onChange={set("goal")} disabled={loading} autoFocus />
               <div className="flex flex-wrap gap-1.5 mt-2">
                 {GOAL_PICKS.map(({ icon, label, goal }) => (
                   <button key={label} type="button" onClick={() => setF(p => ({ ...p, goal }))} disabled={loading}
@@ -553,18 +518,12 @@ export default function Create({ onSaved, remaining, isPro }) {
                 ))}
               </div>
             </div>
-            <select
-              className="w-full border border-ink/20 rounded-xl p-3 outline-none focus:border-magic bg-canvas/50 text-right"
-              value={f.world}
-              onChange={set("world")}
-              disabled={loading}
-            >
+            <select className="w-full border border-ink/20 rounded-xl p-3 outline-none focus:border-magic bg-canvas/50 text-right" value={f.world} onChange={set("world")} disabled={loading}>
               {WORLDS.map((w) => <option key={w}>{w}</option>)}
             </select>
           </div>
         )}
 
-        {/* Free text mode */}
         {mode === "free" && (
           <textarea
             className="w-full border border-ink/20 rounded-xl p-3 outline-none focus:border-magic text-right resize-none bg-canvas/50 leading-relaxed"
@@ -575,7 +534,6 @@ export default function Create({ onSaved, remaining, isPro }) {
 
         <div className="border-t border-ink/5" />
 
-        {/* Page count selector — hidden in quick mode */}
         {mode !== "quick" && <div>
           <p className="text-xs text-ink/40 mb-2 font-medium">כמות עמודים</p>
           <div className="flex gap-2">
@@ -588,7 +546,6 @@ export default function Create({ onSaved, remaining, isPro }) {
           </div>
         </div>}
 
-        {/* Answer key toggle — hidden in quick mode */}
         {mode !== "quick" && (
           <label className="flex items-center justify-between gap-3 cursor-pointer select-none">
             <div>
@@ -604,21 +561,18 @@ export default function Create({ onSaved, remaining, isPro }) {
           </label>
         )}
 
-        {/* Rate limit countdown */}
         {rateCountdown > 0 && (
           <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-amber-700 text-sm text-center">
             ⏳ יש להמתין עוד {rateCountdown} שניות לפני יצירה נוספת
           </div>
         )}
 
-        {/* Generic error */}
         {error?.startsWith("generic:") && (
           <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-red-600 text-sm">
             {error.replace("generic:", "")}
           </div>
         )}
 
-        {/* Submit / loading */}
         {loading ? (
           <div className="text-center py-8 space-y-3">
             <div className="flex justify-center gap-1">

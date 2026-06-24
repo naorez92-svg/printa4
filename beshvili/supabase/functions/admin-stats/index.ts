@@ -3,7 +3,7 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
 const cors = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "GET, OPTIONS",
+  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
   "Access-Control-Max-Age": "86400",
 };
 
@@ -21,7 +21,10 @@ Deno.serve(async (req) => {
   if (!jwt) return new Response(JSON.stringify({ error: "unauthorized" }), { status: 401, headers: cors });
 
   const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-  if (jwt !== serviceRoleKey) {
+  let isServiceRole = false;
+  if (jwt === serviceRoleKey) {
+    isServiceRole = true;
+  } else {
     const { data: { user }, error: authErr } = await admin.auth.getUser(jwt);
     if (authErr || !user) return new Response(JSON.stringify({ error: "unauthorized" }), { status: 401, headers: cors });
     const { data: callerProfile } = await admin.from("profiles").select("plan").eq("id", user.id).single();
@@ -30,12 +33,22 @@ Deno.serve(async (req) => {
     }
   }
 
+  // Parse body for flags
+  let shouldGenerateProposals = false;
+  try {
+    const text = await req.text();
+    if (text) {
+      const parsed = JSON.parse(text);
+      shouldGenerateProposals = parsed.generateProposals === true;
+    }
+  } catch {}
+
   const now = new Date();
-  const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
+  const weekAgo  = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
   const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
 
-  // Fetch all in parallel
+  // Fetch all core data in parallel
   const [
     { data: authData },
     { count: totalBooklets },
@@ -60,7 +73,7 @@ Deno.serve(async (req) => {
 
   const users = authData?.users ?? [];
   const usersThisWeek = users.filter(u => u.created_at >= weekAgo).length;
-  const usersToday = users.filter(u => u.created_at >= todayStart).length;
+  const usersToday    = users.filter(u => u.created_at >= todayStart).length;
 
   // Profile map
   const profileMap: Record<string, { plan: string; full_name: string | null; followup_sent_at: string | null }> = {};
@@ -78,12 +91,11 @@ Deno.serve(async (req) => {
     planBreakdown[plan] = (planBreakdown[plan] ?? 0) + 1;
   });
 
-  // Top topics — normalize goal text to a short label
+  // Top topics
   const topicCount: Record<string, number> = {};
   (allBookletRows ?? []).forEach(b => {
     const raw = (b.goal ?? b.world ?? "").trim();
     if (!raw) return;
-    // Take first ~40 chars as the label (trim at last space to avoid mid-word cuts)
     const label = raw.length > 40 ? raw.substring(0, 40).replace(/\s\S*$/, "") + "…" : raw;
     topicCount[label] = (topicCount[label] ?? 0) + 1;
   });
@@ -106,18 +118,155 @@ Deno.serve(async (req) => {
       followupSent: profileMap[u.id]?.followup_sent_at,
     }));
 
+  // Funnel stats from events (last 7 days)
+  let funnelStats = { sessions: 0, started: 0, completed: 0 };
+  try {
+    const { data: eventsData } = await admin
+      .from("events")
+      .select("event, user_id")
+      .gte("created_at", weekAgo);
+    if (eventsData) {
+      funnelStats = {
+        sessions:  [...new Set(eventsData.filter(e => e.event === "session_start").map(e => e.user_id))].length,
+        started:   [...new Set(eventsData.filter(e => e.event === "booklet_started").map(e => e.user_id))].length,
+        completed: [...new Set(eventsData.filter(e => e.event === "booklet_completed").map(e => e.user_id))].length,
+      };
+    }
+  } catch { /* events table may not exist yet */ }
+
+  // Load existing pending proposals
+  let pendingProposals: any[] = [];
+  try {
+    const { data } = await admin
+      .from("proposals")
+      .select("*")
+      .eq("status", "pending")
+      .order("created_at", { ascending: false });
+    pendingProposals = data ?? [];
+  } catch { /* proposals table may not exist yet */ }
+
+  // Generate new proposals (called from cron at 8am)
+  if (shouldGenerateProposals) {
+    const PLAN_PRICE: Record<string, number> = { parent: 19, teacher: 59, pro: 30 };
+    const COST_PER_BOOKLET = 0.80;
+
+    const revenueLines = Object.entries(planBreakdown)
+      .filter(([plan]) => PLAN_PRICE[plan] != null)
+      .map(([plan, count]) => ({ plan, count: count as number, total: (count as number) * PLAN_PRICE[plan] }));
+    const totalMRR  = revenueLines.reduce((s, r) => s + r.total, 0);
+    const paidUsers = revenueLines.reduce((s, r) => s + r.count, 0);
+    const apiCostNIS = (bookletsThisMonth ?? 0) * COST_PER_BOOKLET;
+    const netProfit  = totalMRR - apiCostNIS;
+
+    const newProposals: Array<{
+      agent: string; title: string; description: string;
+      action_type: string; action_payload: object;
+    }> = [];
+
+    // Financial agent
+    const freeAtLimit = users.filter(u => {
+      const plan = profileMap[u.id]?.plan ?? "free";
+      return plan === "free" && (bookletsByUser[u.id] ?? 0) >= 2;
+    });
+    if (freeAtLimit.length > 0) {
+      newProposals.push({
+        agent: "financial",
+        title: `${freeAtLimit.length} משתמשים free הגיעו למכסה — פוטנציאל שדרוג`,
+        description: `${freeAtLimit.length} משתמשים יצרו 2+ חוברות וסביר שיזדקקו ליותר. שלח הודעת WhatsApp להצעת שדרוג.`,
+        action_type: "whatsapp",
+        action_payload: {
+          phone: "972509139137",
+          message: "שלום! ראיתי שיצרת כמה חוברות יפות עם בשבילי 📚\nאם תרצה ליצור עוד חוברות — יש מנוי הורה ב-19 ₪/חודש (5 חוברות) ומנוי מורה ב-59 ₪/חודש (20 חוברות).\nאשמח לעזור!",
+        },
+      });
+    }
+    newProposals.push({
+      agent: "financial",
+      title: `MRR: ${totalMRR} ₪ · רווח נקי: ${netProfit.toFixed(0)} ₪ · ${paidUsers} מנויים`,
+      description: `עלות API החודש: ${apiCostNIS.toFixed(1)} ₪ (${bookletsThisMonth ?? 0} חוברות × 0.80 ₪). ${netProfit >= 0 ? "האפליקציה רווחית ✅" : "הוצאות עולות על הכנסות ⚠️ — בדוק עלויות."}`,
+      action_type: "info_only",
+      action_payload: {},
+    });
+
+    // Product agent
+    const nonAdminUsers = users.filter(u => (profileMap[u.id]?.plan ?? "free") !== "admin");
+    const noBookletUsers = nonAdminUsers.filter(u => (bookletsByUser[u.id] ?? 0) === 0);
+    const noBookletPct   = nonAdminUsers.length > 0 ? Math.round((noBookletUsers.length / nonAdminUsers.length) * 100) : 0;
+    if (noBookletPct > 25 && noBookletUsers.length > 3) {
+      newProposals.push({
+        agent: "product",
+        title: `${noBookletPct}% מהמשתמשים לא יצרו אף חוברת (${noBookletUsers.length} אנשים)`,
+        description: `${noBookletUsers.length} מתוך ${nonAdminUsers.length} נרשמו אך לא יצרו חוברת. שקול לשפר onboarding, לשלוח תזכורת, או לבדוק מה עוצר אותם.`,
+        action_type: "info_only",
+        action_payload: {},
+      });
+    }
+    if ((recentFeedback ?? []).length > 0) {
+      const fbSample = (recentFeedback ?? []).slice(0, 3)
+        .map((f: any) => `"${(f.message ?? "").substring(0, 70)}"`)
+        .join(" | ");
+      newProposals.push({
+        agent: "product",
+        title: `${(recentFeedback ?? []).length} פידבקים ממתינים לסקירה`,
+        description: fbSample,
+        action_type: "info_only",
+        action_payload: {},
+      });
+    } else {
+      newProposals.push({
+        agent: "product",
+        title: "אין פידבקים חדשים — הכל שקט 🌟",
+        description: "לא התקבלו פידבקים חדשים. אין פעולה נדרשת.",
+        action_type: "info_only",
+        action_payload: {},
+      });
+    }
+
+    // Health agent
+    const avgPerDay   = (bookletsThisWeek ?? 0) / 7;
+    const todayCount  = bookletsToday ?? 0;
+    if (todayCount === 0 && avgPerDay > 2) {
+      newProposals.push({
+        agent: "health",
+        title: `⚠️ אפס חוברות היום — ממוצע יומי ${avgPerDay.toFixed(1)}`,
+        description: "לא נוצרו חוברות היום. בדוק שה-Edge Function generate-booklet פועל תקין.",
+        action_type: "info_only",
+        action_payload: {},
+      });
+    } else {
+      newProposals.push({
+        agent: "health",
+        title: `✅ מערכת תקינה — ${todayCount} חוברות היום, ${usersToday} משתמשים חדשים`,
+        description: `ממוצע יומי: ${avgPerDay.toFixed(1)} חוברות. הכל פועל כנדרש.`,
+        action_type: "info_only",
+        action_payload: {},
+      });
+    }
+
+    // Replace today's pending proposals
+    try {
+      await admin.from("proposals").delete().eq("status", "pending").gte("created_at", todayStart);
+      const { data: inserted } = await admin.from("proposals").insert(newProposals).select("*");
+      pendingProposals = inserted ?? [];
+    } catch (err) {
+      console.error("Failed to upsert proposals:", err);
+    }
+  }
+
   return new Response(JSON.stringify({
     totalUsers: users.length,
     usersThisWeek,
     usersToday,
-    totalBooklets: totalBooklets ?? 0,
-    bookletsThisWeek: bookletsThisWeek ?? 0,
-    bookletsToday: bookletsToday ?? 0,
+    totalBooklets:     totalBooklets ?? 0,
+    bookletsThisWeek:  bookletsThisWeek ?? 0,
+    bookletsToday:     bookletsToday ?? 0,
     bookletsThisMonth: bookletsThisMonth ?? 0,
     planBreakdown,
     topTopics,
     recentUsers,
     recentFeedback: recentFeedback ?? [],
-    recentLeads: recentLeads ?? [],
+    recentLeads:    recentLeads ?? [],
+    funnelStats,
+    proposals: pendingProposals,
   }), { headers: { ...cors, "content-type": "application/json" } });
 });
