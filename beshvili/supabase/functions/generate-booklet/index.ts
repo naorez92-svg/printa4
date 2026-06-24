@@ -120,6 +120,9 @@ const BOOKLET_SYSTEM = `אתה "יוצר החוברות של חני 2.0" — מ�
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
+  if (req.method !== "POST") {
+    return new Response(JSON.stringify({ error: "method_not_allowed" }), { status: 405, headers: cors });
+  }
 
   // Admin Supabase client (service role — bypasses RLS for server checks)
   const admin = createClient(
@@ -223,12 +226,7 @@ Deno.serve(async (req) => {
 
     const userMsg = freeText
       ? `צור חוברת עבודה לפי הבקשה הבאה:\n\n${freeText}\n\nצור HTML מלא עם בדיוק ${pageCount} עמודים.${answerKeyNote} קוד HTML גולמי בלבד.`
-      : `צור חוברת עבודה עם בדיוק ${pageCount} עמודים:
-שם: ${childName || "לא צוין"} | כיתה: ${grade || "לא צוין"} | עולם: ${world || "כללי"}
-יעד: ${goal}
-רמה: ${level === "basic" ? "בסיסי" : level === "advanced" ? "מתקדם" : "בינוני"}
-${weaknesses ? `חולשות לחיזוק: ${weaknesses}` : ""}${answerKeyNote}
-קוד HTML גולמי בלבד, ללא הסברים.`;
+      : `צור חוברת עבודה עם בדיוק ${pageCount} עמודים:\nשם: ${childName || "לא צוין"} | כיתה: ${grade || "לא צוין"} | עולם: ${world || "כללי"}\nיעד: ${goal}\nרמה: ${level === "basic" ? "בסיסי" : level === "advanced" ? "מתקדם" : "בינוני"}\n${weaknesses ? `חולשות לחיזוק: ${weaknesses}` : ""}${answerKeyNote}\nקוד HTML גולמי בלבד, ללא הסברים.`;
 
     // ── 6. Generate (streaming — client receives SSE, sees HTML in real time) ──
     const anthropicResp = await fetch("https://api.anthropic.com/v1/messages", {
@@ -265,7 +263,7 @@ ${weaknesses ? `חולשות לחיזוק: ${weaknesses}` : ""}${answerKeyNote}
     });
 
   } catch (e: unknown) {
-    const status = (e as { status?: number }).status ?? 500;
-    return new Response(JSON.stringify({ error: String(e) }), { status, headers: cors });
+    console.error("generate-booklet error:", e);
+    return new Response(JSON.stringify({ error: String(e) }), { status: 500, headers: cors });
   }
 });
