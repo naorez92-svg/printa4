@@ -44,9 +44,10 @@ Deno.serve(async (req) => {
   } catch {}
 
   const now = new Date();
-  const weekAgo  = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
-  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+  const weekAgo     = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
+  const threeDaysAgo = new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000).toISOString();
+  const todayStart  = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
+  const monthStart  = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
 
   // Fetch all core data in parallel
   const [
@@ -68,7 +69,7 @@ Deno.serve(async (req) => {
     admin.from("profiles").select("id, plan, full_name, created_at, followup_sent_at"),
     admin.from("feedback").select("message, created_at, user_id").order("created_at", { ascending: false }).limit(15),
     admin.from("leads").select("name, phone, created_at").order("created_at", { ascending: false }).limit(15),
-    admin.from("booklets").select("user_id, title, world, goal, created_at").order("created_at", { ascending: false }).limit(200),
+    admin.from("booklets").select("user_id, title, world, goal, created_at, difficulty_feedback").order("created_at", { ascending: false }).limit(200),
   ]);
 
   const users = authData?.users ?? [];
@@ -103,6 +104,21 @@ Deno.serve(async (req) => {
     .sort((a, b) => b[1] - a[1])
     .slice(0, 10)
     .map(([topic, count]) => ({ topic, count }));
+
+  // Difficulty feedback breakdown (from recent 200 booklets)
+  const difficultyBreakdown: Record<string, number> = {};
+  (allBookletRows ?? []).forEach(b => {
+    if (b.difficulty_feedback) {
+      difficultyBreakdown[b.difficulty_feedback] = (difficultyBreakdown[b.difficulty_feedback] ?? 0) + 1;
+    }
+  });
+  const ratedBooklets = (Object.values(difficultyBreakdown) as number[]).reduce((s, n) => s + n, 0);
+
+  // Churn risk: registered 3+ days ago, 0 booklets, non-admin
+  const churnRiskCount = users.filter(u => {
+    const plan = profileMap[u.id]?.plan ?? "free";
+    return plan !== "admin" && u.created_at < threeDaysAgo && (bookletsByUser[u.id] ?? 0) === 0;
+  }).length;
 
   const recentUsers = users
     .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
@@ -190,17 +206,32 @@ Deno.serve(async (req) => {
 
     // ── Product agent ────────────────────────────────
     const nonAdminUsers = users.filter(u => (profileMap[u.id]?.plan ?? "free") !== "admin");
-    const noBookletUsers = nonAdminUsers.filter(u => (bookletsByUser[u.id] ?? 0) === 0);
-    const noBookletPct   = nonAdminUsers.length > 0 ? Math.round((noBookletUsers.length / nonAdminUsers.length) * 100) : 0;
-    if (noBookletPct > 25 && noBookletUsers.length > 3) {
+
+    // Churn risk: registered 3+ days ago, still 0 booklets
+    const churnUsers = nonAdminUsers.filter(u => u.created_at < threeDaysAgo && (bookletsByUser[u.id] ?? 0) === 0);
+    if (churnUsers.length > 2) {
       newProposals.push({
         agent: "product",
-        title: `${noBookletPct}% מהמשתמשים לא יצרו אף חוברת (${noBookletUsers.length} אנשים)`,
-        description: `${noBookletUsers.length} מתוך ${nonAdminUsers.length} נרשמו אך לא יצרו חוברת. שקול לשפר onboarding, לשלוח תזכורת, או לבדוק מה עוצר אותם.`,
+        title: `⚠️ ${churnUsers.length} משתמשים בסיכון נטישה — נרשמו 3+ ימים ולא יצרו חוברת`,
+        description: `${churnUsers.length} אנשים נרשמו לפני 3+ ימים ועדיין לא יצרו חוברת. ייתכן שיש חסם ב-onboarding. שקול לבדוק את תהליך הכניסה הראשונה ואם צריך — שלח תזכורת ידנית.`,
         action_type: "info_only",
         action_payload: {},
       });
     }
+
+    // Difficulty signal: if ≥30% of rated booklets got "too hard"
+    const tooHardCount = difficultyBreakdown["too_hard"] ?? 0;
+    const tooHardPct   = ratedBooklets >= 10 ? Math.round((tooHardCount / ratedBooklets) * 100) : 0;
+    if (tooHardPct >= 30) {
+      newProposals.push({
+        agent: "product",
+        title: `⚠️ ${tooHardPct}% מהחוברות דורגו "קשה מדי" (${tooHardCount}/${ratedBooklets})`,
+        description: `מתוך ${ratedBooklets} חוברות שדורגו על ידי המשתמשים, ${tooHardCount} קיבלו "קשה מדי". שקול להנמיך את רמת הקושי בברירת המחדל, או להוסיף בחירת רמה מפורשת בטופס היצירה.`,
+        action_type: "info_only",
+        action_payload: {},
+      });
+    }
+
     if ((recentFeedback ?? []).length > 0) {
       const fbSample = (recentFeedback ?? []).slice(0, 3)
         .map((f: any) => `"${(f.message ?? "").substring(0, 70)}"`)
@@ -264,9 +295,12 @@ Deno.serve(async (req) => {
     planBreakdown,
     topTopics,
     recentUsers,
-    recentFeedback: recentFeedback ?? [],
-    recentLeads:    recentLeads ?? [],
+    recentFeedback:     recentFeedback ?? [],
+    recentLeads:        recentLeads ?? [],
     funnelStats,
+    difficultyBreakdown,
+    ratedBooklets,
+    churnRiskCount,
     proposals: pendingProposals,
   }), { headers: { ...cors, "content-type": "application/json" } });
 });
