@@ -170,7 +170,7 @@ export default function AdminPanel() {
         </div>
       )}
 
-      {/* Funnel */}
+      {/* Funnel (last 7 days) */}
       <div className="bg-white rounded-2xl p-4 border border-ink/5 shadow-sm">
         <h3 className="font-bold text-ink mb-3 text-sm">📊 משפך 7 ימים אחרונים</h3>
         {fs.sessions === 0 && fs.started === 0 ? (
@@ -196,6 +196,46 @@ export default function AdminPanel() {
           </div>
         )}
       </div>
+
+      {/* Quality signals */}
+      {(data.ratedBooklets > 0 || data.churnRiskCount > 0) && (
+        <div className="bg-white rounded-2xl p-4 border border-ink/5 shadow-sm">
+          <h3 className="font-bold text-ink mb-3 text-sm">🎯 איכות ונטישה</h3>
+          <div className="flex gap-4 items-start">
+            {data.ratedBooklets > 0 && (
+              <div className="flex-1">
+                <p className="text-xs text-ink/40 mb-2">דירוג חוברות ({data.ratedBooklets} מדורגות)</p>
+                <div className="space-y-1.5">
+                  {[
+                    { key: "just_right", emoji: "😊", label: "בדיוק",   color: "bg-grow"     },
+                    { key: "too_easy",   emoji: "🌟", label: "קל מדי", color: "bg-brand"    },
+                    { key: "too_hard",   emoji: "😓", label: "קשה מדי", color: "bg-red-400"  },
+                  ].map(({ key, emoji, label, color }) => {
+                    const count = (data.difficultyBreakdown ?? {})[key] ?? 0;
+                    const pct   = data.ratedBooklets > 0 ? Math.round((count / data.ratedBooklets) * 100) : 0;
+                    return (
+                      <div key={key} className="flex items-center gap-2">
+                        <span className="text-sm w-5 flex-shrink-0">{emoji}</span>
+                        <div className="flex-1 h-2 bg-canvas rounded-full overflow-hidden">
+                          <div className={`h-full ${color} rounded-full transition-all`} style={{ width: `${pct}%` }} />
+                        </div>
+                        <span className="text-[11px] text-ink/50 w-16 text-left">{label}: {count}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+            {data.churnRiskCount > 0 && (
+              <div className="flex-shrink-0 text-center bg-red-50 rounded-xl p-3 border border-red-100 min-w-[80px]">
+                <div className="text-2xl font-bold text-red-500 font-display">{data.churnRiskCount}</div>
+                <div className="text-[10px] text-red-400 font-semibold mt-0.5">בסיכון נטישה</div>
+                <div className="text-[10px] text-ink/30 mt-0.5">3+ ימים ללא חוברת</div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Stats grid */}
       <div className="grid grid-cols-3 gap-3">
