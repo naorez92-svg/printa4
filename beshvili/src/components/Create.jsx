@@ -379,11 +379,14 @@ export default function Create({ onSaved, remaining, isPro }) {
           <div className="space-y-3">
             <input id="inp-name" className="w-full border border-ink/20 rounded-xl p-3 outline-none focus:border-magic text-right bg-canvas/50" placeholder="שם הילד/ה *" value={f.childName} onChange={set("childName")} disabled={loading} />
             <input className="w-full border border-ink/20 rounded-xl p-3 outline-none focus:border-magic text-right bg-canvas/50" placeholder="גיל / כיתה" value={f.grade} onChange={set("grade")} disabled={loading} />
-            <select className="w-full border border-ink/20 rounded-xl p-3 outline-none focus:border-magic bg-canvas/50 text-right" value={f.world} onChange={set("world")} disabled={loading}>
-              {WORLDS.map((w) => <option key={w}>{w}</option>)}
-            </select>
             <div>
-              <textarea className="w-full border border-ink/20 rounded-xl p-3 outline-none focus:border-magic text-right resize-none bg-canvas/50" placeholder="יעד פדגוגי *" rows={2} value={f.goal} onChange={set("goal")} disabled={loading} />
+              <p className="text-xs text-ink/40 mb-1.5 font-medium">מה הילד/ה אוהב? (עולם התוכן)</p>
+              <select className="w-full border border-ink/20 rounded-xl p-3 outline-none focus:border-magic bg-canvas/50 text-right" value={f.world} onChange={set("world")} disabled={loading}>
+                {WORLDS.map((w) => <option key={w}>{w}</option>)}
+              </select>
+            </div>
+            <div>
+              <textarea className="w-full border border-ink/20 rounded-xl p-3 outline-none focus:border-magic text-right resize-none bg-canvas/50" placeholder="מה לתרגל? * — למשל: חיבור וחיסור עד 100, הבנת הנקרא..." rows={2} value={f.goal} onChange={set("goal")} disabled={loading} />
               <div className="flex flex-wrap gap-1.5 mt-2">
                 {GOAL_PICKS.map(({ icon, label, goal }) => (
                   <button key={label} type="button" onClick={() => setF(p => ({ ...p, goal }))} disabled={loading}
