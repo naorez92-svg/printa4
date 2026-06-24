@@ -5,6 +5,7 @@ import BookletRating from "./BookletRating";
 import UpgradeModal from "./UpgradeModal";
 import { FREE_LIMIT } from "../hooks/useProfile";
 import { useChildren } from "../hooks/useChildren";
+import { track } from "../hooks/useEvents";
 
 const WORLDS = ["כדורגל", "גיימינג", "חיות", "חלל", "בישול", "מוזיקה", "סוסים", "נינג'ה", "פוקימון", "מינקראפט"];
 const LEVELS = [["basic", "🌱 בסיסי"], ["medium", "⚡ בינוני"], ["advanced", "🚀 מתקדם"]];
@@ -104,6 +105,7 @@ export default function Create({ onSaved, remaining, isPro }) {
     setLoading(true);
     setHtml(null);
     setError(null);
+    track("booklet_started", { mode, goal: f.goal, grade: f.grade, world: f.world });
 
     const quickText = `דף תרגיל מהיר${f.childName ? ` עבור ${f.childName.trim()}` : ""}${f.grade ? `, כיתה ${f.grade}` : ""}. נושא: ${f.goal.trim()}${f.world ? `, עולם תוכן: ${f.world}` : ""}. צור עמוד A4 אחד עם 8–12 תרגילים מגוונים ומהנים. ללא שער ורפלקציה. קוד HTML גולמי בלבד.`;
 
@@ -220,6 +222,7 @@ export default function Create({ onSaved, remaining, isPro }) {
     setShareToken(inserted?.share_token ?? null);
     setShowRating(true);
     setHtml(html);
+    track("booklet_completed", { booklet_id: inserted?.id, pages: pageCount, mode });
     onSaved?.();
   }, [canSubmit, mode, freeText, f, pageCount, withAnswerKey, onSaved, photoUrl]);
 
