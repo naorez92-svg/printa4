@@ -132,15 +132,19 @@ export default function Create({ onSaved, remaining, isPro }) {
     }
 
     if (!resp.ok) {
-      const errData = await resp.json().catch(() => ({}));
+      const rawBody = await resp.text().catch(() => "");
+      let errData = {};
+      try { errData = JSON.parse(rawBody); } catch {}
       const code = errData?.error;
+      console.error("[generate-booklet] HTTP", resp.status, "body:", rawBody.substring(0, 300));
       setLoading(false);
       if (code === "quota_exceeded") {
         setError(errData?.period === "monthly" ? "quota_monthly" : "quota");
         return;
       }
       if (code === "rate_limited") { setError(`rate:${errData?.wait ?? 60}`); return; }
-      setError(`generic:${code || `שגיאת שרת ${resp.status}`}`);
+      const detail = code || (rawBody.length < 80 ? rawBody : rawBody.substring(0, 60) + "…");
+      setError(`generic:שגיאת שרת ${resp.status}${detail ? ` — ${detail}` : ""}`);
       return;
     }
 

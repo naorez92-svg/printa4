@@ -119,7 +119,11 @@ const BOOKLET_SYSTEM = `אתה "יוצר החוברות של חני 2.0" — מ�
 <p style="position:absolute;bottom:6mm;left:0;right:0;text-align:center;font-size:8px;color:#ccc;margin:0;">נוצר בחינם עם beshvili.com ✨</p>`;
 
 Deno.serve(async (req) => {
+  console.log("[generate-booklet] invoked:", req.method, "origin:", req.headers.get("origin") ?? "-");
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
+  if (req.method !== "POST") {
+    return new Response(JSON.stringify({ error: "method_not_allowed" }), { status: 405, headers: cors });
+  }
 
   // Admin Supabase client (service role — bypasses RLS for server checks)
   const admin = createClient(
@@ -265,7 +269,7 @@ ${weaknesses ? `חולשות לחיזוק: ${weaknesses}` : ""}${answerKeyNote}
     });
 
   } catch (e: unknown) {
-    const status = (e as { status?: number }).status ?? 500;
-    return new Response(JSON.stringify({ error: String(e) }), { status, headers: cors });
+    console.error("generate-booklet error:", e);
+    return new Response(JSON.stringify({ error: String(e) }), { status: 500, headers: cors });
   }
 });
