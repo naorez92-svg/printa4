@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "../lib/supabase";
 import Preview from "./Preview";
 import BookletRating from "./BookletRating";
@@ -65,6 +65,9 @@ export default function Create({ onSaved, remaining, isPro }) {
   const [rateCountdown, setRateCountdown] = useState(null);
   const [childSaved, setChildSaved] = useState(false);
   const { children: savedChildren, loaded: childrenLoaded, save: saveChild } = useChildren();
+  const [photoUrl, setPhotoUrl] = useState(null);
+  const [photoUploading, setPhotoUploading] = useState(false);
+  const photoInputRef = useRef(null);
 
   // Rotate loading messages every 3.5 s while generating
   useEffect(() => {
@@ -107,7 +110,7 @@ export default function Create({ onSaved, remaining, isPro }) {
       ? { freeText: freeText.trim(), pageCount, withAnswerKey }
       : mode === "quick"
       ? { freeText: quickText, pageCount: 1, withAnswerKey: false }
-      : { ...f, pageCount, withAnswerKey };
+      : { ...f, pageCount, withAnswerKey, ...(photoUrl ? { childPhotoUrl: photoUrl } : {}) };
 
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) {
@@ -225,7 +228,24 @@ export default function Create({ onSaved, remaining, isPro }) {
     return () => window.removeEventListener("keydown", h);
   }, [create]);
 
-  const reset = () => { setHtml(null); setF(EMPTY); setFreeText(""); setError(null); setBookletId(null); setShareToken(null); setShowRating(false); setChildSaved(false); };
+  const handlePhotoUpload = useCallback(async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) { alert("תמונה גדולה מדי — מקסימום 5MB"); return; }
+    setPhotoUploading(true);
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) { setPhotoUploading(false); return; }
+    const ext = file.name.split(".").pop() || "jpg";
+    const path = `${user.id}/${Date.now()}.${ext}`;
+    const { error: upErr } = await supabase.storage.from("child-photos").upload(path, file, { upsert: true });
+    if (upErr) { setPhotoUploading(false); console.error("photo upload:", upErr); return; }
+    const { data: { publicUrl } } = supabase.storage.from("child-photos").getPublicUrl(path);
+    setPhotoUrl(publicUrl);
+    setPhotoUploading(false);
+    e.target.value = "";
+  }, []);
+
+  const reset = () => { setHtml(null); setF(EMPTY); setFreeText(""); setError(null); setBookletId(null); setShareToken(null); setShowRating(false); setChildSaved(false); setPhotoUrl(null); };
   const set   = (k) => (e) => setF((p) => ({ ...p, [k]: e.target.value }));
   const applyTmpl = (tmpl) => { setF((p) => ({ ...p, ...tmpl.f })); setMode("form"); setTimeout(() => document.getElementById("inp-name")?.focus(), 50); };
 
@@ -432,6 +452,39 @@ export default function Create({ onSaved, remaining, isPro }) {
               </div>
             )}
             <input id="inp-name" className="w-full border border-ink/20 rounded-xl p-3 outline-none focus:border-magic text-right bg-canvas/50" placeholder="שם הילד/ה *" value={f.childName} onChange={set("childName")} disabled={loading} />
+
+            {/* Child photo upload */}
+            <input type="file" ref={photoInputRef} accept="image/*" onChange={handlePhotoUpload} className="hidden" />
+            <div className="flex items-center gap-3">
+              <div
+                onClick={() => !loading && !photoUploading && photoInputRef.current?.click()}
+                className={`relative flex-shrink-0 w-12 h-12 rounded-full border-2 border-dashed cursor-pointer overflow-hidden flex items-center justify-center transition-colors ${photoUrl ? "border-grow" : "border-magic/30 hover:border-magic/60"}`}
+              >
+                {photoUploading ? (
+                  <div className="w-4 h-4 border-2 border-magic border-t-transparent rounded-full animate-spin" />
+                ) : photoUrl ? (
+                  <img src={photoUrl} alt="" className="w-full h-full object-cover" />
+                ) : (
+                  <span className="text-lg">📷</span>
+                )}
+              </div>
+              <div className="flex-1 text-right">
+                {photoUploading ? (
+                  <p className="text-xs text-ink/50">טוען תמונה...</p>
+                ) : photoUrl ? (
+                  <div className="flex items-center justify-between">
+                    <button type="button" onClick={() => setPhotoUrl(null)} className="text-xs text-red-400 hover:text-red-600 transition-colors" disabled={loading}>הסר תמונה ×</button>
+                    <p className="text-xs text-grow font-medium">תמונה תופיע בשער ✓</p>
+                  </div>
+                ) : (
+                  <div>
+                    <p className="text-xs text-ink/50">תמונה לשער <span className="text-ink/30">(אופציונלי)</span></p>
+                    <p className="text-xs text-ink/30">תופיע כאיור עגול בשער החוברת</p>
+                  </div>
+                )}
+              </div>
+            </div>
+
             <input className="w-full border border-ink/20 rounded-xl p-3 outline-none focus:border-magic text-right bg-canvas/50" placeholder="גיל / כיתה" value={f.grade} onChange={set("grade")} disabled={loading} />
             <div>
               <p className="text-xs text-ink/40 mb-1.5 font-medium">מה הילד/ה אוהב? (עולם התוכן)</p>
