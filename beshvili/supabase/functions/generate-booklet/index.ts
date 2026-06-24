@@ -1,6 +1,6 @@
 import { createClient } from "jsr:@supabase/supabase-js@2";
 
-// v9 — 3-way diagnostic: no-origin vs origin vs origin+auth
+// v10 — fix blank pages between content pages (print margin reset)
 // ── Commercial limits ────────────────────────────────────────────────────────
 const FREE_BOOKLET_LIMIT     = 2;   // free-tier total (lifetime)
 const PARENT_MONTHLY_LIMIT   = 5;   // parent tier (19₪) per calendar month
@@ -43,7 +43,14 @@ const BOOKLET_SYSTEM = `אתה "יוצר החוברות של חני 2.0" — מ�
 
 === חוקי CSS A4 (חובה בכל עמוד!) ===
 • כל div עמוד: width:210mm; height:296mm; margin:10px auto; overflow:hidden; page-break-after:always; box-sizing:border-box; position:relative; padding:12mm;
-• סגנון הדפסה: @page{size:A4;margin:0} @media print{.no-print{display:none!important}}
+• סגנון הדפסה (חובה לכלול בדיוק כך ב-<style> בתוך <head>):
+  @page{size:A4;margin:0}
+  @media print{
+    .no-print{display:none!important}
+    body{margin:0!important;padding:0!important;background:white!important}
+    .page{margin:0!important;box-shadow:none!important;border:none!important}
+    .page:last-child{page-break-after:avoid!important}
+  }
 • שמירת צבעים: -webkit-print-color-adjust:exact!important; print-color-adjust:exact!important
 
 === עקרונות עיצוב ===
