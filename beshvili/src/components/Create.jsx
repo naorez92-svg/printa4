@@ -473,19 +473,20 @@ export default function Create({ onSaved, remaining, isPro }) {
         </div>}
 
         {/* Answer key toggle — hidden in quick mode */}
-        {mode === "quick" && null}
-        <label className="flex items-center justify-between gap-3 cursor-pointer select-none">
-          <div>
-            <span className="text-sm font-medium text-ink">מפתח תשובות</span>
-            <span className="text-xs text-ink/40 mr-2">דף תשובות בסוף החוברת</span>
-          </div>
-          <div
-            onClick={() => !loading && setWithAnswerKey(v => !v)}
-            className={`relative w-11 h-6 rounded-full transition-colors cursor-pointer ${withAnswerKey ? "bg-magic" : "bg-ink/20"}`}
-          >
-            <div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all ${withAnswerKey ? "right-0.5" : "left-0.5"}`} />
-          </div>
-        </label>
+        {mode !== "quick" && (
+          <label className="flex items-center justify-between gap-3 cursor-pointer select-none">
+            <div>
+              <span className="text-sm font-medium text-ink">מפתח תשובות</span>
+              <span className="text-xs text-ink/40 mr-2">דף תשובות בסוף החוברת</span>
+            </div>
+            <div
+              onClick={() => !loading && setWithAnswerKey(v => !v)}
+              className={`relative w-11 h-6 rounded-full transition-colors cursor-pointer ${withAnswerKey ? "bg-magic" : "bg-ink/20"}`}
+            >
+              <div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all ${withAnswerKey ? "right-0.5" : "left-0.5"}`} />
+            </div>
+          </label>
+        )}
 
         {/* Rate limit countdown */}
         {rateCountdown > 0 && (
