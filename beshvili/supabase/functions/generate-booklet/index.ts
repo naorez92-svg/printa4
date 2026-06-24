@@ -119,6 +119,7 @@ const BOOKLET_SYSTEM = `אתה "יוצר החוברות של חני 2.0" — מ�
 <p style="position:absolute;bottom:6mm;left:0;right:0;text-align:center;font-size:8px;color:#ccc;margin:0;">נוצר בחינם עם beshvili.com ✨</p>`;
 
 Deno.serve(async (req) => {
+  console.log("[generate-booklet] invoked:", req.method, "origin:", req.headers.get("origin") ?? "-");
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   if (req.method !== "POST") {
     return new Response(JSON.stringify({ error: "method_not_allowed" }), { status: 405, headers: cors });
@@ -226,7 +227,12 @@ Deno.serve(async (req) => {
 
     const userMsg = freeText
       ? `צור חוברת עבודה לפי הבקשה הבאה:\n\n${freeText}\n\nצור HTML מלא עם בדיוק ${pageCount} עמודים.${answerKeyNote} קוד HTML גולמי בלבד.`
-      : `צור חוברת עבודה עם בדיוק ${pageCount} עמודים:\nשם: ${childName || "לא צוין"} | כיתה: ${grade || "לא צוין"} | עולם: ${world || "כללי"}\nיעד: ${goal}\nרמה: ${level === "basic" ? "בסיסי" : level === "advanced" ? "מתקדם" : "בינוני"}\n${weaknesses ? `חולשות לחיזוק: ${weaknesses}` : ""}${answerKeyNote}\nקוד HTML גולמי בלבד, ללא הסברים.`;
+      : `צור חוברת עבודה עם בדיוק ${pageCount} עמודים:
+שם: ${childName || "לא צוין"} | כיתה: ${grade || "לא צוין"} | עולם: ${world || "כללי"}
+יעד: ${goal}
+רמה: ${level === "basic" ? "בסיסי" : level === "advanced" ? "מתקדם" : "בינוני"}
+${weaknesses ? `חולשות לחיזוק: ${weaknesses}` : ""}${answerKeyNote}
+קוד HTML גולמי בלבד, ללא הסברים.`;
 
     // ── 6. Generate (streaming — client receives SSE, sees HTML in real time) ──
     const anthropicResp = await fetch("https://api.anthropic.com/v1/messages", {
