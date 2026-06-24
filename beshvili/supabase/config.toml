@@ -1,0 +1,16 @@
+project_id = "gywpdzkvkdisonuzhsib"
+
+[functions.generate-booklet]
+verify_jwt = false
+
+[functions.admin-stats]
+verify_jwt = false
+
+[functions.send-followup]
+verify_jwt = false
+
+[functions.send-renewal-reminder]
+verify_jwt = false
+
+[functions.view-booklet]
+verify_jwt = false
