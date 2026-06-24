@@ -68,6 +68,7 @@ export default function Create({ onSaved, remaining, isPro }) {
   const [photoUrl, setPhotoUrl] = useState(null);
   const [photoUploading, setPhotoUploading] = useState(false);
   const photoInputRef = useRef(null);
+  const [recentTmpl, setRecentTmpl] = useState(null);
 
   // Rotate loading messages every 3.5 s while generating
   useEffect(() => {
@@ -220,7 +221,7 @@ export default function Create({ onSaved, remaining, isPro }) {
     setShowRating(true);
     setHtml(html);
     onSaved?.();
-  }, [canSubmit, mode, freeText, f, pageCount, withAnswerKey, onSaved]);
+  }, [canSubmit, mode, freeText, f, pageCount, withAnswerKey, onSaved, photoUrl]);
 
   useEffect(() => {
     const h = (e) => { if ((e.ctrlKey || e.metaKey) && e.key === "Enter") create(); };
@@ -247,7 +248,13 @@ export default function Create({ onSaved, remaining, isPro }) {
 
   const reset = () => { setHtml(null); setF(EMPTY); setFreeText(""); setError(null); setBookletId(null); setShareToken(null); setShowRating(false); setChildSaved(false); setPhotoUrl(null); };
   const set   = (k) => (e) => setF((p) => ({ ...p, [k]: e.target.value }));
-  const applyTmpl = (tmpl) => { setF((p) => ({ ...p, ...tmpl.f })); setMode("form"); setTimeout(() => document.getElementById("inp-name")?.focus(), 50); };
+  const applyTmpl = (tmpl) => {
+    setF((p) => ({ ...p, ...tmpl.f }));
+    setMode("form");
+    setRecentTmpl(tmpl.label);
+    setTimeout(() => setRecentTmpl(null), 1500);
+    setTimeout(() => document.getElementById("inp-goal")?.scrollIntoView({ behavior: "smooth", block: "nearest" }), 80);
+  };
 
   // ── Pro monthly quota exceeded ────────────────────────────────────────────
   if (error === "quota_monthly") {
@@ -367,7 +374,7 @@ export default function Create({ onSaved, remaining, isPro }) {
         {mode === "form" && f.childName.trim() && childrenLoaded && !childSaved && !savedChildren.some(c => c.name === f.childName.trim()) && (
           <button
             onClick={async () => {
-              const saved = await saveChild({ name: f.childName, grade: f.grade, world: f.world, level: f.level });
+              const saved = await saveChild({ name: f.childName, grade: f.grade, world: f.world, level: f.level, photo_url: photoUrl });
               if (saved) setChildSaved(true);
             }}
             className="w-full flex items-center justify-center gap-2 border border-grow/40 text-grow rounded-xl p-3 text-sm font-semibold hover:bg-grow/5 transition-colors"
@@ -412,7 +419,7 @@ export default function Create({ onSaved, remaining, isPro }) {
           <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
             {TEMPLATES.map((t) => (
               <button key={t.label} onClick={() => applyTmpl(t)}
-                className="flex-shrink-0 border border-ink/15 rounded-full px-3 py-1 text-xs text-ink/70 hover:border-magic hover:text-magic transition-colors whitespace-nowrap">
+                className={`flex-shrink-0 border rounded-full px-3 py-1 text-xs transition-colors whitespace-nowrap ${recentTmpl === t.label ? "border-magic bg-magic/10 text-magic font-semibold" : "border-ink/15 text-ink/70 hover:border-magic hover:text-magic"}`}>
                 {t.icon} {t.label}
               </button>
             ))}
@@ -434,13 +441,16 @@ export default function Create({ onSaved, remaining, isPro }) {
                       key={c.id}
                       type="button"
                       disabled={loading}
-                      onClick={() => setF(p => ({
-                        ...p,
-                        childName: c.name,
-                        grade: c.grade || p.grade,
-                        world: c.worlds?.[0] || p.world,
-                        level: c.level || p.level,
-                      }))}
+                      onClick={() => {
+                        setF(p => ({
+                          ...p,
+                          childName: c.name,
+                          grade: c.grade || p.grade,
+                          world: c.worlds?.[0] || p.world,
+                          level: c.level || p.level,
+                        }));
+                        setPhotoUrl(c.photo_url || null);
+                      }}
                       className={`flex items-center gap-1.5 border rounded-full px-3 py-1 text-xs transition-colors disabled:opacity-40 ${f.childName === c.name ? "border-magic text-magic bg-magic/5" : "border-ink/15 text-ink/70 hover:border-magic hover:text-magic bg-canvas/50"}`}
                     >
                       <span>👤</span>
@@ -493,7 +503,7 @@ export default function Create({ onSaved, remaining, isPro }) {
               </select>
             </div>
             <div>
-              <textarea className="w-full border border-ink/20 rounded-xl p-3 outline-none focus:border-magic text-right resize-none bg-canvas/50" placeholder="מה לתרגל? * — למשל: חיבור וחיסור עד 100, הבנת הנקרא..." rows={2} value={f.goal} onChange={set("goal")} disabled={loading} />
+              <textarea id="inp-goal" className="w-full border border-ink/20 rounded-xl p-3 outline-none focus:border-magic text-right resize-none bg-canvas/50" placeholder="מה לתרגל? * — למשל: חיבור וחיסור עד 100, הבנת הנקרא..." rows={2} value={f.goal} onChange={set("goal")} disabled={loading} />
               <div className="flex flex-wrap gap-1.5 mt-2">
                 {GOAL_PICKS.map(({ icon, label, goal }) => (
                   <button key={label} type="button" onClick={() => setF(p => ({ ...p, goal }))} disabled={loading}

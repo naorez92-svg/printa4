@@ -82,6 +82,7 @@ export default function QuickCreate({ student, onClose, onSaved, remaining, isPr
       pageCount,
       withAnswerKey: false,
       weaknesses: student.special_needs || "",
+      ...(student.photo_url ? { childPhotoUrl: student.photo_url } : {}),
     };
 
     const { data: { session } } = await supabase.auth.getSession();

@@ -8,7 +8,7 @@ export function useChildren() {
   const refresh = useCallback(async () => {
     const { data } = await supabase
       .from("children")
-      .select("id, name, grade, worlds, level")
+      .select("id, name, grade, worlds, level, photo_url")
       .order("name");
     setChildren(data ?? []);
     setLoaded(true);
@@ -16,7 +16,7 @@ export function useChildren() {
 
   useEffect(() => { refresh(); }, [refresh]);
 
-  const save = useCallback(async ({ name, grade, world, level }) => {
+  const save = useCallback(async ({ name, grade, world, level, photo_url }) => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user || !name?.trim()) return null;
 
@@ -31,8 +31,9 @@ export function useChildren() {
         grade: grade?.trim() || null,
         worlds: world ? [world] : [],
         level: level || "medium",
+        photo_url: photo_url || null,
       })
-      .select("id, name, grade, worlds, level")
+      .select("id, name, grade, worlds, level, photo_url")
       .single();
 
     if (error || !data) return null;
