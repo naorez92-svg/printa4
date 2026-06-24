@@ -87,7 +87,7 @@ Deno.serve(async (req) => {
     <h2 style="color:#20184A;text-align:center;margin:0 0 16px;">שלום!</h2>
     <p style="color:#555;line-height:1.7;margin:0 0 24px;">${bodyText}</p>
     <div style="text-align:center;margin-bottom:24px;">
-      <a href="https://beshvili.app"
+      <a href="https://beshvili.com"
          style="display:inline-block;background:linear-gradient(to left,#F4A02C,#6C5CE7);color:white;padding:14px 32px;border-radius:12px;text-decoration:none;font-weight:bold;font-size:16px;">
         ${ctaText}
       </a>
@@ -107,7 +107,7 @@ Deno.serve(async (req) => {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        from: "בשבילי <hello@beshvili.app>",
+        from: "בשבילי <hello@beshvili.com>",
         to: [email],
         subject,
         html,
