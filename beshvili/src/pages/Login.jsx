@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { supabase } from "../lib/supabase";
 
 const GoogleIcon = () => (
@@ -13,8 +13,9 @@ const GoogleIcon = () => (
 const scrollTo = (id) => document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
 
 export default function Login() {
+  useEffect(() => { window.scrollTo(0, 0); }, []);
   const [email, setEmail] = useState("");
-  const [step, setStep]   = useState("email"); // "email" | "verify"
+  const [step, setStep]   = useState("email");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -167,8 +168,6 @@ export default function Login() {
           <h2 className="text-2xl font-bold text-ink mb-2 font-display">מחירים שקופים</h2>
           <p className="text-ink/50 mb-10 text-sm">מתחילים חינם, משדרגים כשרוצים</p>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
-
-            {/* Free */}
             <div className="bg-white rounded-2xl p-6 border border-ink/10 shadow-sm text-right">
               <div className="text-2xl mb-2">🌱 חינמי</div>
               <div className="text-3xl font-bold text-ink mb-1 font-display">₪0</div>
@@ -178,15 +177,11 @@ export default function Login() {
                   <li key={f} className="flex items-center gap-2"><span className="text-grow">✓</span>{f}</li>
                 ))}
               </ul>
-              <button
-                onClick={() => scrollTo("login-form")}
-                className="block w-full border border-ink/20 text-ink/60 rounded-xl px-4 py-2.5 text-sm font-semibold text-center hover:border-magic/40 hover:text-magic transition-colors"
-              >
+              <button onClick={() => scrollTo("login-form")}
+                className="block w-full border border-ink/20 text-ink/60 rounded-xl px-4 py-2.5 text-sm font-semibold text-center hover:border-magic/40 hover:text-magic transition-colors">
                 התחל חינם ✨
               </button>
             </div>
-
-            {/* Parent */}
             <div className="bg-white rounded-2xl p-6 border border-brand/30 shadow-sm text-right">
               <div className="text-2xl mb-2">🌟 הורה</div>
               <div className="text-3xl font-bold text-brand mb-1 font-display">₪19<span className="text-sm font-normal text-ink/40">/חודש</span></div>
@@ -196,16 +191,12 @@ export default function Login() {
                   <li key={f} className="flex items-center gap-2"><span className="text-brand">✓</span>{f}</li>
                 ))}
               </ul>
-              <a
-                href={"https://wa.me/972509139137?text=" + encodeURIComponent("שלום! אני רוצה לשדרג לתוכנית הורה בבשבילי 🌟")}
+              <a href={"https://wa.me/972509139137?text=" + encodeURIComponent("שלום! אני רוצה לשדרג לתוכנית הורה בבשבילי 🌟")}
                 target="_blank" rel="noopener noreferrer"
-                className="block w-full bg-brand text-white rounded-xl px-4 py-2.5 text-sm font-semibold text-center hover:opacity-90 transition-opacity shadow-sm"
-              >
+                className="block w-full bg-brand text-white rounded-xl px-4 py-2.5 text-sm font-semibold text-center hover:opacity-90 transition-opacity shadow-sm">
                 💙 שדרגי — ₪19
               </a>
             </div>
-
-            {/* Teacher */}
             <div className="bg-gradient-to-br from-brand/10 to-magic/10 rounded-2xl p-6 border border-magic/20 shadow-sm text-right relative overflow-hidden flex flex-col">
               <div className="absolute top-3 left-3 bg-magic text-white text-xs rounded-full px-2.5 py-1 font-semibold">הכי פופולרי</div>
               <div className="text-2xl mb-2">🚀 מורה</div>
@@ -216,15 +207,12 @@ export default function Login() {
                   <li key={f} className="flex items-center gap-2"><span className="text-magic">✓</span>{f}</li>
                 ))}
               </ul>
-              <a
-                href={"https://wa.me/972509139137?text=" + encodeURIComponent("שלום! אני רוצה לשדרג לתוכנית מורה בבשבילי 🚀")}
+              <a href={"https://wa.me/972509139137?text=" + encodeURIComponent("שלום! אני רוצה לשדרג לתוכנית מורה בבשבילי 🚀")}
                 target="_blank" rel="noopener noreferrer"
-                className="block w-full bg-[#25D366] text-white rounded-xl px-4 py-2.5 text-sm font-semibold text-center hover:opacity-90 transition-opacity shadow-sm"
-              >
+                className="block w-full bg-[#25D366] text-white rounded-xl px-4 py-2.5 text-sm font-semibold text-center hover:opacity-90 transition-opacity shadow-sm">
                 💬 שדרגי — ₪59
               </a>
             </div>
-
           </div>
         </div>
       </section>
@@ -252,21 +240,16 @@ export default function Login() {
                   <p className="mt-1">לחץ על הכפתור בתוך המייל — תיכנס ישירות לאפליקציה ✨</p>
                 </div>
                 {error && <p className="text-red-500 text-sm text-center">{error}</p>}
-                <button
-                  onClick={() => { setStep("email"); setError(""); }}
-                  className="w-full text-sm text-ink/50 hover:text-magic transition-colors border border-ink/15 rounded-xl px-4 py-2.5 hover:border-magic/40"
-                >
+                <button onClick={() => { setStep("email"); setError(""); }}
+                  className="w-full text-sm text-ink/50 hover:text-magic transition-colors border border-ink/15 rounded-xl px-4 py-2.5 hover:border-magic/40">
                   שנה מייל / שלח קישור מחדש
                 </button>
               </div>
             ) : (
               <div className="space-y-4">
                 <p className="text-sm text-ink/60 text-center">כניסה / הרשמה — בלי סיסמה</p>
-                <button
-                  onClick={signInWithGoogle}
-                  disabled={loading}
-                  className="w-full flex items-center justify-center gap-3 bg-white border border-ink/20 rounded-xl p-3.5 text-sm font-semibold text-ink/80 hover:border-ink/40 hover:bg-gray-50 transition-all shadow-sm disabled:opacity-50"
-                >
+                <button onClick={signInWithGoogle} disabled={loading}
+                  className="w-full flex items-center justify-center gap-3 bg-white border border-ink/20 rounded-xl p-3.5 text-sm font-semibold text-ink/80 hover:border-ink/40 hover:bg-gray-50 transition-all shadow-sm disabled:opacity-50">
                   <GoogleIcon />
                   כניסה עם Google
                 </button>
@@ -285,11 +268,8 @@ export default function Login() {
                   autoFocus
                 />
                 {error && <p className="text-red-500 text-sm text-center">{error}</p>}
-                <button
-                  onClick={send}
-                  disabled={loading || !email.trim()}
-                  className="w-full bg-gradient-to-l from-brand to-magic text-white rounded-xl p-3.5 font-display font-semibold disabled:opacity-50 hover:opacity-90 transition-opacity shadow-sm"
-                >
+                <button onClick={send} disabled={loading || !email.trim()}
+                  className="w-full bg-gradient-to-l from-brand to-magic text-white rounded-xl p-3.5 font-display font-semibold disabled:opacity-50 hover:opacity-90 transition-opacity shadow-sm">
                   {loading ? "שולח…" : "שלחו לי קישור ✉️"}
                 </button>
               </div>
