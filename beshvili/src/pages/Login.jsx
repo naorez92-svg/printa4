@@ -6,7 +6,6 @@ const scrollTo = (id) => document.getElementById(id)?.scrollIntoView({ behavior:
 export default function Login() {
   const [email, setEmail] = useState("");
   const [step, setStep]   = useState("email"); // "email" | "verify"
-  const [code, setCode]   = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -29,17 +28,6 @@ export default function Login() {
       }
     } else {
       setStep("verify");
-    }
-  };
-
-  const verify = async () => {
-    if (code.length !== 6) return;
-    setLoading(true);
-    setError("");
-    const { error: err } = await supabase.auth.verifyOtp({ email, token: code, type: "email" });
-    setLoading(false);
-    if (err) {
-      setError(/expired/i.test(err.message) ? "הקוד פג תוקף — שלח שוב" : "קוד שגוי — נסה שנית");
     }
   };
 
@@ -231,48 +219,25 @@ export default function Login() {
           </div>
           <div className="bg-canvas rounded-2xl p-6 border border-ink/10 shadow-sm">
             {step === "verify" ? (
-              <div className="space-y-4">
-                <div className="text-center space-y-1">
-                  <div className="text-3xl">✉️</div>
-                  <p className="font-semibold text-ink text-sm">שלחנו מייל ל:</p>
-                  <p className="text-magic font-mono text-sm break-all">{email}</p>
+              <div className="space-y-5 text-center">
+                <div className="w-20 h-20 bg-gradient-to-br from-brand/20 to-magic/20 rounded-full flex items-center justify-center mx-auto">
+                  <span className="text-4xl">✉️</span>
                 </div>
-
-                <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-700 leading-relaxed">
-                  <p><strong>לא קיבלת?</strong> בדוק תיקיית ספאם / קידומי מכירות</p>
-                  <p className="mt-1">הקישור בתוך המייל יכניס אותך ישירות.</p>
+                <div className="space-y-1">
+                  <p className="font-bold text-ink text-xl font-display">בדוק את תיבת הדואר</p>
+                  <p className="text-ink/50 text-sm">שלחנו קישור כניסה לכתובת:</p>
+                  <p className="text-magic font-semibold text-sm break-all">{email}</p>
                 </div>
-
-                <div>
-                  <p className="text-xs text-ink/50 mb-1.5 text-center font-medium">חלופה: הזן את הקוד בן-6 הספרות מהמייל</p>
-                  <input
-                    className="w-full border border-ink/20 rounded-xl p-3 bg-white text-center outline-none focus:border-magic transition-colors text-xl font-mono tracking-widest"
-                    placeholder="123456"
-                    type="text"
-                    inputMode="numeric"
-                    maxLength={6}
-                    value={code}
-                    onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
-                    onKeyDown={(e) => e.key === "Enter" && code.length === 6 && verify()}
-                    autoFocus
-                  />
+                <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-700 leading-relaxed text-right">
+                  <p><strong>לא מצאת?</strong> בדוק ספאם / קידומי מכירות</p>
+                  <p className="mt-1">לחץ על הכפתור בתוך המייל — תיכנס ישירות לאפליקציה ✨</p>
                 </div>
-
                 {error && <p className="text-red-500 text-sm text-center">{error}</p>}
-
                 <button
-                  onClick={verify}
-                  disabled={loading || code.length !== 6}
-                  className="w-full bg-gradient-to-l from-brand to-magic text-white rounded-xl p-3.5 font-display font-semibold disabled:opacity-50 hover:opacity-90 transition-opacity shadow-sm"
+                  onClick={() => { setStep("email"); setError(""); }}
+                  className="w-full text-sm text-ink/50 hover:text-magic transition-colors border border-ink/15 rounded-xl px-4 py-2.5 hover:border-magic/40"
                 >
-                  {loading ? "מאמת…" : "כניסה →"}
-                </button>
-
-                <button
-                  onClick={() => { setStep("email"); setCode(""); setError(""); }}
-                  className="w-full text-xs text-ink/40 hover:text-ink/60 underline text-center"
-                >
-                  שנה מייל / שלח שוב
+                  שנה מייל / שלח קישור מחדש
                 </button>
               </div>
             ) : (

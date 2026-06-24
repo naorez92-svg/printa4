@@ -16,24 +16,24 @@ export default function Dashboard() {
   return (
     <div className="min-h-screen bg-canvas">
       {/* Sticky header */}
-      <header className="sticky top-0 z-10 bg-white/90 backdrop-blur border-b border-ink/5">
+      <header className="sticky top-0 z-10 bg-ink shadow-md">
         <div className="max-w-2xl mx-auto px-5 py-3 flex justify-between items-center">
           <div className="flex items-center gap-2">
             <span className="text-2xl">📚</span>
-            <span className="font-bold text-ink text-lg font-display">בשבילי<span className="text-brand">·</span></span>
+            <span className="font-bold text-white text-lg font-display">בשבילי<span className="text-brand">·</span></span>
           </div>
 
           <div className="flex items-center gap-3">
             {/* Plan badge */}
             {!loading && (
               isPro ? (
-                <span className="text-xs font-semibold bg-magic/10 text-magic border border-magic/30 rounded-full px-2.5 py-1">
+                <span className="text-xs font-semibold bg-magic/25 text-magic border border-magic/40 rounded-full px-2.5 py-1">
                   ✓ {plan === "teacher" || plan === "pro" ? "מורה" : plan === "parent" ? "הורה" : "פרו"}
                 </span>
               ) : (
                 <button
                   onClick={() => setShowUpgrade(true)}
-                  className="text-xs font-medium text-ink/50 bg-canvas border border-ink/10 rounded-full px-2.5 py-1 hover:border-magic/40 hover:text-magic transition-colors"
+                  className="text-xs font-medium text-white/60 bg-white/10 border border-white/20 rounded-full px-2.5 py-1 hover:border-magic/60 hover:text-magic transition-colors"
                 >
                   {remaining}/{FREE_LIMIT} חינם ↑
                 </button>
@@ -41,7 +41,7 @@ export default function Dashboard() {
             )}
             <button
               onClick={() => supabase.auth.signOut()}
-              className="text-xs text-ink/40 hover:text-ink/70 transition-colors border border-ink/10 rounded-lg px-3 py-1.5"
+              className="text-xs text-white/40 hover:text-white/70 transition-colors border border-white/10 rounded-lg px-3 py-1.5"
             >
               יציאה
             </button>
@@ -52,8 +52,8 @@ export default function Dashboard() {
         {!loading && (
           <div className="max-w-2xl mx-auto px-5 pb-2">
             {isPro && monthlyLimit ? (
-              <div className="flex items-center gap-2 text-xs text-ink/50">
-                <div className="flex-1 h-1 bg-ink/10 rounded-full overflow-hidden">
+              <div className="flex items-center gap-2 text-xs text-white/40">
+                <div className="flex-1 h-1 bg-white/10 rounded-full overflow-hidden">
                   <div
                     className={`h-full rounded-full transition-all ${monthlyBookletCount >= monthlyLimit ? "bg-amber-400" : "bg-magic"}`}
                     style={{ width: `${Math.min(100, (monthlyBookletCount / monthlyLimit) * 100)}%` }}
@@ -62,8 +62,8 @@ export default function Dashboard() {
                 <span>{monthlyBookletCount}/{monthlyLimit} חוברות החודש</span>
               </div>
             ) : !isPro ? (
-              <div className="flex items-center gap-2 text-xs text-ink/50">
-                <div className="flex-1 h-1 bg-ink/10 rounded-full overflow-hidden">
+              <div className="flex items-center gap-2 text-xs text-white/40">
+                <div className="flex-1 h-1 bg-white/10 rounded-full overflow-hidden">
                   <div
                     className={`h-full rounded-full transition-all ${bookletCount >= FREE_LIMIT ? "bg-red-400" : "bg-brand"}`}
                     style={{ width: `${Math.min(100, (bookletCount / FREE_LIMIT) * 100)}%` }}
@@ -82,7 +82,7 @@ export default function Dashboard() {
               key={id}
               onClick={() => setTab(id)}
               className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all ${
-                tab === id ? "bg-magic text-white shadow-sm" : "text-ink/50 hover:text-ink"
+                tab === id ? "bg-white text-ink shadow-sm" : "text-white/50 hover:text-white/80"
               }`}
             >
               {label}
