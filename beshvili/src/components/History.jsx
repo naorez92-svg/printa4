@@ -5,6 +5,7 @@ import Preview from "./Preview";
 export default function History() {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [search, setSearch] = useState("");
 
   useEffect(() => {
@@ -12,7 +13,8 @@ export default function History() {
       .from("booklets")
       .select("id, title, world, child_name, grade, created_at")
       .order("created_at", { ascending: false })
-      .then(({ data }) => {
+      .then(({ data, error }) => {
+        if (error) setLoadError(true);
         setItems(data ?? []);
         setLoading(false);
       });
@@ -54,7 +56,8 @@ export default function History() {
       </div>
 
       {loading && <p className="text-ink/40 text-sm animate-pulse">טוען…</p>}
-      {!loading && items.length === 0 && (
+      {loadError && <p className="text-red-500 text-sm">שגיאה בטעינת החוברות — נסה לרענן את הדף</p>}
+      {!loading && items.length === 0 && !loadError && (
         <p className="text-ink/50 text-sm">עדיין אין חוברות. צור את הראשונה למעלה.</p>
       )}
       {!loading && items.length > 0 && filtered.length === 0 && (
@@ -76,6 +79,7 @@ function BookletRow({ booklet: b, onDelete }) {
 
   const toggle = async () => {
     if (html) { setHtml(null); setShareToken(null); return; }
+    if (loadingHtml) return;
     setLoadingHtml(true);
     const { data } = await supabase.from("booklets").select("html, share_token").eq("id", b.id).single();
     setHtml(data?.html ?? null);

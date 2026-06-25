@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 const A4_PX = 794;
 const A4_H  = 1123; // A4 at 96dpi: 297mm × (96/25.4) ≈ 1123px
@@ -7,20 +7,29 @@ export default function PublicBooklet({ token }) {
   const [booklet, setBooklet] = useState(null);
   const [error, setError]     = useState(null);
   const [scale, setScale]     = useState(1);
+  const wrapperRef = useRef(null);
 
   useEffect(() => {
     const url = `${import.meta.env.VITE_SUPABASE_URL || "https://gywpdzkvkdisonuzhsib.supabase.co"}/functions/v1/view-booklet?token=${token}`;
     fetch(url)
-      .then(r => r.ok ? r.json() : r.json().then(e => { throw new Error(e.error); }))
+      .then(r => r.ok ? r.json() : r.text().then(t => {
+        let e = {};
+        try { e = JSON.parse(t); } catch {}
+        throw new Error(e.error || `שגיאת שרת ${r.status}`);
+      }))
       .then(setBooklet)
       .catch(e => setError(e.message));
   }, [token]);
 
   useEffect(() => {
-    const update = () => setScale(Math.min(1, window.innerWidth / A4_PX));
+    const update = () => {
+      if (!wrapperRef.current) return;
+      setScale(Math.min(1, wrapperRef.current.offsetWidth / A4_PX));
+    };
     update();
-    window.addEventListener("resize", update);
-    return () => window.removeEventListener("resize", update);
+    const ro = new ResizeObserver(update);
+    if (wrapperRef.current) ro.observe(wrapperRef.current);
+    return () => ro.disconnect();
   }, []);
 
   const openAndPrint = () => {
@@ -87,6 +96,7 @@ export default function PublicBooklet({ token }) {
       {/* Booklet preview */}
       <div className="max-w-screen-sm mx-auto p-4 space-y-4">
         <div
+          ref={wrapperRef}
           className="rounded-2xl overflow-hidden border border-ink/10 shadow-lg bg-white relative"
           style={{ height: `${scaledH}px` }}
         >
