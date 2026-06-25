@@ -7,6 +7,7 @@ import UpgradeModal from "../components/UpgradeModal";
 import FeedbackWidget from "../components/FeedbackWidget";
 import AdminPanel from "../components/AdminPanel";
 import { useProfile, FREE_LIMIT } from "../hooks/useProfile";
+import InstallPWA from "../components/InstallPWA";
 
 const NAV = [
   ["create",   "✨", "צור חוברת"],
@@ -78,9 +79,10 @@ export default function Dashboard() {
           ))}
         </nav>
 
-        {/* Quota + sign out */}
+        {/* Quota + install + sign out */}
         <div className="px-5 py-4 border-t border-white/10 space-y-3">
           <QuotaBar />
+          <InstallPWA variant="sidebar" />
           <button onClick={() => supabase.auth.signOut()}
             className="w-full text-xs text-white/30 hover:text-white/60 transition-colors text-right">
             יציאה מהחשבון →
@@ -151,6 +153,7 @@ export default function Dashboard() {
 
       {showUpgrade && <UpgradeModal onClose={() => setShowUpgrade(false)} />}
       <FeedbackWidget />
+      <InstallPWA variant="banner" />
     </div>
   );
 }
