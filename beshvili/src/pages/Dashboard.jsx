@@ -6,8 +6,8 @@ import Students from "../components/Students";
 import UpgradeModal from "../components/UpgradeModal";
 import FeedbackWidget from "../components/FeedbackWidget";
 import AdminPanel from "../components/AdminPanel";
-import InstallPWA from "../components/InstallPWA";
 import { useProfile, FREE_LIMIT } from "../hooks/useProfile";
+import InstallPWA from "../components/InstallPWA";
 
 const NAV = [
   ["create",   "✨", "צור חוברת"],
@@ -131,7 +131,10 @@ export default function Dashboard() {
       {/* ── Main content ── */}
       <div className="lg:mr-60">
         <main className="max-w-3xl mx-auto px-5 py-6 lg:py-8">
-          {tab === "create" && <Create onSaved={() => refresh()} remaining={remaining} isPro={isPro} />}
+          {/* Create stays mounted to preserve in-progress generation when switching tabs */}
+          <div className={tab === "create" ? "" : "hidden"}>
+            <Create active={tab === "create"} onSaved={() => refresh()} remaining={remaining} isPro={isPro} />
+          </div>
           {tab === "students" && <Students onBookletSaved={() => { refresh(); setTab("history"); }} remaining={remaining} isPro={isPro} />}
           {tab === "history" && <History />}
           {tab === "admin" && isAdmin && <AdminPanel />}
