@@ -15,14 +15,9 @@ const NAV = [
   ["history",  "📂", "החוברות שלי"],
 ];
 
-export default function Dashboard() {
-  const [tab, setTab]             = useState("create");
-  const [showUpgrade, setShowUpgrade] = useState(false);
-  const { profile, plan, bookletCount, monthlyBookletCount, monthlyLimit, remaining, isPro, isAdmin, loading, refresh } = useProfile();
-
-  const tabs = [...NAV, ...(isAdmin ? [["admin", "🔐", "ניהול"]] : [])];
-
-  const QuotaBar = ({ className = "" }) => !loading ? (
+function QuotaBar({ loading, isPro, monthlyBookletCount, monthlyLimit, bookletCount, className = "" }) {
+  if (loading) return null;
+  return (
     <div className={`flex items-center gap-2 text-xs text-white/40 ${className}`}>
       <div className="flex-1 h-1 bg-white/10 rounded-full overflow-hidden">
         {isPro && monthlyLimit ? (
@@ -37,7 +32,15 @@ export default function Dashboard() {
         {isPro && monthlyLimit ? `${monthlyBookletCount}/${monthlyLimit} החודש` : !isPro ? `${bookletCount}/${FREE_LIMIT} חינם` : ""}
       </span>
     </div>
-  ) : null;
+  );
+}
+
+export default function Dashboard() {
+  const [tab, setTab]             = useState("create");
+  const [showUpgrade, setShowUpgrade] = useState(false);
+  const { profile, plan, bookletCount, monthlyBookletCount, monthlyLimit, remaining, isPro, isAdmin, loading, refresh } = useProfile();
+
+  const tabs = [...NAV, ...(isAdmin ? [["admin", "🔐", "ניהול"]] : [])];
 
   return (
     <div className="min-h-screen bg-canvas" dir="rtl">
@@ -81,7 +84,7 @@ export default function Dashboard() {
 
         {/* Quota + install + sign out */}
         <div className="px-5 py-4 border-t border-white/10 space-y-3">
-          <QuotaBar />
+          <QuotaBar loading={loading} isPro={isPro} monthlyBookletCount={monthlyBookletCount} monthlyLimit={monthlyLimit} bookletCount={bookletCount} />
           <InstallPWA variant="sidebar" />
           <button onClick={() => supabase.auth.signOut()}
             className="w-full text-xs text-white/30 hover:text-white/60 transition-colors text-right">
@@ -114,7 +117,7 @@ export default function Dashboard() {
             </button>
           </div>
         </div>
-        <QuotaBar className="px-4 pb-2" />
+        <QuotaBar loading={loading} isPro={isPro} monthlyBookletCount={monthlyBookletCount} monthlyLimit={monthlyLimit} bookletCount={bookletCount} className="px-4 pb-2" />
         {/* Mobile tabs */}
         <div className="px-3 pb-2 flex gap-1 overflow-x-auto scrollbar-none">
           {tabs.map(([id, icon, label]) => (

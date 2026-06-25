@@ -45,17 +45,17 @@ export default function Preview({ html, onReset, shareToken, active = true }) {
         );
 
   const openInNewTab = () => {
-    const html = getPrintHtml();
-    const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+    const printHtml = getPrintHtml();
+    const blob = new Blob([printHtml], { type: "text/html;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const w = window.open(url, "_blank");
     if (!w) { alert("אפשרי חלונות קופצים בדפדפן"); URL.revokeObjectURL(url); return; }
     setTimeout(() => URL.revokeObjectURL(url), 120000);
   };
 
-  const handlePrint = () => {
-    const html = getPrintHtml();
-    const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+  const handlePrint = useCallback(() => {
+    const printHtml = getPrintHtml();
+    const blob = new Blob([printHtml], { type: "text/html;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const w = window.open(url, "_blank");
     if (!w) { alert("אפשרי חלונות קופצים בדפדפן"); URL.revokeObjectURL(url); return; }
@@ -63,14 +63,14 @@ export default function Preview({ html, onReset, shareToken, active = true }) {
       try { w.focus(); w.print(); } catch {}
       setTimeout(() => URL.revokeObjectURL(url), 120000);
     }, 1000);
-  };
+  }, [html]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!active) return;
     const h = (e) => { if ((e.ctrlKey || e.metaKey) && e.key === "p") { e.preventDefault(); handlePrint(); } };
     window.addEventListener("keydown", h);
     return () => window.removeEventListener("keydown", h);
-  }, [html, active]);
+  }, [html, active, handlePrint]);
 
   const toggleRead = useCallback(() => {
     const synth = window.speechSynthesis;
@@ -129,10 +129,12 @@ export default function Preview({ html, onReset, shareToken, active = true }) {
   }, [shareToken]);
 
   const downloadHtml = () => {
+    const url = URL.createObjectURL(new Blob([html], { type: "text/html;charset=utf-8" }));
     const a = document.createElement("a");
-    a.href = URL.createObjectURL(new Blob([html], { type: "text/html;charset=utf-8" }));
+    a.href = url;
     a.download = "חוברת-בשבילי.html";
     a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 30000);
   };
 
   return (
@@ -144,7 +146,7 @@ export default function Preview({ html, onReset, shareToken, active = true }) {
         style={{ height: `${scaledHeight}px` }}
       >
         <iframe
-          title="תצוגה מקדימה"
+          title="תצוגה מקדימית"
           srcDoc={html}
           sandbox="allow-scripts"
           style={{
@@ -188,7 +190,7 @@ export default function Preview({ html, onReset, shareToken, active = true }) {
         className="w-full flex items-center justify-center gap-2 bg-gradient-to-l from-grow to-grow/80 text-white rounded-2xl p-4 font-display font-semibold text-base hover:opacity-90 transition-opacity shadow-md"
       >
         <span className="text-xl">🖨️</span>
-        <span>{isMobile ? "פתחי לצפייה ושמירה כ-PDF" : "הדפס / שמור PDF"}</span>
+        <span>{isMobile ? "פתחי לצפייה ושמירה כ־ PDF" : "הדפס / שמור PDF"}</span>
         {!isMobile && <span className="text-white/50 text-xs font-normal mr-1">Ctrl+P</span>}
       </button>
 
@@ -217,7 +219,7 @@ export default function Preview({ html, onReset, shareToken, active = true }) {
         <div className="bg-blue-50 border border-blue-100 rounded-xl px-4 py-3 text-xs text-blue-700 text-right space-y-1">
           <p className="font-semibold">איך שומרים PDF בטלפון?</p>
           <p>iOS Safari: לחצי שתף ← "הדפס" ← פרגני ← שמור PDF</p>
-          <p>Android Chrome: לחצי ⋮ ← "הדפס" ← שנה יעד → "שמור כ-PDF"</p>
+          <p>Android Chrome: לחצי ⋮ ← "הדפס" ← שנה יעד → "שמור כ־ PDF"</p>
         </div>
       )}
 
@@ -256,7 +258,7 @@ export default function Preview({ html, onReset, shareToken, active = true }) {
 
       {!isMobile && (
         <p className="text-center text-xs text-ink/25">
-          לחץ "הדפס / שמור PDF" ← בחר <strong className="text-ink/40">שמור כ-PDF</strong> בחלון ההדפסה
+          לחץ "הדפס / שמור PDF" ← בחר <strong className="text-ink/40">שמור כ־ PDF</strong> בחלון ההדפסה
         </p>
       )}
     </div>
