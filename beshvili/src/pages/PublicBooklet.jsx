@@ -7,7 +7,7 @@ export default function PublicBooklet({ token }) {
   const [booklet, setBooklet] = useState(null);
   const [error, setError]     = useState(null);
   const [scale, setScale]     = useState(1);
-  const wrapperRef = useRef(null);
+  const containerRef = useRef(null); // outer div — measures available width
 
   useEffect(() => {
     const url = `${import.meta.env.VITE_SUPABASE_URL || "https://gywpdzkvkdisonuzhsib.supabase.co"}/functions/v1/view-booklet?token=${token}`;
@@ -23,12 +23,12 @@ export default function PublicBooklet({ token }) {
 
   useEffect(() => {
     const update = () => {
-      if (!wrapperRef.current) return;
-      setScale(Math.min(1, wrapperRef.current.offsetWidth / A4_PX));
+      if (!containerRef.current) return;
+      setScale(Math.min(1, containerRef.current.offsetWidth / A4_PX));
     };
     update();
     const ro = new ResizeObserver(update);
-    if (wrapperRef.current) ro.observe(wrapperRef.current);
+    if (containerRef.current) ro.observe(containerRef.current);
     return () => ro.disconnect();
   }, []);
 
@@ -65,6 +65,7 @@ export default function PublicBooklet({ token }) {
     </div>
   );
 
+  const scaledW = Math.round(A4_PX * scale);
   const scaledH = Math.round(A4_H * scale);
 
   return (
@@ -95,28 +96,31 @@ export default function PublicBooklet({ token }) {
 
       {/* Booklet preview */}
       <div className="max-w-screen-sm mx-auto p-4 space-y-4">
-        <div
-          ref={wrapperRef}
-          className="rounded-2xl overflow-hidden border border-ink/10 shadow-lg bg-white relative"
-          style={{ height: `${scaledH}px` }}
-        >
-          <iframe
-            title={booklet.title || "חוברת"}
-            srcDoc={booklet.html}
-            sandbox="allow-scripts"
-            style={{
-              width:  `${A4_PX}px`,
-              height: `${A4_H}px`,
-              transform: `scale(${scale})`,
-              transformOrigin: "top left",
-              border: "none",
-              display: "block",
-              position: "absolute",
-              top: 0,
-              left: 0,
-            }}
-          />
-          <div className="absolute bottom-0 inset-x-0 h-10 bg-gradient-to-t from-white/70 to-transparent pointer-events-none" />
+        {/* containerRef measures the available width; inner div gets exact scaled dimensions */}
+        <div ref={containerRef} className="w-full">
+          <div
+            dir="ltr"
+            className="rounded-2xl overflow-hidden border border-ink/10 shadow-lg bg-white relative"
+            style={{ width: `${scaledW}px`, height: `${scaledH}px` }}
+          >
+            <iframe
+              title={booklet.title || "חוברת"}
+              srcDoc={booklet.html}
+              sandbox="allow-scripts"
+              style={{
+                width:  `${A4_PX}px`,
+                height: `${A4_H}px`,
+                transform: `scale(${scale})`,
+                transformOrigin: "top left",
+                border: "none",
+                display: "block",
+                position: "absolute",
+                top: 0,
+                left: 0,
+              }}
+            />
+            <div className="absolute bottom-0 inset-x-0 h-10 bg-gradient-to-t from-white/70 to-transparent pointer-events-none" />
+          </div>
         </div>
 
         <p className="text-center text-xs text-ink/30">גלול בתוך התצוגה לצפייה בכל העמודים</p>

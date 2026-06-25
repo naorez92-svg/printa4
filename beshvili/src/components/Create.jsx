@@ -38,13 +38,13 @@ const GOAL_PICKS = [
 const EMPTY = { childName: "", grade: "", world: "כדורגל", goal: "", level: "medium" };
 const PAGE_OPTIONS = [3, 5, 7, 10];
 const LOADING_MSGS = [
-  "קורא את הבקשה שלך...",
-  "מתכנן את מבנה החוברת...",
-  "כותב תרגילים ומשימות...",
-  "מעצב עמודי A4...",
-  "מוסיף צבעים ואימוג'ים...",
-  "עוד קצת בסבלנות, זה כבר בדרך...",
-  "בודק איכות ומסיים...",
+  "מכינה את החוברת... ✍️",
+  "בונה תרגילים מגוונים...",
+  "כותבת שאלות וסיפורים...",
+  "מעצבת עמודים יפים...",
+  "מוסיפה צבעים ואיורים...",
+  "מדייקת לפי רמת הילד...",
+  "עורכת ובודקת הכל...",
   "כמעט מוכן! עוד רגע...",
 ];
 
@@ -58,9 +58,11 @@ export default function Create({ onSaved, remaining, isPro, active = true }) {
   const [loading, setLoading]     = useState(false);
   const [loadingMsgIdx, setLoadingMsgIdx] = useState(0);
   const [streamChars, setStreamChars] = useState(0);
+  const [loadingElapsed, setLoadingElapsed] = useState(0);
   const [html, setHtml]           = useState(null);
   const [bookletId, setBookletId] = useState(null);
   const [shareToken, setShareToken] = useState(null);
+  const [bookletTitle, setBookletTitle] = useState(null);
   const [showRating, setShowRating] = useState(false);
   const [error, setError]         = useState(null); // null | "quota" | "quota_monthly" | "rate:{wait}" | "generic:{msg}"
   const [rateCountdown, setRateCountdown] = useState(null);
@@ -71,11 +73,12 @@ export default function Create({ onSaved, remaining, isPro, active = true }) {
   const photoInputRef = useRef(null);
   const [recentTmpl, setRecentTmpl] = useState(null);
 
-  // Rotate loading messages every 3.5 s while generating
+  // Rotate loading messages every 3.5 s while generating; tick elapsed seconds
   useEffect(() => {
-    if (!loading) { setLoadingMsgIdx(0); setStreamChars(0); return; }
-    const id = setInterval(() => setLoadingMsgIdx(i => (i + 1) % LOADING_MSGS.length), 3500);
-    return () => clearInterval(id);
+    if (!loading) { setLoadingMsgIdx(0); setStreamChars(0); setLoadingElapsed(0); return; }
+    const msgId = setInterval(() => setLoadingMsgIdx(i => (i + 1) % LOADING_MSGS.length), 3500);
+    const secId = setInterval(() => setLoadingElapsed(s => s + 1), 1000);
+    return () => { clearInterval(msgId); clearInterval(secId); };
   }, [loading]);
 
   // Start countdown when rate-limited
@@ -240,6 +243,7 @@ export default function Create({ onSaved, remaining, isPro, active = true }) {
 
     setBookletId(inserted?.id ?? null);
     setShareToken(inserted?.share_token ?? null);
+    setBookletTitle(title);
     setShowRating(true);
     setHtml(generatedHtml);
     track("booklet_completed", { booklet_id: inserted?.id, pages: pageCount, mode });
@@ -281,7 +285,7 @@ export default function Create({ onSaved, remaining, isPro, active = true }) {
     e.target.value = "";
   }, []);
 
-  const reset = () => { setHtml(null); setF(EMPTY); setFreeText(""); setError(null); setBookletId(null); setShareToken(null); setShowRating(false); setChildSaved(false); setPhotoUrl(null); };
+  const reset = () => { setHtml(null); setF(EMPTY); setFreeText(""); setError(null); setBookletId(null); setShareToken(null); setBookletTitle(null); setShowRating(false); setChildSaved(false); setPhotoUrl(null); };
   const set   = (k) => (e) => setF((p) => ({ ...p, [k]: e.target.value }));
   const applyTmpl = (tmpl) => {
     setF((p) => ({ ...p, ...tmpl.f }));
@@ -394,7 +398,7 @@ export default function Create({ onSaved, remaining, isPro, active = true }) {
         )}
 
         {/* Booklet preview — shown immediately, always first */}
-        <Preview html={html} onReset={reset} shareToken={shareToken} active={active} />
+        <Preview html={html} onReset={reset} shareToken={shareToken} title={bookletTitle} active={active} />
 
         {/* Rating widget — shown below the booklet, optional */}
         {showRating && bookletId && (
@@ -666,6 +670,9 @@ export default function Create({ onSaved, remaining, isPro, active = true }) {
         {/* Submit / loading */}
         {loading ? (
           <div className="text-center py-8 space-y-3">
+            {f.childName && (
+              <p className="text-magic font-display font-semibold">✨ יוצרת חוברת עבור {f.childName}</p>
+            )}
             <div className="flex justify-center gap-1">
               {[0, 1, 2].map((i) => (
                 <div key={i} className="w-2.5 h-2.5 rounded-full bg-magic animate-bounce" style={{ animationDelay: `${i * 0.15}s` }} />
@@ -683,6 +690,11 @@ export default function Create({ onSaved, remaining, isPro, active = true }) {
                 : <div className="h-full bg-gradient-to-r from-brand via-magic to-grow rounded-full animate-shimmer" />
               }
             </div>
+            {loadingElapsed >= 8 && typeof Notification !== "undefined" && Notification.permission !== "denied" && (
+              <p className="text-ink/40 text-xs bg-canvas rounded-xl px-3 py-2">
+                🔔 אפשר לנעול את המסך — נשלח לך התראה כשהחוברת מוכנה
+              </p>
+            )}
           </div>
         ) : (!isPro && remaining === 0) ? (
           <button
