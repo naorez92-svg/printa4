@@ -23,6 +23,10 @@ const cors = {
 const BOOKLET_SYSTEM = `אתה "יוצר החוברות של חני 2.0" — מומחה פדגוגי בכיר, מעצב גרפי לפרינט ומפתח HTML/CSS.
 מטרתך: לייצר קוד HTML מלא לחוברות עבודה לימודיות לילדים ברמה עיצובית גבוהה, חסכוניות בדיו, מוכנות להדפסה בפורמט A4.
 
+=== כלל ברזל: שם הגיבור/ה ===
+• הגיבור/ה הוא תמיד שם הילד/ה שסופק בפרמטרים — ולא שם של חיה, אפילו אם עולם התוכן הוא "חיות".
+• אם לא סופק שם — השתמש ב"הגיבור/ה" בלבד, ולא בשם של בעל חיים.
+
 === עקרונות פדגוגיים (חובה!) ===
 • טקסונומיית בלום — סדר תרגילים בכל עמוד לפי: זכירה → הבנה → יישום → ניתוח/הערכה
 • שלוש רמות בכל עמוד: סמן כל תרגיל עם badge: ✅ קל | 🌟 בינוני | 🧠 אתגר
@@ -254,6 +258,7 @@ Deno.serve(async (req) => {
     // ── 6. Generate (streaming — client receives SSE, sees HTML in real time) ──
     const anthropicResp = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
+      signal: AbortSignal.timeout(270_000), // 270s — headroom before Deno's 300s hard limit
       headers: {
         "content-type": "application/json",
         "x-api-key": apiKey,
@@ -270,7 +275,11 @@ Deno.serve(async (req) => {
     });
 
     if (!anthropicResp.ok) {
-      throw new Error(`Anthropic ${anthropicResp.status}: ${await anthropicResp.text()}`);
+      const status = anthropicResp.status;
+      if (status === 529 || status === 503) {
+        return new Response(JSON.stringify({ error: "ai_overloaded" }), { status: 503, headers: cors });
+      }
+      throw new Error(`Anthropic ${status}: ${await anthropicResp.text()}`);
     }
 
     const monthlyLimit = isAdmin ? -1 : isTeacher ? TEACHER_MONTHLY_LIMIT : isParent ? PARENT_MONTHLY_LIMIT : FREE_BOOKLET_LIMIT;
@@ -287,6 +296,8 @@ Deno.serve(async (req) => {
 
   } catch (e: unknown) {
     console.error("generate-booklet error:", e);
-    return new Response(JSON.stringify({ error: "internal_error" }), { status: 500, headers: cors });
+    const isTimeout = e instanceof Error && (e.name === "TimeoutError" || e.message.includes("timeout"));
+    const errCode = isTimeout ? "ai_timeout" : "internal_error";
+    return new Response(JSON.stringify({ error: errCode }), { status: 500, headers: cors });
   }
 });

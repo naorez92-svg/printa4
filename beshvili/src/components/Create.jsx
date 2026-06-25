@@ -160,6 +160,8 @@ export default function Create({ onSaved, remaining, isPro, active = true }) {
         return;
       }
       if (code === "rate_limited") { setError(`rate:${errData?.wait ?? 60}`); return; }
+      if (code === "ai_overloaded") { setError("generic:השרת עמוס כרגע — נסי שוב בעוד דקה 🙏"); return; }
+      if (code === "ai_timeout")    { setError("generic:הייצור לקח יותר מדי זמן — נסי עם פחות עמודים"); return; }
       const detail = code || (rawBody.length < 80 ? rawBody : rawBody.substring(0, 60) + "…");
       setError(`generic:שגיאת שרת ${resp.status}${detail ? ` — ${detail}` : ""}`);
       return;

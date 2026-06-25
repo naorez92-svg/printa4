@@ -188,13 +188,23 @@ export default function Preview({ html, onReset, shareToken, title, active = tru
         <span>שתפי בוואטסאפ</span>
       </button>
 
+      {/* Mobile PDF instructions — shown BEFORE the button so user knows what to expect */}
+      {isMobile && (
+        <div className="bg-canvas border border-ink/10 rounded-xl px-4 py-3 text-xs text-ink/50 text-right space-y-1">
+          <p className="font-semibold text-ink/70">📥 איך שומרים PDF בטלפון?</p>
+          <p>לאחר לחיצה תיפתח החוברת בדף חדש עם כפתור הדפסה.</p>
+          <p><span className="font-medium text-ink/60">iPhone:</span> שתף ← "הדפס" ← פרגני ← שמור PDF</p>
+          <p><span className="font-medium text-ink/60">Android:</span> ⋮ ← "הדפס" ← שנה יעד ← "שמור כ-PDF"</p>
+        </div>
+      )}
+
       {/* Print / Save PDF */}
       <button
         onClick={handlePrint}
         className="w-full flex items-center justify-center gap-2 bg-gradient-to-l from-grow to-grow/80 text-white rounded-2xl p-4 font-display font-semibold text-base hover:opacity-90 transition-opacity shadow-md"
       >
         <span className="text-xl">🖨️</span>
-        <span>{isMobile ? "פתחי לצפייה ושמירה כ־ PDF" : "הדפס / שמור PDF"}</span>
+        <span>{isMobile ? "פתחי לשמירה כ-PDF" : "הדפס / שמור PDF"}</span>
         {!isMobile && <span className="text-white/50 text-xs font-normal mr-1">Ctrl+P</span>}
       </button>
 
@@ -217,15 +227,6 @@ export default function Preview({ html, onReset, shareToken, title, active = tru
           </span>
         )}
       </button>
-
-      {/* Mobile PDF instructions */}
-      {isMobile && (
-        <div className="bg-blue-50 border border-blue-100 rounded-xl px-4 py-3 text-xs text-blue-700 text-right space-y-1">
-          <p className="font-semibold">איך שומרים PDF בטלפון?</p>
-          <p>iOS Safari: לחצי שתף ← "הדפס" ← פרגני ← שמור PDF</p>
-          <p>Android Chrome: לחצי ⋮ ← "הדפס" ← שנה יעד → "שמור כ־ PDF"</p>
-        </div>
-      )}
 
       {/* Copy share link */}
       {shareToken && (
