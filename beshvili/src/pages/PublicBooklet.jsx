@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 
 const A4_PX = 794;
-const A4_H  = 620;
+const A4_H  = 1123; // A4 at 96dpi: 297mm × (96/25.4) ≈ 1123px
 
 export default function PublicBooklet({ token }) {
   const [booklet, setBooklet] = useState(null);
@@ -38,7 +38,7 @@ export default function PublicBooklet({ token }) {
         <div className="text-5xl">😕</div>
         <p className="text-ink font-semibold">החוברת לא נמצאה</p>
         <p className="text-ink/40 text-sm">ייתכן שהקישור שגוי או שהחוברת הוסרה</p>
-        <a href="https://printa4-eight.vercel.app" className="text-magic text-sm underline">לבשבילי ←</a>
+        <a href="https://beshvili.com" className="text-magic text-sm underline">לבשבילי ←</a>
       </div>
     </div>
   );
@@ -73,7 +73,7 @@ export default function PublicBooklet({ token }) {
             🖨️ הדפס
           </button>
           <a
-            href="https://printa4-eight.vercel.app"
+            href="https://beshvili.com"
             className="border border-ink/15 text-ink/50 rounded-xl px-3 py-2 text-xs hover:text-ink transition-colors"
           >
             צרי גם ✨
@@ -121,7 +121,7 @@ export default function PublicBooklet({ token }) {
           <p className="text-sm font-semibold text-ink">רוצה ליצור חוברות מותאמות אישית?</p>
           <p className="text-xs text-ink/50">בשבילי יוצרת חוברות AI בעברית בתוך דקה — חינם!</p>
           <a
-            href="https://printa4-eight.vercel.app"
+            href="https://beshvili.com"
             className="inline-block bg-gradient-to-l from-brand to-magic text-white rounded-xl px-6 py-2.5 text-sm font-semibold hover:opacity-90 transition-opacity"
           >
             נסי חינם ← בשבילי

@@ -379,7 +379,7 @@ export default function Create({ onSaved, remaining, isPro, active = true }) {
         )}
 
         {/* Booklet preview — shown immediately, always first */}
-        <Preview html={html} onReset={reset} shareToken={shareToken} />
+        <Preview html={html} onReset={reset} shareToken={shareToken} active={active} />
 
         {/* Rating widget — shown below the booklet, optional */}
         {showRating && bookletId && (
