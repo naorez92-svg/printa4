@@ -3,6 +3,11 @@ import { useEffect, useRef, useState, useCallback } from "react";
 const A4_PX = 794;
 const A4_H  = 1123; // A4 at 96dpi: 297mm × (96/25.4) ≈ 1123px
 
+function injectHeightProbe(html) {
+  const probe = `<script>(function(){function s(){window.parent.postMessage({type:"beshvili_height",height:document.body.scrollHeight},"*")}if(document.readyState==="loading"){document.addEventListener("DOMContentLoaded",s)}else{s()}window.addEventListener("load",function(){setTimeout(s,300)})})()</script>`;
+  return html.includes("</body>") ? html.replace("</body>", probe + "</body>") : html + probe;
+}
+
 function isMobileDevice() {
   return typeof navigator !== "undefined" && /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
 }
@@ -16,6 +21,7 @@ function extractText(html) {
 export default function Preview({ html, onReset, shareToken, title, active = true }) {
   const containerRef = useRef(null); // outer div — measures available width
   const [scale, setScale]   = useState(1);
+  const [iframeHeight, setIframeHeight] = useState(A4_H);
   const [copied, setCopied] = useState(false);
   const [reading, setReading] = useState(false);
   const isMobile = isMobileDevice();
@@ -31,11 +37,25 @@ export default function Preview({ html, onReset, shareToken, title, active = tru
     return () => ro.disconnect();
   }, []);
 
+  // Receive actual content height from iframe postMessage probe.
+  // srcDoc iframes with allow-scripts (no allow-same-origin) always send origin "null".
+  useEffect(() => {
+    const handler = (e) => {
+      if (e.origin !== "null" && e.origin !== window.location.origin) return;
+      const h = e.data?.height;
+      if (e.data?.type === "beshvili_height" && typeof h === "number" && h > A4_H && h < 60000) {
+        setIframeHeight(h);
+      }
+    };
+    window.addEventListener("message", handler);
+    return () => window.removeEventListener("message", handler);
+  }, []);
+
   // Cancel speech when component unmounts
   useEffect(() => () => window.speechSynthesis?.cancel(), []);
 
   const scaledW = Math.round(A4_PX * scale);
-  const scaledHeight = Math.round(A4_H * scale);
+  const scaledHeight = Math.round(iframeHeight * scale);
 
   const getPrintHtml = () =>
     html.includes("@page")
@@ -150,11 +170,11 @@ export default function Preview({ html, onReset, shareToken, title, active = tru
       >
         <iframe
           title="תצוגה מקדימית"
-          srcDoc={html}
+          srcDoc={injectHeightProbe(html)}
           sandbox="allow-scripts"
           style={{
             width: `${A4_PX}px`,
-            height: `${A4_H}px`,
+            height: `${iframeHeight}px`,
             transform: `scale(${scale})`,
             transformOrigin: "top left",
             border: "none",
@@ -177,7 +197,6 @@ export default function Preview({ html, onReset, shareToken, title, active = tru
       </div>
       </div>
 
-      <p className="text-center text-xs text-ink/30">גלול בתוך התצוגה לצפייה בכל העמודים</p>
 
       {/* WhatsApp — primary share CTA */}
       <button

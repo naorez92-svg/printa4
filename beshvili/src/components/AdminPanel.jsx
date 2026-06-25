@@ -248,6 +248,65 @@ export default function AdminPanel() {
         ))}
       </div>
 
+      {/* Retention funnel */}
+      {data.totalNonAdminUsers > 0 && (
+        <div className="bg-white rounded-2xl p-4 border border-ink/5 shadow-sm">
+          <h3 className="font-bold text-ink mb-3 text-sm">🔄 שימור — מסלול המשתמש</h3>
+          <div className="grid grid-cols-3 gap-2">
+            {[
+              { label: "יצרו חוברת אחת", value: data.usersWithAnyBooklet, color: "text-brand", bar: "bg-brand" },
+              { label: "יצרו 2+ חוברות", value: data.retentionToSecond,   color: "text-magic", bar: "bg-magic" },
+              { label: "3+ חוברות (הרגל)", value: data.retentionToThird,  color: "text-grow",  bar: "bg-grow"  },
+            ].map(({ label, value, color, bar }) => {
+              const pct = Math.round(((value ?? 0) / data.totalNonAdminUsers) * 100);
+              return (
+                <div key={label} className="bg-canvas rounded-xl p-3 text-center">
+                  <div className={`text-2xl font-bold font-display ${color}`}>{pct}%</div>
+                  <div className="text-[11px] text-ink/50 mt-0.5">{value ?? 0}/{data.totalNonAdminUsers}</div>
+                  <div className="h-1.5 bg-white rounded-full overflow-hidden mt-2">
+                    <div className={`h-full ${bar} rounded-full`} style={{ width: `${pct}%` }} />
+                  </div>
+                  <div className="text-[10px] text-ink/35 mt-1.5 leading-tight">{label}</div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Upgrade opportunities */}
+      {(data.freeAtLimitCount ?? 0) > 0 && (
+        <div className="bg-white rounded-2xl p-4 border border-brand/25 shadow-sm">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="font-bold text-ink text-sm">⚡ הזדמנויות שדרוג</h3>
+            <span className="bg-brand/10 text-brand text-xs font-bold px-2.5 py-1 rounded-full">
+              {data.freeAtLimitCount}
+            </span>
+          </div>
+          <p className="text-[11px] text-ink/40 mb-3">
+            משתמשים חינם שהגיעו ל-3 חוברות — הכי קרובים להמרה
+          </p>
+          <div className="space-y-1.5 max-h-52 overflow-y-auto">
+            {(data.freeAtLimitUsers ?? []).map((u, i) => (
+              <div key={i} className="flex justify-between items-center bg-canvas rounded-xl px-3 py-2">
+                <div className="min-w-0 flex-1">
+                  {u.name && <p className="text-xs font-medium text-ink truncate">{u.name}</p>}
+                  <p className="text-xs text-ink/60 font-mono truncate">{u.email}</p>
+                  <p className="text-[10px] text-ink/30">{u.bookletCount} חוברות</p>
+                </div>
+                <button
+                  onClick={() => { try { navigator.clipboard?.writeText(u.email); } catch {} }}
+                  className="text-[10px] text-ink/30 hover:text-magic transition-colors px-2 py-1 rounded flex-shrink-0"
+                  title="העתק מייל"
+                >
+                  📋
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Economics / P&L */}
       <div className="bg-white rounded-2xl p-4 border border-ink/5 shadow-sm">
         <h3 className="font-bold text-ink mb-3 text-sm">💰 כלכלה — חודש נוכחי</h3>
@@ -307,22 +366,37 @@ export default function AdminPanel() {
         <p className="text-[10px] text-ink/25 mt-2 text-center">עלות API מחושבת לפי הערכה — ~0.80 ₪/חוברת</p>
       </div>
 
-      {/* Plan breakdown */}
+      {/* Plan breakdown + conversion rate */}
       <div className="bg-white rounded-2xl p-4 border border-ink/5 shadow-sm">
-        <h3 className="font-bold text-ink mb-3 text-sm">פילוח תוכניות</h3>
-        <div className="flex gap-2 flex-wrap text-sm">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="font-bold text-ink text-sm">פילוח תוכניות</h3>
+          {data.totalNonAdminUsers > 0 && paidUsers > 0 && (
+            <span className="text-xs text-magic font-bold bg-magic/8 px-2 py-0.5 rounded-full">
+              {Math.round((paidUsers / data.totalNonAdminUsers) * 100)}% המרה חינם→פרו
+            </span>
+          )}
+        </div>
+        <div className="flex gap-2 flex-wrap">
           {Object.entries(data.planBreakdown ?? {}).map(([plan, count]) => (
-            <span key={plan} className={`px-3 py-1 rounded-full text-xs font-medium ${
+            <span key={plan} className={`px-3 py-1.5 rounded-full text-xs font-medium ${
               plan === "teacher" ? "bg-magic/10 text-magic" :
               plan === "parent"  ? "bg-brand/10 text-brand" :
               plan === "pro"     ? "bg-magic/10 text-magic" :
               plan === "admin"   ? "bg-grow/10 text-grow"   :
               "bg-canvas text-ink/50"
             }`}>
-              {plan === "teacher" ? "מורה" : plan === "parent" ? "הורה" : plan}: {count}
+              {plan === "teacher" ? "🚀 מורה" : plan === "parent" ? "🌟 הורה" : plan}: {count}
             </span>
           ))}
         </div>
+        {data.totalNonAdminUsers > 0 && (
+          <div className="mt-3 h-2 bg-canvas rounded-full overflow-hidden">
+            <div
+              className="h-full bg-gradient-to-r from-brand to-magic rounded-full transition-all"
+              style={{ width: `${Math.min(100, Math.round((paidUsers / data.totalNonAdminUsers) * 100))}%` }}
+            />
+          </div>
+        )}
       </div>
 
       {/* Popular topics */}
@@ -396,8 +470,13 @@ export default function AdminPanel() {
                   <td className="py-1.5 pr-1 text-ink/50">{fmtDate(u.createdAt)}</td>
                   <td className="py-1.5 pr-1 text-ink/50">{fmtDate(u.lastSignIn)}</td>
                   <td className="py-1.5 pr-1">
-                    <span className={`font-bold ${u.bookletCount === 0 ? "text-red-400" : "text-grow"}`}>
+                    <span className={`font-bold ${
+                      u.bookletCount === 0 ? "text-red-400" :
+                      u.plan === "free" && u.bookletCount >= 3 ? "text-brand" :
+                      "text-grow"
+                    }`}>
                       {u.bookletCount}
+                      {u.plan === "free" && u.bookletCount >= 3 ? " ⚡" : ""}
                     </span>
                   </td>
                   <td className="py-1.5 pr-1">

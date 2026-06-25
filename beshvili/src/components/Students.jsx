@@ -62,6 +62,9 @@ function PhotoUploader({ photoUrl, uploading, inputRef, onFileChange, onRemove }
 export default function Students({ onBookletSaved, remaining, isPro }) {
   const [students, setStudents]   = useState([]);
   const [loading, setLoading]     = useState(true);
+  const [loadError, setLoadError] = useState(null);
+  const [saveError, setSaveError] = useState(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState(null);
   const [showAdd, setShowAdd]     = useState(false);
   const [form, setForm]           = useState(EMPTY);
   const [photoUrl, setPhotoUrl]   = useState(null);
@@ -77,12 +80,13 @@ export default function Students({ onBookletSaved, remaining, isPro }) {
   const editPhotoRef = useRef(null);
 
   const fetchStudents = async () => {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("children")
       .select("*")
       .order("grade")
       .order("name");
-    setStudents(data || []);
+    if (error) { setLoadError("לא ניתן לטעון תלמידים — נסה לרענן"); }
+    else { setLoadError(null); setStudents(data || []); }
     setLoading(false);
   };
 
@@ -111,8 +115,10 @@ export default function Students({ onBookletSaved, remaining, isPro }) {
   const addStudent = async () => {
     if (!form.name.trim()) return;
     setSaving(true);
+    setSaveError(null);
     const { data: { user } } = await supabase.auth.getUser();
-    await supabase.from("children").insert({
+    if (!user) { setSaving(false); setSaveError("לא מחובר — נסה לרענן"); return; }
+    const { error } = await supabase.from("children").insert({
       user_id: user.id,
       name: form.name.trim(),
       grade: form.grade,
@@ -122,6 +128,7 @@ export default function Students({ onBookletSaved, remaining, isPro }) {
       photo_url: photoUrl || null,
     });
     setSaving(false);
+    if (error) { setSaveError("השמירה נכשלה — נסה שנית"); return; }
     setShowAdd(false);
     setForm(EMPTY);
     setPhotoUrl(null);
@@ -143,7 +150,8 @@ export default function Students({ onBookletSaved, remaining, isPro }) {
   const saveEdit = async () => {
     if (!editForm.name.trim()) return;
     setSaving(true);
-    await supabase.from("children").update({
+    setSaveError(null);
+    const { error } = await supabase.from("children").update({
       name: editForm.name.trim(),
       grade: editForm.grade,
       level: editForm.level,
@@ -152,6 +160,7 @@ export default function Students({ onBookletSaved, remaining, isPro }) {
       photo_url: editPhotoUrl || null,
     }).eq("id", editId);
     setSaving(false);
+    if (error) { setSaveError("העדכון נכשל — נסה שנית"); return; }
     setEditId(null);
     setEditForm(null);
     setEditPhotoUrl(null);
@@ -159,8 +168,9 @@ export default function Students({ onBookletSaved, remaining, isPro }) {
   };
 
   const deleteStudent = async (id) => {
-    if (!confirm("למחוק את התלמיד/ה?")) return;
-    await supabase.from("children").delete().eq("id", id);
+    const { error } = await supabase.from("children").delete().eq("id", id);
+    setConfirmDeleteId(null);
+    if (error) { setSaveError("המחיקה נכשלה — נסה שנית"); return; }
     fetchStudents();
   };
 
@@ -268,6 +278,9 @@ export default function Students({ onBookletSaved, remaining, isPro }) {
             onChange={e => setForm(p => ({ ...p, special_needs: e.target.value }))}
           />
 
+          {saveError && (
+            <p className="text-red-500 text-xs text-center">{saveError}</p>
+          )}
           <div className="flex gap-2">
             <button
               onClick={addStudent}
@@ -277,7 +290,7 @@ export default function Students({ onBookletSaved, remaining, isPro }) {
               {saving ? "שומר..." : "💾 שמור"}
             </button>
             <button
-              onClick={() => { setShowAdd(false); setForm(EMPTY); setPhotoUrl(null); }}
+              onClick={() => { setShowAdd(false); setForm(EMPTY); setPhotoUrl(null); setSaveError(null); }}
               className="px-5 border border-ink/15 rounded-xl text-ink/50 hover:text-ink transition-colors"
             >
               ביטול
@@ -287,6 +300,12 @@ export default function Students({ onBookletSaved, remaining, isPro }) {
       )}
 
       {loading && <div className="text-center py-12 text-ink/30">טוען...</div>}
+      {loadError && (
+        <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-red-600 text-sm text-center">
+          {loadError}
+          <button onClick={fetchStudents} className="mr-2 underline">נסה שנית</button>
+        </div>
+      )}
 
       {!loading && students.length === 0 && !showAdd && (
         <div className="bg-white rounded-2xl p-8 shadow-sm border border-ink/5 text-center space-y-4">
@@ -356,12 +375,15 @@ export default function Students({ onBookletSaved, remaining, isPro }) {
                     value={editForm.special_needs}
                     onChange={e => setEditForm(p => ({ ...p, special_needs: e.target.value }))}
                   />
+                  {saveError && (
+                    <p className="text-red-500 text-xs text-center">{saveError}</p>
+                  )}
                   <div className="flex gap-2">
                     <button onClick={saveEdit} disabled={saving || !editForm.name.trim()}
                       className="flex-1 bg-magic text-white rounded-xl p-2.5 text-sm font-medium disabled:opacity-40 hover:opacity-90">
                       {saving ? "שומר..." : "💾 שמור"}
                     </button>
-                    <button onClick={() => { setEditId(null); setEditForm(null); setEditPhotoUrl(null); }}
+                    <button onClick={() => { setEditId(null); setEditForm(null); setEditPhotoUrl(null); setSaveError(null); }}
                       className="px-5 border border-ink/15 rounded-xl text-ink/50 hover:text-ink text-sm">
                       ביטול
                     </button>
@@ -403,10 +425,17 @@ export default function Students({ onBookletSaved, remaining, isPro }) {
                     className="bg-gradient-to-l from-brand to-magic text-white rounded-xl px-4 py-2 text-sm font-semibold hover:opacity-90 transition-opacity shadow-sm whitespace-nowrap">
                     ✨ צור
                   </button>
-                  <button onClick={() => deleteStudent(student.id)}
-                    className="text-ink/20 hover:text-red-400 transition-colors text-xl leading-none flex-shrink-0" title="מחק">
-                    ×
-                  </button>
+                  {confirmDeleteId === student.id ? (
+                    <div className="flex items-center gap-1 flex-shrink-0">
+                      <button onClick={() => deleteStudent(student.id)} className="text-red-500 text-xs font-semibold hover:text-red-700 transition-colors px-1">מחק</button>
+                      <button onClick={() => setConfirmDeleteId(null)} className="text-ink/30 text-xs hover:text-ink/60 transition-colors px-1">ביטול</button>
+                    </div>
+                  ) : (
+                    <button onClick={() => setConfirmDeleteId(student.id)}
+                      className="text-ink/20 hover:text-red-400 transition-colors text-xl leading-none flex-shrink-0" title="מחק">
+                      ×
+                    </button>
+                  )}
                 </div>
               )}
             </div>

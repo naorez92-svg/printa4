@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "../lib/supabase";
+import { sanitizeBookletHtml } from "../lib/sanitize";
 import Preview from "./Preview";
 import BookletRating from "./BookletRating";
 import UpgradeModal from "./UpgradeModal";
@@ -22,6 +23,8 @@ const TEMPLATES = [
   { icon: "📝", label: "מבחן חצי שנתי",    f: { grade: "",         world: "כללי",    goal: "מבחן חצי שנתי: חשבון, שפה, הבנת הנקרא",                        level: "advanced" } },
   { icon: "🔄", label: "חזרה לפני בחינה",  f: { grade: "",         world: "גיימינג", goal: "חזרה כללית: ארבע פעולות, שברים, אחוזים, בעיות",                level: "medium"   } },
   { icon: "🌟", label: "העשרה מתקדמת",     f: { grade: "",         world: "חלל",     goal: "חשיבה מתמטית: פאזלים, לוגיקה, חשיבה מחוץ לקופסה",             level: "advanced" } },
+  { icon: "📋", label: "שיעורי בית שבועיים", f: { grade: "כיתה ג", world: "כדורגל", goal: "שיעורי בית שבועיים: קריאה, כתיבה וחשבון — תרגילים לכל יום", level: "medium" } },
+  { icon: "🎯", label: "תרגול ממוקד דיסלקציה", f: { grade: "כיתה ב", world: "חיות", goal: "קריאה וכתיבה: אותיות דומות, מילים בניקוד, הבנת משפט קצר", level: "basic" } },
 ];
 const GOAL_PICKS = [
   { icon: "📖", label: "הבנת הנקרא",       goal: "הבנת הנקרא: טקסט ספרותי, שאלות הבנה ואוצר מילים" },
@@ -48,8 +51,9 @@ const LOADING_MSGS = [
   "כמעט מוכן! עוד רגע...",
 ];
 
-export default function Create({ onSaved, remaining, isPro, active = true }) {
+export default function Create({ onSaved, remaining, isPro, active = true, bookletCount = 0, onUpgrade }) {
   const [showUpgrade, setShowUpgrade] = useState(false);
+  const openUpgrade = onUpgrade ?? (() => setShowUpgrade(true));
   const [mode, setMode]           = useState(() => {
     try { return localStorage.getItem("beshvili_mode") || "quick"; } catch { return "quick"; }
   });
@@ -242,12 +246,9 @@ export default function Create({ onSaved, remaining, isPro, active = true }) {
     setLoading(false);
     creatingRef.current = false;
 
-    // Strip any external <script src="..."> that isn't the Tailwind CDN
-    // (defense against prompt injection adding exfiltration scripts)
-    const sanitize = (h) => h.replace(
-      /<script\b[^>]*\bsrc=["'](?!https:\/\/cdn\.tailwindcss\.com)[^"']+["'][^>]*>[\s\S]*?<\/script>/gi, ""
-    );
-    const generatedHtml = sanitize(htmlAccumulated.trim());
+    // Strip all scripts + event-handler attributes from AI-generated HTML,
+    // then restore the Tailwind CDN script (see src/lib/sanitize.js).
+    const generatedHtml = sanitizeBookletHtml(htmlAccumulated.trim());
     if (!generatedHtml || !generatedHtml.includes("<")) { setError("generic:לא התקבל HTML תקין מהשרת"); return; }
 
     const baseTitle = mode === "free"
@@ -303,7 +304,11 @@ export default function Create({ onSaved, remaining, isPro, active = true }) {
     const ext = file.name.split(".").pop() || "jpg";
     const path = `${user.id}/${Date.now()}.${ext}`;
     const { error: upErr } = await supabase.storage.from("child-photos").upload(path, file, { upsert: true });
-    if (upErr) { setPhotoUploading(false); console.error("photo upload:", upErr); return; }
+    if (upErr) {
+      setPhotoUploading(false);
+      alert("העלאת התמונה נכשלה — ודאי שהקובץ הוא תמונה תקינה (JPG/PNG) עד 5MB");
+      return;
+    }
     const { data: { publicUrl } } = supabase.storage.from("child-photos").getPublicUrl(path);
     setPhotoUrl(publicUrl);
     setPhotoUploading(false);
@@ -357,8 +362,8 @@ export default function Create({ onSaved, remaining, isPro, active = true }) {
           </div>
 
           {/* Value hook */}
-          <div className="bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 text-right text-xs text-amber-800">
-            מורה פרטית = ₪120/שעה · חוברת מותאמת אישית = <strong>₪3 בלבד</strong>
+          <div className="bg-magic/8 border border-magic/20 rounded-xl px-3 py-2 text-right text-xs text-magic">
+            20 חוברות = 20 שעות הכנה שנחסכות 💡 · מורה פרטית = ROI של <strong>40x</strong>
           </div>
 
           <div className="grid grid-cols-2 gap-3 text-right">
@@ -377,7 +382,7 @@ export default function Create({ onSaved, remaining, isPro, active = true }) {
           </div>
 
           <button
-            onClick={() => setShowUpgrade(true)}
+            onClick={() => openUpgrade()}
             className="block w-full bg-gradient-to-l from-brand to-magic text-white rounded-xl p-3.5 font-display font-semibold hover:opacity-90 transition-opacity shadow-sm"
           >
             🚀 שדרגי עכשיו
@@ -392,33 +397,57 @@ export default function Create({ onSaved, remaining, isPro, active = true }) {
 
   // ── Generated ──────────────────────────────────────────────────────────────
   if (html) {
+    const timeSaved = mode === "quick" ? 15 : pageCount * 8;
+    // Total lifetime savings (45 min avg × total booklets ever created, including this one)
+    const totalSavedMin = (bookletCount) * 45; // bookletCount already includes the new one after onSaved()
+    const totalSavedStr = totalSavedMin >= 120
+      ? `${(totalSavedMin / 60).toFixed(1).replace(".0", "")} שעות`
+      : `${totalSavedMin} דק'`;
+
     return (
       <section className="space-y-4">
         {/* Success banner — always visible */}
-        <div className="bg-gradient-to-l from-grow/15 to-brand/10 border border-grow/20 rounded-2xl px-5 py-4 flex items-center gap-3">
-          <span className="text-3xl">🎉</span>
-          <div className="flex-1">
-            <p className="font-bold text-ink text-base">החוברת מוכנה!</p>
-            <p className="text-xs text-ink/50 mt-0.5">נשמרה בענן · מוכנה להדפסה או שיתוף</p>
+        <div className="bg-gradient-to-l from-grow/15 to-brand/10 border border-grow/20 rounded-2xl px-5 py-4">
+          <div className="flex items-center gap-3 mb-2">
+            <span className="text-3xl">🎉</span>
+            <div className="flex-1">
+              <p className="font-bold text-ink text-base">החוברת מוכנה!</p>
+              <p className="text-xs text-ink/50 mt-0.5">
+                נשמרה בענן · מוכנה להדפסה · <span className="text-grow font-medium">⏱ חסכת ~{timeSaved} דק' הכנה!</span>
+              </p>
+            </div>
+            {!isPro && remaining !== undefined && (
+              <span className="text-xs text-ink/40 bg-white rounded-full px-2.5 py-1 border border-ink/10">
+                {remaining} נותרו
+              </span>
+            )}
           </div>
-          {!isPro && remaining !== undefined && (
-            <span className="text-xs text-ink/40 bg-white rounded-full px-2.5 py-1 border border-ink/10">
-              {remaining} נותרו
-            </span>
+          {bookletCount > 1 && (
+            <div className="flex items-center gap-2 bg-white/50 rounded-xl px-3 py-2 text-xs text-ink/60">
+              <span className="text-grow font-bold">✓</span>
+              <span>סה"כ עם בשבילי חסכת <strong className="text-grow">{totalSavedStr} הכנה</strong> — {bookletCount} חוברות נוצרו</span>
+            </div>
           )}
         </div>
 
-        {/* Upgrade nudge — shown when one free booklet left */}
-        {!isPro && remaining === 1 && (
-          <div className="bg-gradient-to-l from-magic/10 to-brand/10 border border-magic/20 rounded-2xl px-5 py-4 flex items-center gap-3">
-            <span className="text-2xl">⭐</span>
-            <div className="flex-1">
-              <p className="font-semibold text-ink text-sm">אהבת? נשארה לך עוד חוברת אחת חינמית</p>
-              <p className="text-xs text-ink/50 mt-0.5">שדרגי ל-₪19/חודש וצור 5 חוברות בחודש</p>
+        {/* Upgrade nudge — shown when ≤2 free booklets remain */}
+        {!isPro && remaining > 0 && remaining <= 2 && (
+          <div className="bg-gradient-to-l from-magic/10 to-brand/10 border border-magic/20 rounded-2xl px-5 py-4">
+            <div className="flex items-center gap-3 mb-2">
+              <span className="text-2xl">⭐</span>
+              <div className="flex-1">
+                <p className="font-semibold text-ink text-sm">
+                  {remaining === 1 ? "נשארה לך חוברת חינמית אחת בלבד!" : `נשארו לך ${remaining} חוברות חינמיות`}
+                </p>
+                <p className="text-xs text-ink/50 mt-0.5">
+                  בתוכנית מורה: 20 חוברות = <strong className="text-magic">15 שעות הכנה חסכות בחודש</strong>
+                </p>
+              </div>
+              <button onClick={() => openUpgrade()} className="flex-shrink-0 bg-gradient-to-l from-brand to-magic text-white text-xs rounded-xl px-3 py-2 font-semibold hover:opacity-90 transition-opacity">
+                שדרגי
+              </button>
             </div>
-            <button onClick={() => setShowUpgrade(true)} className="flex-shrink-0 bg-gradient-to-l from-brand to-magic text-white text-xs rounded-xl px-3 py-2 font-semibold hover:opacity-90 transition-opacity">
-              שדרגי
-            </button>
+            <div className="text-[10px] text-ink/40 text-center">הצטרפי ל-120+ מורות שכבר חוסכות זמן עם בשבילי 🎓</div>
           </div>
         )}
 
@@ -535,9 +564,12 @@ export default function Create({ onSaved, remaining, isPro, active = true }) {
             {/* Child photo upload */}
             <input type="file" ref={photoInputRef} accept="image/*" onChange={handlePhotoUpload} className="hidden" />
             <div className="flex items-center gap-3">
-              <div
+              <button
+                type="button"
+                aria-label="העלה תמונת פרופיל"
                 onClick={() => !loading && !photoUploading && photoInputRef.current?.click()}
-                className={`relative flex-shrink-0 w-12 h-12 rounded-full border-2 border-dashed cursor-pointer overflow-hidden flex items-center justify-center transition-colors ${photoUrl ? "border-grow" : "border-magic/30 hover:border-magic/60"}`}
+                disabled={loading || photoUploading}
+                className={`relative flex-shrink-0 w-12 h-12 rounded-full border-2 border-dashed overflow-hidden flex items-center justify-center transition-colors ${photoUrl ? "border-grow" : "border-magic/30 hover:border-magic/60"}`}
               >
                 {photoUploading ? (
                   <div className="w-4 h-4 border-2 border-magic border-t-transparent rounded-full animate-spin" />
@@ -546,7 +578,7 @@ export default function Create({ onSaved, remaining, isPro, active = true }) {
                 ) : (
                   <span className="text-lg">📷</span>
                 )}
-              </div>
+              </button>
               <div className="flex-1 text-right">
                 {photoUploading ? (
                   <p className="text-xs text-ink/50">טוען תמונה...</p>
@@ -669,18 +701,23 @@ export default function Create({ onSaved, remaining, isPro, active = true }) {
 
         {/* Answer key toggle — hidden in quick mode */}
         {mode !== "quick" && (
-          <label className="flex items-center justify-between gap-3 cursor-pointer select-none">
+          <div className="flex items-center justify-between gap-3">
             <div>
               <span className="text-sm font-medium text-ink">מפתח תשובות</span>
               <span className="text-xs text-ink/40 mr-2">דף תשובות בסוף החוברת</span>
             </div>
-            <div
+            <button
+              type="button"
+              role="switch"
+              aria-checked={withAnswerKey}
+              aria-label="מפתח תשובות"
               onClick={() => !loading && setWithAnswerKey(v => !v)}
-              className={`relative w-11 h-6 rounded-full transition-colors cursor-pointer ${withAnswerKey ? "bg-magic" : "bg-ink/20"}`}
+              disabled={loading}
+              className={`relative w-11 h-6 rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-magic ${withAnswerKey ? "bg-magic" : "bg-ink/20"}`}
             >
               <div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all ${withAnswerKey ? "right-0.5" : "left-0.5"}`} />
-            </div>
-          </label>
+            </button>
+          </div>
         )}
 
         {/* Rate limit countdown */}
@@ -728,7 +765,7 @@ export default function Create({ onSaved, remaining, isPro, active = true }) {
           </div>
         ) : (!isPro && remaining === 0) ? (
           <button
-            onClick={() => setShowUpgrade(true)}
+            onClick={() => openUpgrade()}
             className="w-full bg-gradient-to-l from-brand to-magic text-white rounded-xl p-3.5 font-display font-semibold hover:opacity-90 transition-opacity shadow-sm"
           >
             🚀 שדרגי לפרו להמשיך

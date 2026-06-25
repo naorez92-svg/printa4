@@ -4,7 +4,9 @@ import { useInstallPrompt } from "../hooks/useInstallPrompt";
 export default function InstallPWA({ variant = "banner" }) {
   const { canInstall, isIOS, install } = useInstallPrompt();
   const [showIOSModal, setShowIOSModal] = useState(false);
-  const [dismissed, setDismissed]      = useState(false);
+  const [dismissed, setDismissed]      = useState(() => {
+    try { return localStorage.getItem("beshvili_pwa_dismissed") === "1"; } catch { return false; }
+  });
 
   if (!canInstall || dismissed) return null;
 
@@ -42,7 +44,7 @@ export default function InstallPWA({ variant = "banner" }) {
           {isIOS ? "איך?" : "התקן"}
         </button>
         <button
-          onClick={() => setDismissed(true)}
+          onClick={() => { try { localStorage.setItem("beshvili_pwa_dismissed", "1"); } catch {} setDismissed(true); }}
           className="flex-shrink-0 text-white/30 hover:text-white/60 text-lg leading-none px-1"
           aria-label="סגור"
         >
@@ -87,7 +89,7 @@ export default function InstallPWA({ variant = "banner" }) {
             </ol>
 
             <button
-              onClick={() => { setShowIOSModal(false); setDismissed(true); }}
+              onClick={() => { setShowIOSModal(false); try { localStorage.setItem("beshvili_pwa_dismissed", "1"); } catch {} setDismissed(true); }}
               className="w-full bg-ink text-white py-3 rounded-2xl font-bold text-sm"
             >
               הבנתי, תודה!
