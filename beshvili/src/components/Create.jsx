@@ -48,7 +48,7 @@ const LOADING_MSGS = [
   "כמעט מוכן! עוד רגע...",
 ];
 
-export default function Create({ onSaved, remaining, isPro }) {
+export default function Create({ onSaved, remaining, isPro, active = true }) {
   const [showUpgrade, setShowUpgrade] = useState(false);
   const [mode, setMode]           = useState("form");
   const [f, setF]                 = useState(EMPTY);
@@ -106,6 +106,11 @@ export default function Create({ onSaved, remaining, isPro }) {
     setHtml(null);
     setError(null);
     track("booklet_started", { mode, goal: f.goal, grade: f.grade, world: f.world });
+
+    // Ask for notification permission so we can alert when done (non-blocking)
+    if ("Notification" in window && Notification.permission === "default") {
+      Notification.requestPermission();
+    }
 
     const quickText = `דף תרגיל מהיר${f.childName ? ` עבור ${f.childName.trim()}` : ""}${f.grade ? `, כיתה ${f.grade}` : ""}. נושא: ${f.goal.trim()}${f.world ? `, עולם תוכן: ${f.world}` : ""}. צור עמוד A4 אחד עם 8–12 תרגילים מגוונים ומהנים. ללא שער ורפלקציה. קוד HTML גולמי בלבד.`;
 
@@ -224,13 +229,25 @@ export default function Create({ onSaved, remaining, isPro }) {
     setHtml(html);
     track("booklet_completed", { booklet_id: inserted?.id, pages: pageCount, mode });
     onSaved?.();
+
+    // Notify user if they switched away during generation
+    if ("Notification" in window && Notification.permission === "granted" && document.visibilityState !== "visible") {
+      try {
+        new Notification("החוברת מוכנה! 🎉", {
+          body: title.substring(0, 80),
+          icon: "/icon.svg",
+          tag: "booklet-ready",
+        });
+      } catch {}
+    }
   }, [canSubmit, mode, freeText, f, pageCount, withAnswerKey, onSaved, photoUrl]);
 
   useEffect(() => {
+    if (!active) return;
     const h = (e) => { if ((e.ctrlKey || e.metaKey) && e.key === "Enter") create(); };
     window.addEventListener("keydown", h);
     return () => window.removeEventListener("keydown", h);
-  }, [create]);
+  }, [create, active]);
 
   const handlePhotoUpload = useCallback(async (e) => {
     const file = e.target.files?.[0];
