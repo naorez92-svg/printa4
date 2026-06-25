@@ -74,6 +74,8 @@ export default function Create({ onSaved, remaining, isPro, active = true }) {
   const [photoUploading, setPhotoUploading] = useState(false);
   const photoInputRef = useRef(null);
   const [recentTmpl, setRecentTmpl] = useState(null);
+  const creatingRef   = useRef(false);   // prevent double-submit
+  const streamAbortRef = useRef(null);   // cancel in-flight SSE on unmount
 
   // Rotate loading messages every 3.5 s while generating; tick elapsed seconds
   useEffect(() => {
@@ -82,6 +84,9 @@ export default function Create({ onSaved, remaining, isPro, active = true }) {
     const secId = setInterval(() => setLoadingElapsed(s => s + 1), 1000);
     return () => { clearInterval(msgId); clearInterval(secId); };
   }, [loading]);
+
+  // Abort any in-flight SSE stream on unmount
+  useEffect(() => () => streamAbortRef.current?.abort(), []);
 
   // Start countdown when rate-limited
   useEffect(() => {
@@ -106,7 +111,8 @@ export default function Create({ onSaved, remaining, isPro, active = true }) {
   );
 
   const create = useCallback(async () => {
-    if (!canSubmit) return;
+    if (!canSubmit || creatingRef.current) return;
+    creatingRef.current = true;
     setLoading(true);
     setHtml(null);
     setError(null);
@@ -128,15 +134,20 @@ export default function Create({ onSaved, remaining, isPro, active = true }) {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) {
       setLoading(false);
+      creatingRef.current = false;
       setError("generic:אתה לא מחובר — נסה להתחבר מחדש");
       return;
     }
+
+    const ctrl = new AbortController();
+    streamAbortRef.current = ctrl;
 
     const fnUrl = `${import.meta.env.VITE_SUPABASE_URL ?? "https://gywpdzkvkdisonuzhsib.supabase.co"}/functions/v1/generate-booklet`;
     let resp;
     try {
       resp = await fetch(fnUrl, {
         method: "POST",
+        signal: ctrl.signal,
         headers: {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${session.access_token}`,
@@ -146,6 +157,8 @@ export default function Create({ onSaved, remaining, isPro, active = true }) {
       });
     } catch (e) {
       setLoading(false);
+      creatingRef.current = false;
+      if (ctrl.signal.aborted) return; // unmounted — don't show error
       setError(`generic:שגיאת רשת — ${String(e)}`);
       return;
     }
@@ -157,6 +170,7 @@ export default function Create({ onSaved, remaining, isPro, active = true }) {
       const code = errData?.error;
       console.error("[generate-booklet] HTTP", resp.status, "body:", rawBody.substring(0, 300));
       setLoading(false);
+      creatingRef.current = false;
       if (code === "quota_exceeded") {
         setError(errData?.period === "monthly" ? "quota_monthly" : "quota");
         return;
@@ -218,6 +232,7 @@ export default function Create({ onSaved, remaining, isPro, active = true }) {
         // Fall through to save the partial booklet below
       } else {
         setLoading(false);
+        creatingRef.current = false;
         setError("generic:החיבור נקטע — נסה שנית, רצוי עם פחות עמודים");
         return;
       }
@@ -225,6 +240,7 @@ export default function Create({ onSaved, remaining, isPro, active = true }) {
 
     wakeLock?.release().catch(() => {});
     setLoading(false);
+    creatingRef.current = false;
 
     const generatedHtml = htmlAccumulated.trim();
     if (!generatedHtml || !generatedHtml.includes("<")) { setError("generic:לא התקבל HTML תקין מהשרת"); return; }
