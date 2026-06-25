@@ -76,21 +76,24 @@ export default function Login() {
         <div className="absolute -top-40 left-1/2 -translate-x-1/2 w-[500px] h-[500px] bg-magic/15 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute bottom-0 right-0 w-80 h-80 bg-brand/20 rounded-full blur-3xl pointer-events-none" />
         <div className="relative max-w-2xl mx-auto space-y-6">
-          <div className="text-6xl">📚</div>
+          <div className="inline-flex items-center gap-2 bg-white/10 border border-white/20 rounded-full px-4 py-1.5 text-sm text-white/70">
+            <span className="w-2 h-2 bg-grow rounded-full animate-pulse inline-block flex-shrink-0" />
+            40+ מורות פרטיות משתמשות · 150+ חוברות נוצרו
+          </div>
           <h1 className="text-4xl sm:text-5xl font-bold text-white font-display leading-tight">
-            חוברת לימוד מותאמת אישית<br />
+            הפסיקי להכין דפי עבודה ידנית —<br />
             <span className="text-transparent bg-clip-text bg-gradient-to-l from-brand to-[#A78BFA]">
-              בפחות מ-60 שניות
+              תני ל-AI לעשות את זה
             </span>
           </h1>
           <p className="text-xl text-white/65 leading-relaxed max-w-lg mx-auto">
-            AI חכם שיוצר חוברת עבודה לפי שם הילד, העולם שלו, והיעד הפדגוגי — מוכנה להדפסה ישר מהדפדפן
+            מורות פרטיות חוסכות <strong className="text-brand">3+ שעות הכנה בשבוע</strong>. חוברת עבודה מלאה בעברית, מותאמת לכל תלמיד — מוכנה להדפסה תוך 60 שניות
           </p>
           <button
             onClick={() => scrollTo("login-form")}
             className="inline-block bg-gradient-to-l from-brand to-magic text-white rounded-2xl px-10 py-4 text-xl font-display font-semibold hover:scale-105 transition-all shadow-2xl shadow-magic/30 active:scale-100"
           >
-            ✨ התחל חינם — 2 חוברות במתנה
+            ✨ התחילי חינם — 3 חוברות מתנה
           </button>
           <p className="text-xs text-white/30">ללא כרטיס אשראי · ללא סיסמה · כניסה קלה במייל</p>
         </div>
@@ -99,18 +102,38 @@ export default function Login() {
       {/* ── For whom ── */}
       <section className="py-14 px-5 bg-white">
         <div className="max-w-3xl mx-auto text-center">
-          <h2 className="text-2xl font-bold text-ink mb-2 font-display">מושלם עבור</h2>
-          <p className="text-ink/50 mb-10 text-sm">כלי העבודה שכל מי שמלמד ילדים חיכה לו</p>
+          <h2 className="text-2xl font-bold text-ink mb-2 font-display">בנויה עבור אנשי חינוך</h2>
+          <p className="text-ink/50 mb-10 text-sm">מורה פרטית, מחנכת, או הורה שרוצה לעזור — בשבילי עובדת בשבילך</p>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
             {[
-              { icon: "🎓", title: "מורה פרטית", desc: "חוברת ייחודית לכל תלמיד, בדיוק לפי הקשיים שלו — לא עוד דפי צילום גנריים", bg: "bg-gradient-to-br from-magic/10 to-magic/5", border: "border-magic/20" },
-              { icon: "👩‍👧", title: "הורה", desc: "תרגול בעולם שהילד אוהב — כדורגל, גיימינג, חיות. לומד בלי להרגיש שהוא לומד", bg: "bg-gradient-to-br from-brand/15 to-brand/5", border: "border-brand/20" },
-              { icon: "🏫", title: "מחנכת", desc: "חוברת חזרה לפני מבחן, מבחן חצי שנתי, חוברת העשרה — בקלות ובמהירות", bg: "bg-gradient-to-br from-grow/10 to-grow/5", border: "border-grow/20" },
-            ].map(({ icon, title, desc, bg, border }) => (
-              <div key={title} className={`${bg} rounded-2xl p-6 text-center border ${border} shadow-sm`}>
+              { icon: "🎓", title: "מורה פרטית", desc: "חוברת ייחודית לכל תלמיד, בדיוק לפי הקשיים שלו. לא עוד שעות הכנה — 60 שניות במקום שעה", bg: "bg-gradient-to-br from-magic/15 to-magic/5", border: "border-magic/30", highlight: true },
+              { icon: "🏫", title: "מחנכת כיתה", desc: "מבחן חצי שנתי, חוברת חזרה לפני בחינה, חוברת העשרה — לכל הכיתה בכמה לחיצות", bg: "bg-gradient-to-br from-grow/10 to-grow/5", border: "border-grow/20" },
+              { icon: "👩‍👧", title: "הורה", desc: "תרגול בעולם שהילד אוהב — כדורגל, גיימינג, חיות. לומד בלי להרגיש שהוא לומד", bg: "bg-gradient-to-br from-brand/10 to-brand/5", border: "border-brand/20" },
+            ].map(({ icon, title, desc, bg, border, highlight }) => (
+              <div key={title} className={`${bg} rounded-2xl p-6 text-center border ${border} shadow-sm ${highlight ? "ring-2 ring-magic/20 shadow-magic/10" : ""}`}>
+                {highlight && <div className="text-xs font-bold text-magic bg-magic/10 rounded-full px-3 py-1 inline-block mb-3">הכי פופולרי ⭐</div>}
                 <div className="text-4xl mb-3">{icon}</div>
                 <h3 className="font-bold text-ink mb-2 font-display">{title}</h3>
                 <p className="text-ink/60 text-sm leading-relaxed">{desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── ROI strip ── */}
+      <section className="py-8 px-5 bg-gradient-to-l from-magic/10 to-brand/10 border-y border-magic/10">
+        <div className="max-w-3xl mx-auto">
+          <div className="grid grid-cols-3 gap-4 text-center">
+            {[
+              { num: "3+", label: "שעות חינם בשבוע", sub: "שחוסכת מורה פרטית" },
+              { num: "60″", label: "זמן יצירת חוברת", sub: "במקום שעה של הכנה" },
+              { num: "₪3", label: "עלות לחוברת", sub: "בתוכנית מורה" },
+            ].map(({ num, label, sub }) => (
+              <div key={label}>
+                <div className="text-2xl sm:text-3xl font-bold text-magic font-display">{num}</div>
+                <div className="text-xs sm:text-sm font-semibold text-ink mt-0.5">{label}</div>
+                <div className="text-xs text-ink/40 mt-0.5 hidden sm:block">{sub}</div>
               </div>
             ))}
           </div>
@@ -124,9 +147,9 @@ export default function Login() {
           <p className="text-ink/50 mb-10 text-sm">3 שלבים פשוטים — תוך פחות מדקה</p>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
             {[
-              { num: "01", icon: "✍️", title: "מלא פרטי הילד", desc: "שם, כיתה, העולם האהוב, יעד פדגוגי — או פשוט כתוב מה תרצה בחופשיות" },
-              { num: "02", icon: "⚡", title: "AI יוצר תוך שניות", desc: "מערכת ה-AI מייצרת חוברת עבודה מלאה עם תרגילים, עמודים ואיור — הכל בעברית" },
-              { num: "03", icon: "🖨️", title: "הדפס ומסור", desc: "לחץ הדפס → שמור כ-PDF — מקבל קובץ A4 מוכן, חסכוני בדיו" },
+              { num: "01", icon: "✍️", title: "בחרי תלמיד ונושא", desc: "שם, כיתה, העולם האהוב, יעד פדגוגי — או פשוט כתבי מה תרצי בחופשיות" },
+              { num: "02", icon: "⚡", title: "AI יוצר תוך 60 שניות", desc: "חוברת עבודה מלאה עם תרגילים, עמודים ומפתח תשובות — הכל בעברית, מותאם לרמת הילד" },
+              { num: "03", icon: "🖨️", title: "הדפסי ומסרי", desc: "לחצי הדפס ← שמרי כ-PDF — קובץ A4 מוכן, כיתה של 30 ילדים תוך 3 דקות" },
             ].map(({ num, icon, title, desc }) => (
               <div key={num} className="relative bg-white rounded-2xl p-6 border border-ink/5 shadow-sm">
                 <div className="absolute -top-3 right-4 text-xs font-bold text-white bg-gradient-to-l from-brand to-magic rounded-full px-2.5 py-1">{num}</div>
@@ -147,10 +170,10 @@ export default function Login() {
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
             {[
-              { icon: "🎯", title: "אישי לחלוטין", desc: "לפי שם, כיתה, עולם תוכן וקשיים ספציפיים" },
-              { icon: "📄", title: "3–10 עמודים", desc: "שער אישי, תרגילים, חשיבה, רפלקציה" },
-              { icon: "🔑", title: "מפתח תשובות", desc: "דף תשובות נפרד לשימוש המורה" },
-              { icon: "☁️", title: "שמור בענן", desc: "כל החוברות שיצרת — גישה מכל מכשיר" },
+              { icon: "🎯", title: "אישי לכל תלמיד", desc: "לפי שם, כיתה, עולם תוכן וקשיים ספציפיים" },
+              { icon: "📄", title: "1–20 עמודים", desc: "שער אישי, תרגילים, חשיבה, רפלקציה ומפתח" },
+              { icon: "👥", title: "ניהול תלמידים", desc: "שמרי פרופיל לכל תלמיד — הגדרות נשמרות" },
+              { icon: "☁️", title: "ארכיון בענן", desc: "כל החוברות שיצרת — גישה מכל מכשיר" },
             ].map(({ icon, title, desc }) => (
               <div key={title} className="bg-canvas rounded-2xl p-4 text-center border border-ink/5">
                 <div className="text-3xl mb-2">{icon}</div>
@@ -166,20 +189,38 @@ export default function Login() {
       <section className="py-14 px-5 bg-canvas">
         <div className="max-w-3xl mx-auto text-center">
           <h2 className="text-2xl font-bold text-ink mb-2 font-display">מחירים שקופים</h2>
-          <p className="text-ink/50 mb-10 text-sm">מתחילים חינם, משדרגים כשרוצים</p>
+          <p className="text-ink/50 mb-2 text-sm">מתחילים חינם, משדרגים כשרוצים</p>
+          <p className="text-xs text-magic/70 font-medium mb-10">מורה פרטית = ₪120/שעה · חוברת בבשבילי = ₪3 · החישוב פשוט 🧮</p>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+            {/* Teacher — most prominent, shown first on mobile */}
+            <div className="bg-gradient-to-br from-magic/10 to-brand/10 rounded-2xl p-6 border-2 border-magic/30 shadow-lg text-right relative overflow-hidden flex flex-col order-first sm:order-last">
+              <div className="absolute top-3 left-3 bg-magic text-white text-xs rounded-full px-2.5 py-1 font-semibold">מומלץ למורות</div>
+              <div className="text-2xl mb-2">🚀 מורה פרטית</div>
+              <div className="text-3xl font-bold text-magic mb-1 font-display">₪59<span className="text-sm font-normal text-ink/40">/חודש</span></div>
+              <div className="text-xs text-magic/60 font-semibold mb-4">≈ ₪3 לחוברת · 20 שעות הכנה שנחסכות</div>
+              <ul className="space-y-2 text-sm text-ink/70 mb-5 flex-1">
+                {["20 חוברות לחודש", "עד 20 עמודים לחוברת", "מפתח תשובות אוטומטי", "ניהול תלמידים", "שמירה בענן לצמיתות", "תמיכה אישית ישירה"].map((f) => (
+                  <li key={f} className="flex items-center gap-2"><span className="text-magic font-bold">✓</span>{f}</li>
+                ))}
+              </ul>
+              <a href={"https://wa.me/972509139137?text=" + encodeURIComponent("שלום! אני רוצה לשדרג לתוכנית מורה בבשבילי 🚀")}
+                target="_blank" rel="noopener noreferrer"
+                className="block w-full bg-gradient-to-l from-brand to-magic text-white rounded-xl px-4 py-2.5 text-sm font-semibold text-center hover:opacity-90 transition-opacity shadow-md">
+                💬 שדרגי עכשיו — ₪59
+              </a>
+            </div>
             <div className="bg-white rounded-2xl p-6 border border-ink/10 shadow-sm text-right">
               <div className="text-2xl mb-2">🌱 חינמי</div>
               <div className="text-3xl font-bold text-ink mb-1 font-display">₪0</div>
-              <div className="text-xs text-ink/40 mb-4">לתמיד</div>
+              <div className="text-xs text-ink/40 mb-4">לתמיד · ללא כרטיס אשראי</div>
               <ul className="space-y-2 text-sm text-ink/70 mb-5">
-                {["2 חוברות להתנסות", "עד 10 עמודים", "שמירה בענן"].map((f) => (
+                {["3 חוברות להתנסות", "עד 10 עמודים", "שמירה בענן"].map((f) => (
                   <li key={f} className="flex items-center gap-2"><span className="text-grow">✓</span>{f}</li>
                 ))}
               </ul>
               <button onClick={() => scrollTo("login-form")}
                 className="block w-full border border-ink/20 text-ink/60 rounded-xl px-4 py-2.5 text-sm font-semibold text-center hover:border-magic/40 hover:text-magic transition-colors">
-                התחל חינם ✨
+                התחילי חינם ✨
               </button>
             </div>
             <div className="bg-white rounded-2xl p-6 border border-brand/30 shadow-sm text-right">
@@ -197,22 +238,6 @@ export default function Login() {
                 💙 שדרגי — ₪19
               </a>
             </div>
-            <div className="bg-gradient-to-br from-brand/10 to-magic/10 rounded-2xl p-6 border border-magic/20 shadow-sm text-right relative overflow-hidden flex flex-col">
-              <div className="absolute top-3 left-3 bg-magic text-white text-xs rounded-full px-2.5 py-1 font-semibold">הכי פופולרי</div>
-              <div className="text-2xl mb-2">🚀 מורה</div>
-              <div className="text-3xl font-bold text-magic mb-1 font-display">₪59<span className="text-sm font-normal text-ink/40">/חודש</span></div>
-              <div className="text-xs text-ink/40 mb-4">ביטול בכל עת</div>
-              <ul className="space-y-2 text-sm text-ink/70 mb-5 flex-1">
-                {["20 חוברות לחודש", "עד 20 עמודים", "מפתח תשובות אוטומטי", "שמירה בענן", "תמיכה אישית"].map((f) => (
-                  <li key={f} className="flex items-center gap-2"><span className="text-magic">✓</span>{f}</li>
-                ))}
-              </ul>
-              <a href={"https://wa.me/972509139137?text=" + encodeURIComponent("שלום! אני רוצה לשדרג לתוכנית מורה בבשבילי 🚀")}
-                target="_blank" rel="noopener noreferrer"
-                className="block w-full bg-[#25D366] text-white rounded-xl px-4 py-2.5 text-sm font-semibold text-center hover:opacity-90 transition-opacity shadow-sm">
-                💬 שדרגי — ₪59
-              </a>
-            </div>
           </div>
         </div>
       </section>
@@ -221,8 +246,8 @@ export default function Login() {
       <section id="login-form" className="py-16 px-5 bg-white">
         <div className="max-w-sm mx-auto">
           <div className="text-center mb-8">
-            <h2 className="text-2xl font-bold text-ink font-display mb-2">מוכן להתחיל?</h2>
-            <p className="text-ink/50">ההרשמה חינמית — ללא כרטיס אשראי</p>
+            <h2 className="text-2xl font-bold text-ink font-display mb-2">מוכנה להתחיל?</h2>
+            <p className="text-ink/50">3 חוברות חינם · ללא כרטיס אשראי · 30 שניות הרשמה</p>
           </div>
           <div className="bg-canvas rounded-2xl p-6 border border-ink/10 shadow-sm">
             {step === "verify" ? (

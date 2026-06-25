@@ -18,13 +18,13 @@ const PLANS = [
   {
     id: "teacher",
     icon: "🚀",
-    title: "מורה",
+    title: "מורה פרטית",
     price: 59,
     booklets: 20,
     pages: 20,
     color: "purple",
-    badge: "הכי פופולרי",
-    features: ["20 חוברות לחודש", "עד 20 עמודים לחוברת", "מפתח תשובות", "שמירה בענן לצמיתות", "תמיכה אישית ישירה"],
+    badge: "מומלץ",
+    features: ["20 חוברות לחודש", "עד 20 עמודים לחוברת", "מפתח תשובות אוטומטי", "ניהול פרופילי תלמידים", "שמירה בענן לצמיתות", "תמיכה אישית ישירה"],
   },
 ];
 
@@ -76,17 +76,24 @@ export default function UpgradeModal({ onClose }) {
         {/* Header */}
         <div className="flex justify-between items-start">
           <div>
-            <h2 className="text-xl font-bold text-ink font-display">שדרגי את החוברות</h2>
-            <p className="text-sm text-ink/50">2 חוברות ראשונות חינם לכולם</p>
+            <h2 className="text-xl font-bold text-ink font-display">שדרגי לתוכנית מורה</h2>
+            <p className="text-sm text-ink/50">3 חוברות ניסיון · ביטול בכל עת</p>
           </div>
           <button onClick={onClose} className="text-ink/30 hover:text-ink text-3xl leading-none">×</button>
         </div>
 
-        {/* Value hook */}
-        <div className="bg-amber-50 border border-amber-200 rounded-2xl px-3 py-2.5 text-right">
-          <p className="text-xs font-semibold text-amber-800">מורה פרטית = ₪120 לשעה</p>
-          <p className="text-xs text-amber-700 mt-0.5">חוברת מותאמת אישית שחוסכת שעת הכנה — <strong>₪3 בלבד</strong></p>
-        </div>
+        {/* Value hook — dynamic per plan */}
+        {selectedPlan === "teacher" ? (
+          <div className="bg-magic/8 border border-magic/20 rounded-2xl px-3 py-2.5 text-right">
+            <p className="text-xs font-semibold text-magic">20 חוברות = 20 שעות הכנה שנחסכות 💡</p>
+            <p className="text-xs text-ink/60 mt-0.5">מורה פרטית גובה ₪120/שעה — ₪59 לחודש זה <strong className="text-magic">ROI של 40x</strong></p>
+          </div>
+        ) : (
+          <div className="bg-amber-50 border border-amber-200 rounded-2xl px-3 py-2.5 text-right">
+            <p className="text-xs font-semibold text-amber-800">5 חוברות אישיות לילד ₪19 בלבד</p>
+            <p className="text-xs text-amber-700 mt-0.5">כל חוברת מותאמת לעולם שלו — <strong>₪4 לחוברת</strong></p>
+          </div>
+        )}
 
         {/* Plan cards */}
         <div className="grid grid-cols-2 gap-3">

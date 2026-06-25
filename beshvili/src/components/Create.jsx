@@ -22,6 +22,8 @@ const TEMPLATES = [
   { icon: "📝", label: "מבחן חצי שנתי",    f: { grade: "",         world: "כללי",    goal: "מבחן חצי שנתי: חשבון, שפה, הבנת הנקרא",                        level: "advanced" } },
   { icon: "🔄", label: "חזרה לפני בחינה",  f: { grade: "",         world: "גיימינג", goal: "חזרה כללית: ארבע פעולות, שברים, אחוזים, בעיות",                level: "medium"   } },
   { icon: "🌟", label: "העשרה מתקדמת",     f: { grade: "",         world: "חלל",     goal: "חשיבה מתמטית: פאזלים, לוגיקה, חשיבה מחוץ לקופסה",             level: "advanced" } },
+  { icon: "📋", label: "שיעורי בית שבועיים", f: { grade: "כיתה ג", world: "כדורגל", goal: "שיעורי בית שבועיים: קריאה, כתיבה וחשבון — תרגילים לכל יום", level: "medium" } },
+  { icon: "🎯", label: "תרגול ממוקד דיסלקציה", f: { grade: "כיתה ב", world: "חיות", goal: "קריאה וכתיבה: אותיות דומות, מילים בניקוד, הבנת משפט קצר", level: "basic" } },
 ];
 const GOAL_PICKS = [
   { icon: "📖", label: "הבנת הנקרא",       goal: "הבנת הנקרא: טקסט ספרותי, שאלות הבנה ואוצר מילים" },
@@ -357,8 +359,8 @@ export default function Create({ onSaved, remaining, isPro, active = true }) {
           </div>
 
           {/* Value hook */}
-          <div className="bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 text-right text-xs text-amber-800">
-            מורה פרטית = ₪120/שעה · חוברת מותאמת אישית = <strong>₪3 בלבד</strong>
+          <div className="bg-magic/8 border border-magic/20 rounded-xl px-3 py-2 text-right text-xs text-magic">
+            20 חוברות = 20 שעות הכנה שנחסכות 💡 · מורה פרטית = ROI של <strong>40x</strong>
           </div>
 
           <div className="grid grid-cols-2 gap-3 text-right">

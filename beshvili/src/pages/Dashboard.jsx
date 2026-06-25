@@ -134,6 +134,19 @@ export default function Dashboard() {
       {/* ── Main content ── */}
       <div className="lg:mr-60">
         <main className="max-w-3xl mx-auto px-5 py-6 lg:py-8">
+          {/* First-time welcome nudge for new teachers */}
+          {tab === "create" && !loading && !isPro && bookletCount === 0 && (
+            <div className="bg-gradient-to-l from-magic/10 to-brand/10 border border-magic/20 rounded-2xl px-5 py-4 mb-4 flex items-start gap-3">
+              <span className="text-2xl flex-shrink-0 mt-0.5">👋</span>
+              <div className="flex-1">
+                <p className="font-semibold text-ink text-sm">ברוכה הבאה! יש לך 3 חוברות חינם להתנסות</p>
+                <p className="text-xs text-ink/50 mt-0.5">
+                  מורה פרטית? <button onClick={() => setTab("students")} className="text-magic underline font-medium">הוסיפי תלמיד ←</button> ואז צרי לו חוברת בלחיצה אחת
+                </p>
+              </div>
+            </div>
+          )}
+
           {/* Create stays mounted to preserve in-progress generation when switching tabs */}
           <div className={tab === "create" ? "" : "hidden"}>
             <Create active={tab === "create"} onSaved={() => refresh()} remaining={remaining} isPro={isPro} />
