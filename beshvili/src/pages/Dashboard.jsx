@@ -147,6 +147,35 @@ export default function Dashboard() {
             </div>
           )}
 
+          {/* Quota progress card — shown after first booklet to drive conversion */}
+          {tab === "create" && !loading && !isPro && bookletCount > 0 && remaining > 0 && (
+            <div className="bg-white border border-ink/8 rounded-2xl px-5 py-4 mb-4 shadow-sm">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-semibold text-ink/60">חוברות חינמיות שנוצלו</span>
+                <span className="text-xs font-bold text-ink">{bookletCount} / {FREE_LIMIT}</span>
+              </div>
+              <div className="w-full h-2 bg-canvas rounded-full overflow-hidden mb-3">
+                <div
+                  className={`h-full rounded-full transition-all duration-500 ${remaining === 1 ? "bg-gradient-to-l from-red-400 to-orange-400" : "bg-gradient-to-l from-brand to-magic"}`}
+                  style={{ width: `${Math.min(100, (bookletCount / FREE_LIMIT) * 100)}%` }}
+                />
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-xs text-ink/50">
+                  {remaining === 1
+                    ? "⚠️ נשארה לך חוברת חינמית אחת בלבד"
+                    : `נותרו לך ${remaining} חוברות חינמיות`}
+                </p>
+                <button
+                  onClick={() => setShowUpgrade(true)}
+                  className="flex-shrink-0 text-xs bg-gradient-to-l from-brand to-magic text-white rounded-xl px-3 py-1.5 font-semibold hover:opacity-90 transition-opacity"
+                >
+                  שדרגי לפרו ✨
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Create stays mounted to preserve in-progress generation when switching tabs */}
           <div className={tab === "create" ? "" : "hidden"}>
             <Create active={tab === "create"} onSaved={() => refresh()} remaining={remaining} isPro={isPro} />
