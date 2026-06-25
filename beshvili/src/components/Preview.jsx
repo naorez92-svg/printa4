@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 
 const A4_PX = 794;
-const A4_H  = 620;
+const A4_H  = 1123; // A4 at 96dpi: 297mm × (96/25.4) ≈ 1123px
 
 function isMobileDevice() {
   return typeof navigator !== "undefined" && /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
@@ -13,7 +13,7 @@ function extractText(html) {
   return (doc.body.textContent || "").replace(/\s+/g, " ").trim();
 }
 
-export default function Preview({ html, onReset, shareToken }) {
+export default function Preview({ html, onReset, shareToken, active = true }) {
   const wrapperRef = useRef(null);
   const [scale, setScale]   = useState(1);
   const [copied, setCopied] = useState(false);
@@ -61,10 +61,11 @@ export default function Preview({ html, onReset, shareToken }) {
   };
 
   useEffect(() => {
+    if (!active) return;
     const h = (e) => { if ((e.ctrlKey || e.metaKey) && e.key === "p") { e.preventDefault(); handlePrint(); } };
     window.addEventListener("keydown", h);
     return () => window.removeEventListener("keydown", h);
-  }, [html]);
+  }, [html, active]);
 
   const toggleRead = useCallback(() => {
     const synth = window.speechSynthesis;
