@@ -219,8 +219,8 @@ export default function Create({ onSaved, remaining, isPro, active = true }) {
     wakeLock?.release().catch(() => {});
     setLoading(false);
 
-    const html = htmlAccumulated.trim();
-    if (!html || !html.includes("<")) { setError("generic:לא התקבל HTML תקין מהשרת"); return; }
+    const generatedHtml = htmlAccumulated.trim();
+    if (!generatedHtml || !generatedHtml.includes("<")) { setError("generic:לא התקבל HTML תקין מהשרת"); return; }
 
     const baseTitle = mode === "free"
       ? freeText.trim().substring(0, 60) + (freeText.length > 60 ? "…" : "")
@@ -229,22 +229,19 @@ export default function Create({ onSaved, remaining, isPro, active = true }) {
       : `${f.childName} — ${f.goal}`;
     const title = streamAborted ? `${baseTitle} (חלקי)` : baseTitle;
 
-    const { data: u } = await supabase.auth.getUser();
-    if (!u?.user) { setError("generic:שגיאת משתמש — נסה להתחבר מחדש"); return; }
-
     const { data: inserted, error: insertErr } = await supabase.from("booklets").insert({
-      user_id: u.user.id, title,
+      user_id: session.user.id, title,
       child_name: f.childName || null, grade: f.grade || null,
       world: f.world || null,
       goal: mode === "free" ? freeText.trim().substring(0, 200) : f.goal,
-      level: f.level, html,
+      level: f.level, html: generatedHtml,
     }).select("id, share_token").single();
     if (insertErr) { setError(`generic:שמירה נכשלה — ${insertErr.message}`); return; }
 
     setBookletId(inserted?.id ?? null);
     setShareToken(inserted?.share_token ?? null);
     setShowRating(true);
-    setHtml(html);
+    setHtml(generatedHtml);
     track("booklet_completed", { booklet_id: inserted?.id, pages: pageCount, mode });
     onSaved?.();
 
@@ -409,7 +406,7 @@ export default function Create({ onSaved, remaining, isPro, active = true }) {
         )}
 
         {/* Save child profile prompt */}
-        {mode === "form" && f.childName.trim() && childrenLoaded && !childSaved && !savedChildren.some(c => c.name === f.childName.trim()) && (
+        {mode === "form" && f.childName.trim() && childrenLoaded && !childSaved && !savedChildren.some(c => c.name.toLowerCase() === f.childName.trim().toLowerCase()) && (
           <button
             onClick={async () => {
               const saved = await saveChild({ name: f.childName, grade: f.grade, world: f.world, level: f.level, photo_url: photoUrl });

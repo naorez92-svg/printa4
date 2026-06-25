@@ -53,9 +53,9 @@ export default function Preview({ html, onReset, shareToken, active = true }) {
     setTimeout(() => URL.revokeObjectURL(url), 120000);
   };
 
-  const handlePrint = () => {
-    const html = getPrintHtml();
-    const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+  const handlePrint = useCallback(() => {
+    const printHtml = getPrintHtml();
+    const blob = new Blob([printHtml], { type: "text/html;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const w = window.open(url, "_blank");
     if (!w) { alert("אפשרי חלונות קופצים בדפדפן"); URL.revokeObjectURL(url); return; }
@@ -63,14 +63,14 @@ export default function Preview({ html, onReset, shareToken, active = true }) {
       try { w.focus(); w.print(); } catch {}
       setTimeout(() => URL.revokeObjectURL(url), 120000);
     }, 1000);
-  };
+  }, [html]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!active) return;
     const h = (e) => { if ((e.ctrlKey || e.metaKey) && e.key === "p") { e.preventDefault(); handlePrint(); } };
     window.addEventListener("keydown", h);
     return () => window.removeEventListener("keydown", h);
-  }, [html, active]);
+  }, [html, active, handlePrint]);
 
   const toggleRead = useCallback(() => {
     const synth = window.speechSynthesis;
@@ -129,10 +129,12 @@ export default function Preview({ html, onReset, shareToken, active = true }) {
   }, [shareToken]);
 
   const downloadHtml = () => {
+    const url = URL.createObjectURL(new Blob([html], { type: "text/html;charset=utf-8" }));
     const a = document.createElement("a");
-    a.href = URL.createObjectURL(new Blob([html], { type: "text/html;charset=utf-8" }));
+    a.href = url;
     a.download = "חוברת-בשבילי.html";
     a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 30000);
   };
 
   return (
