@@ -117,6 +117,7 @@ export default function Students({ onBookletSaved, remaining, isPro }) {
     setSaving(true);
     setSaveError(null);
     const { data: { user } } = await supabase.auth.getUser();
+    if (!user) { setSaving(false); setSaveError("לא מחובר — נסה לרענן"); return; }
     const { error } = await supabase.from("children").insert({
       user_id: user.id,
       name: form.name.trim(),
@@ -167,8 +168,9 @@ export default function Students({ onBookletSaved, remaining, isPro }) {
   };
 
   const deleteStudent = async (id) => {
-    await supabase.from("children").delete().eq("id", id);
+    const { error } = await supabase.from("children").delete().eq("id", id);
     setConfirmDeleteId(null);
+    if (error) { setSaveError("המחיקה נכשלה — נסה שנית"); return; }
     fetchStudents();
   };
 

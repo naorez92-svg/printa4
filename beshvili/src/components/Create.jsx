@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "../lib/supabase";
+import { sanitizeBookletHtml } from "../lib/sanitize";
 import Preview from "./Preview";
 import BookletRating from "./BookletRating";
 import UpgradeModal from "./UpgradeModal";
@@ -244,12 +245,9 @@ export default function Create({ onSaved, remaining, isPro, active = true }) {
     setLoading(false);
     creatingRef.current = false;
 
-    // Strip any external <script src="..."> that isn't the Tailwind CDN
-    // (defense against prompt injection adding exfiltration scripts)
-    const sanitize = (h) => h.replace(
-      /<script\b[^>]*\bsrc=["'](?!https:\/\/cdn\.tailwindcss\.com)[^"']+["'][^>]*>[\s\S]*?<\/script>/gi, ""
-    );
-    const generatedHtml = sanitize(htmlAccumulated.trim());
+    // Strip all scripts + event-handler attributes from AI-generated HTML,
+    // then restore the Tailwind CDN script (see src/lib/sanitize.js).
+    const generatedHtml = sanitizeBookletHtml(htmlAccumulated.trim());
     if (!generatedHtml || !generatedHtml.includes("<")) { setError("generic:לא התקבל HTML תקין מהשרת"); return; }
 
     const baseTitle = mode === "free"
@@ -305,7 +303,11 @@ export default function Create({ onSaved, remaining, isPro, active = true }) {
     const ext = file.name.split(".").pop() || "jpg";
     const path = `${user.id}/${Date.now()}.${ext}`;
     const { error: upErr } = await supabase.storage.from("child-photos").upload(path, file, { upsert: true });
-    if (upErr) { setPhotoUploading(false); console.error("photo upload:", upErr); return; }
+    if (upErr) {
+      setPhotoUploading(false);
+      alert("העלאת התמונה נכשלה — ודאי שהקובץ הוא תמונה תקינה (JPG/PNG) עד 5MB");
+      return;
+    }
     const { data: { publicUrl } } = supabase.storage.from("child-photos").getPublicUrl(path);
     setPhotoUrl(publicUrl);
     setPhotoUploading(false);

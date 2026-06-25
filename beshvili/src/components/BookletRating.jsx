@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { supabase } from "../lib/supabase";
 
 const OPTIONS = [
@@ -11,15 +11,22 @@ export default function BookletRating({ bookletId, studentName, onDone }) {
   const [selected, setSelected] = useState(null);
   const [notes, setNotes]       = useState("");
   const [saving, setSaving]     = useState(false);
+  const [saveError, setSaveError] = useState(null);
+  const savingRef = useRef(false);
 
   const save = async () => {
     if (!selected || !bookletId) { onDone(); return; }
+    if (savingRef.current) return;
+    savingRef.current = true;
     setSaving(true);
-    await supabase.from("booklets").update({
+    setSaveError(null);
+    const { error } = await supabase.from("booklets").update({
       difficulty_feedback: selected,
       session_notes: notes.trim() || null,
     }).eq("id", bookletId);
+    savingRef.current = false;
     setSaving(false);
+    if (error) { setSaveError("השמירה נכשלה — נסה שנית"); return; }
     onDone();
   };
 
@@ -57,6 +64,7 @@ export default function BookletRating({ bookletId, studentName, onDone }) {
         />
       )}
 
+      {saveError && <p className="text-red-500 text-xs text-center">{saveError}</p>}
       <div className="flex gap-2">
         <button
           onClick={save}

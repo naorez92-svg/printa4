@@ -37,9 +37,11 @@ export default function Preview({ html, onReset, shareToken, title, active = tru
     return () => ro.disconnect();
   }, []);
 
-  // Receive actual content height from iframe postMessage probe
+  // Receive actual content height from iframe postMessage probe.
+  // srcDoc iframes with allow-scripts (no allow-same-origin) always send origin "null".
   useEffect(() => {
     const handler = (e) => {
+      if (e.origin !== "null" && e.origin !== window.location.origin) return;
       const h = e.data?.height;
       if (e.data?.type === "beshvili_height" && typeof h === "number" && h > A4_H && h < 60000) {
         setIframeHeight(h);

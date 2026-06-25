@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { sanitizeBookletHtml } from "../lib/sanitize";
 
 const A4_PX = 794;
 const A4_H  = 1123; // A4 at 96dpi: 297mm × (96/25.4) ≈ 1123px
@@ -23,7 +24,7 @@ export default function PublicBooklet({ token }) {
         try { e = JSON.parse(t); } catch {}
         throw new Error(e.error || `שגיאת שרת ${r.status}`);
       }))
-      .then(setBooklet)
+      .then(data => setBooklet(data ? { ...data, html: sanitizeBookletHtml(data.html) } : data))
       .catch(e => setError(e.message));
   }, [token]);
 
@@ -38,9 +39,11 @@ export default function PublicBooklet({ token }) {
     return () => ro.disconnect();
   }, []);
 
-  // Receive actual content height from iframe postMessage probe
+  // Receive actual content height from iframe postMessage probe.
+  // srcDoc iframes with allow-scripts (no allow-same-origin) always send origin "null".
   useEffect(() => {
     const handler = (e) => {
+      if (e.origin !== "null" && e.origin !== window.location.origin) return;
       const h = e.data?.height;
       if (e.data?.type === "beshvili_height" && typeof h === "number" && h > A4_H && h < 60000) {
         setIframeHeight(h);
