@@ -60,7 +60,7 @@ export default async function middleware(request) {
   <meta http-equiv="refresh" content="0; url=${esc(pageUrl)}">
 </head>
 <body>
-  <script>window.location.replace(${JSON.stringify(pageUrl)});</script>
+  <script>window.location.replace(${JSON.stringify(pageUrl)});<\/script>
 </body>
 </html>`;
 
