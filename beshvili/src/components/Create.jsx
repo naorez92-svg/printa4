@@ -242,7 +242,12 @@ export default function Create({ onSaved, remaining, isPro, active = true }) {
     setLoading(false);
     creatingRef.current = false;
 
-    const generatedHtml = htmlAccumulated.trim();
+    // Strip any external <script src="..."> that isn't the Tailwind CDN
+    // (defense against prompt injection adding exfiltration scripts)
+    const sanitize = (h) => h.replace(
+      /<script\b[^>]*\bsrc=["'](?!https:\/\/cdn\.tailwindcss\.com)[^"']+["'][^>]*>[\s\S]*?<\/script>/gi, ""
+    );
+    const generatedHtml = sanitize(htmlAccumulated.trim());
     if (!generatedHtml || !generatedHtml.includes("<")) { setError("generic:לא התקבל HTML תקין מהשרת"); return; }
 
     const baseTitle = mode === "free"
