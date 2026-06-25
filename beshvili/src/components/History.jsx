@@ -71,6 +71,11 @@ export default function History() {
       )
     : items;
 
+  const totalSavedMin = items.length * 45;
+  const totalSavedStr = totalSavedMin >= 120
+    ? `${(totalSavedMin / 60).toFixed(1).replace(".0", "")} שעות`
+    : `${totalSavedMin} דק'`;
+
   return (
     <section className="space-y-3">
       <div className="flex items-center justify-between gap-3">
@@ -95,6 +100,20 @@ export default function History() {
           </div>
         )}
       </div>
+
+      {/* Total time saved summary */}
+      {!loading && items.length > 0 && (
+        <div className="bg-gradient-to-l from-grow/10 to-magic/8 border border-grow/20 rounded-2xl px-4 py-3 flex items-center justify-between">
+          <div>
+            <span className="text-sm font-semibold text-ink">סה"כ חסכת</span>
+            <span className="text-xs text-ink/45 mr-1.5">בהכנת חומרי לימוד</span>
+          </div>
+          <div className="text-right">
+            <div className="text-lg font-bold text-grow font-display">⏱ ~{totalSavedStr}</div>
+            <div className="text-[10px] text-ink/35">{items.length} חוברות × ~45 דק' ממוצע</div>
+          </div>
+        </div>
+      )}
 
       {loading && <p className="text-ink/40 text-sm animate-pulse">טוען…</p>}
       {loadError && <p className="text-red-500 text-sm">שגיאה בטעינת החוברות — נסה לרענן את הדף</p>}

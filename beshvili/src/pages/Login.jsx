@@ -221,6 +221,81 @@ export default function Login() {
         </div>
       </section>
 
+      {/* ── Booklet Preview ── */}
+      <section className="py-14 px-5 bg-white">
+        <div className="max-w-4xl mx-auto">
+          <div className="text-center mb-10">
+            <h2 className="text-2xl font-bold text-ink mb-2 font-display">כך נראית החוברת שנוצרת</h2>
+            <p className="text-ink/50 text-sm">לא דפי עבודה משעממים — <strong className="text-magic">משימות חווייתיות שהילד רוצה לסיים</strong></p>
+          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 items-center">
+            {/* Booklet mockup */}
+            <div className="relative">
+              <div className="absolute inset-0 bg-gradient-to-br from-magic/10 to-brand/10 rounded-3xl blur-2xl -z-10 scale-95" />
+              <div className="bg-white rounded-2xl shadow-2xl p-6 border border-ink/8 transform -rotate-1 hover:rotate-0 transition-transform duration-500">
+                {/* Header */}
+                <div className="bg-gradient-to-l from-violet-100 to-blue-50 rounded-xl p-4 mb-4 border-2 border-dashed border-violet-300 text-center">
+                  <div className="text-xs font-bold text-violet-700 mb-1 tracking-wide">🕵️ תיק משימה סודי</div>
+                  <div className="text-base font-bold text-ink">מסיון: הצל את ספינת החלל!</div>
+                  <div className="flex justify-center gap-3 mt-1.5 text-[10px] text-ink/50">
+                    <span>⚠️ סכנה: מנוע ראשי כבוי</span>
+                    <span>·</span>
+                    <span>🏆 פרס: החזרה הביתה</span>
+                  </div>
+                </div>
+                {/* Problem */}
+                <p className="text-xs text-ink/70 mb-3 leading-relaxed font-medium">
+                  ⚡ שלב 1 מתוך 5 — חשב את כל המשוואות כדי להפעיל את המנוע:
+                </p>
+                <div className="grid grid-cols-2 gap-2 mb-4">
+                  {["7 × 8 = ___", "6 × 9 = ___", "48 ÷ 6 = ___", "63 ÷ 7 = ___"].map(eq => (
+                    <div key={eq} className="bg-canvas rounded-lg p-2 text-center text-xs font-mono border border-ink/8 text-ink/80">{eq}</div>
+                  ))}
+                </div>
+                {/* Color by answer */}
+                <div className="bg-amber-50 border border-amber-200 rounded-xl p-3">
+                  <div className="text-[10px] font-bold text-amber-800 mb-1.5 text-center">🎨 צבע לפי התשובה שלך:</div>
+                  <div className="flex justify-center gap-3 text-[10px] text-amber-700">
+                    <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-blue-400 inline-block" />56 = כחול</span>
+                    <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-yellow-400 inline-block" />54 = צהוב</span>
+                    <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-red-400 inline-block" />8 = אדום</span>
+                    <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full bg-green-400 inline-block" />9 = ירוק</span>
+                  </div>
+                </div>
+              </div>
+              {/* Badge */}
+              <div className="absolute -bottom-3 -right-2 bg-grow text-white rounded-xl shadow-lg px-3 py-1.5 flex items-center gap-1.5">
+                <span className="text-xs font-bold">⚡ נוצר ב-58 שניות</span>
+              </div>
+            </div>
+            {/* Benefits list */}
+            <div className="space-y-5">
+              {[
+                { icon: "🎯", title: "משימה חווייתית", desc: "לא תרגילים יבשים — סיפור שהילד רוצה לסיים. הוא לא מרגיש שהוא לומד — הוא חוקר, מציל, בונה.", color: "bg-magic/10" },
+                { icon: "⚽", title: "בעולם שהילד אוהב", desc: "חלל, כדורגל, גיימינג, בישול, פוקימון — הגדרה אחת ובשבילי בונה סביבה שמדברת אליו.", color: "bg-brand/10" },
+                { icon: "🎨", title: "צבוע לפי תשובה", desc: "פעילויות יצירתיות שמגבירות מוטיבציה. הילד מצייר ופותר בו-זמנית — ועושה בדיקה עצמית.", color: "bg-amber-50" },
+                { icon: "📐", title: "מותאם בדיוק לרמה", desc: "בסיסי, בינוני, מתקדם — ה-AI כותב לרמה שציינת. אף פעם לא קל מדי, אף פעם לא קשה מדי.", color: "bg-grow/10" },
+              ].map(({ icon, title, desc, color }) => (
+                <div key={title} className="flex items-start gap-4">
+                  <div className={`w-11 h-11 rounded-xl ${color} flex items-center justify-center text-2xl flex-shrink-0 border border-ink/5`}>{icon}</div>
+                  <div>
+                    <div className="font-semibold text-ink text-sm">{title}</div>
+                    <div className="text-xs text-ink/55 mt-0.5 leading-relaxed">{desc}</div>
+                  </div>
+                </div>
+              ))}
+              <button
+                onClick={() => scrollTo("login-form")}
+                className="inline-flex items-center gap-2 bg-gradient-to-l from-brand to-magic text-white rounded-xl px-5 py-2.5 text-sm font-semibold hover:opacity-90 transition-opacity shadow-md mt-2"
+              >
+                <span>✨ רוצי לראות חוברת אמיתית?</span>
+                <span className="text-white/60 text-xs font-normal">חינם, 60 שניות</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* ── Features ── */}
       <section className="py-14 px-5 bg-white">
         <div className="max-w-3xl mx-auto">

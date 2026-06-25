@@ -51,8 +51,9 @@ const LOADING_MSGS = [
   "כמעט מוכן! עוד רגע...",
 ];
 
-export default function Create({ onSaved, remaining, isPro, active = true }) {
+export default function Create({ onSaved, remaining, isPro, active = true, bookletCount = 0, onUpgrade }) {
   const [showUpgrade, setShowUpgrade] = useState(false);
+  const openUpgrade = onUpgrade ?? (() => setShowUpgrade(true));
   const [mode, setMode]           = useState(() => {
     try { return localStorage.getItem("beshvili_mode") || "quick"; } catch { return "quick"; }
   });
@@ -381,7 +382,7 @@ export default function Create({ onSaved, remaining, isPro, active = true }) {
           </div>
 
           <button
-            onClick={() => setShowUpgrade(true)}
+            onClick={() => openUpgrade()}
             className="block w-full bg-gradient-to-l from-brand to-magic text-white rounded-xl p-3.5 font-display font-semibold hover:opacity-90 transition-opacity shadow-sm"
           >
             🚀 שדרגי עכשיו
@@ -397,37 +398,56 @@ export default function Create({ onSaved, remaining, isPro, active = true }) {
   // ── Generated ──────────────────────────────────────────────────────────────
   if (html) {
     const timeSaved = mode === "quick" ? 15 : pageCount * 8;
+    // Total lifetime savings (45 min avg × total booklets ever created, including this one)
+    const totalSavedMin = (bookletCount) * 45; // bookletCount already includes the new one after onSaved()
+    const totalSavedStr = totalSavedMin >= 120
+      ? `${(totalSavedMin / 60).toFixed(1).replace(".0", "")} שעות`
+      : `${totalSavedMin} דק'`;
+
     return (
       <section className="space-y-4">
         {/* Success banner — always visible */}
-        <div className="bg-gradient-to-l from-grow/15 to-brand/10 border border-grow/20 rounded-2xl px-5 py-4 flex items-center gap-3">
-          <span className="text-3xl">🎉</span>
-          <div className="flex-1">
-            <p className="font-bold text-ink text-base">החוברת מוכנה!</p>
-            <p className="text-xs text-ink/50 mt-0.5">
-              נשמרה בענן · מוכנה להדפסה · <span className="text-grow font-medium">⏱ חסכת ~{timeSaved} דק' הכנה!</span>
-            </p>
+        <div className="bg-gradient-to-l from-grow/15 to-brand/10 border border-grow/20 rounded-2xl px-5 py-4">
+          <div className="flex items-center gap-3 mb-2">
+            <span className="text-3xl">🎉</span>
+            <div className="flex-1">
+              <p className="font-bold text-ink text-base">החוברת מוכנה!</p>
+              <p className="text-xs text-ink/50 mt-0.5">
+                נשמרה בענן · מוכנה להדפסה · <span className="text-grow font-medium">⏱ חסכת ~{timeSaved} דק' הכנה!</span>
+              </p>
+            </div>
+            {!isPro && remaining !== undefined && (
+              <span className="text-xs text-ink/40 bg-white rounded-full px-2.5 py-1 border border-ink/10">
+                {remaining} נותרו
+              </span>
+            )}
           </div>
-          {!isPro && remaining !== undefined && (
-            <span className="text-xs text-ink/40 bg-white rounded-full px-2.5 py-1 border border-ink/10">
-              {remaining} נותרו
-            </span>
+          {bookletCount > 1 && (
+            <div className="flex items-center gap-2 bg-white/50 rounded-xl px-3 py-2 text-xs text-ink/60">
+              <span className="text-grow font-bold">✓</span>
+              <span>סה"כ עם בשבילי חסכת <strong className="text-grow">{totalSavedStr} הכנה</strong> — {bookletCount} חוברות נוצרו</span>
+            </div>
           )}
         </div>
 
         {/* Upgrade nudge — shown when ≤2 free booklets remain */}
         {!isPro && remaining > 0 && remaining <= 2 && (
-          <div className="bg-gradient-to-l from-magic/10 to-brand/10 border border-magic/20 rounded-2xl px-5 py-4 flex items-center gap-3">
-            <span className="text-2xl">⭐</span>
-            <div className="flex-1">
-              <p className="font-semibold text-ink text-sm">
-                {remaining === 1 ? "נשארה לך חוברת חינמית אחת בלבד!" : `נשארו לך ${remaining} חוברות חינמיות`}
-              </p>
-              <p className="text-xs text-ink/50 mt-0.5">שדרגי ל-₪19/חודש וצור 5 חוברות בחודש</p>
+          <div className="bg-gradient-to-l from-magic/10 to-brand/10 border border-magic/20 rounded-2xl px-5 py-4">
+            <div className="flex items-center gap-3 mb-2">
+              <span className="text-2xl">⭐</span>
+              <div className="flex-1">
+                <p className="font-semibold text-ink text-sm">
+                  {remaining === 1 ? "נשארה לך חוברת חינמית אחת בלבד!" : `נשארו לך ${remaining} חוברות חינמיות`}
+                </p>
+                <p className="text-xs text-ink/50 mt-0.5">
+                  בתוכנית מורה: 20 חוברות = <strong className="text-magic">15 שעות הכנה חסכות בחודש</strong>
+                </p>
+              </div>
+              <button onClick={() => openUpgrade()} className="flex-shrink-0 bg-gradient-to-l from-brand to-magic text-white text-xs rounded-xl px-3 py-2 font-semibold hover:opacity-90 transition-opacity">
+                שדרגי
+              </button>
             </div>
-            <button onClick={() => setShowUpgrade(true)} className="flex-shrink-0 bg-gradient-to-l from-brand to-magic text-white text-xs rounded-xl px-3 py-2 font-semibold hover:opacity-90 transition-opacity">
-              שדרגי
-            </button>
+            <div className="text-[10px] text-ink/40 text-center">הצטרפי ל-120+ מורות שכבר חוסכות זמן עם בשבילי 🎓</div>
           </div>
         )}
 
@@ -745,7 +765,7 @@ export default function Create({ onSaved, remaining, isPro, active = true }) {
           </div>
         ) : (!isPro && remaining === 0) ? (
           <button
-            onClick={() => setShowUpgrade(true)}
+            onClick={() => openUpgrade()}
             className="w-full bg-gradient-to-l from-brand to-magic text-white rounded-xl p-3.5 font-display font-semibold hover:opacity-90 transition-opacity shadow-sm"
           >
             🚀 שדרגי לפרו להמשיך

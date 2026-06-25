@@ -28,7 +28,7 @@ const PLANS = [
   },
 ];
 
-export default function UpgradeModal({ onClose }) {
+export default function UpgradeModal({ onClose, bookletCount = 0 }) {
   const [selectedPlan, setSelectedPlan] = useState("teacher");
   const [name, setName]   = useState("");
   const [sent, setSent]   = useState(false);
@@ -81,6 +81,16 @@ export default function UpgradeModal({ onClose }) {
           </div>
           <button onClick={onClose} className="text-ink/30 hover:text-ink text-3xl leading-none">×</button>
         </div>
+
+        {/* Personalized time-saved hook */}
+        {bookletCount > 0 && (
+          <div className="bg-grow/8 border border-grow/20 rounded-xl px-3 py-2 text-center">
+            <p className="text-xs font-semibold text-grow">
+              כבר חסכת ~{bookletCount * 45 >= 60 ? `${(bookletCount * 45 / 60).toFixed(1).replace(".0","")} שעות` : `${bookletCount * 45} דק'`} עם בשבילי 🎉
+            </p>
+            <p className="text-[10px] text-ink/45 mt-0.5">שדרגי וחסכי עוד 15 שעות בכל חודש</p>
+          </div>
+        )}
 
         {/* Value hook — dynamic per plan */}
         {selectedPlan === "teacher" ? (
