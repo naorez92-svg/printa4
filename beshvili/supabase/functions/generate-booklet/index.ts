@@ -1,6 +1,6 @@
 import { createClient } from "jsr:@supabase/supabase-js@2";
 
-// v11 — child photo on booklet cover page
+// v12 — security hardening: rate-limit via profiles.last_generation_at, script sanitization
 // ── Commercial limits ────────────────────────────────────────────
 const FREE_BOOKLET_LIMIT     = 2;   // free-tier total (lifetime)
 const PARENT_MONTHLY_LIMIT   = 5;   // parent tier (19₪) per calendar month
@@ -191,17 +191,17 @@ Deno.serve(async (req) => {
       }
     }
 
-    // ── 3. Rate limiting (1 per 60s per user) ────────────────────────────
-    const { data: lastBooklet } = await admin
-      .from("booklets")
-      .select("created_at")
-      .eq("user_id", user.id)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
+    // ── 3. Rate limiting (1 per 60s per user) via profiles.last_generation_at ──
+    // Using a dedicated column instead of last booklet row — deleting booklets
+    // no longer bypasses the rate limit.
+    const { data: profileForRate } = await admin
+      .from("profiles")
+      .select("last_generation_at")
+      .eq("id", user.id)
+      .single();
 
-    if (lastBooklet?.created_at) {
-      const elapsedSec = (Date.now() - new Date(lastBooklet.created_at).getTime()) / 1000;
+    if (profileForRate?.last_generation_at) {
+      const elapsedSec = (Date.now() - new Date(profileForRate.last_generation_at).getTime()) / 1000;
       if (elapsedSec < RATE_LIMIT_SECONDS) {
         return new Response(
           JSON.stringify({ error: "rate_limited", wait: Math.ceil(RATE_LIMIT_SECONDS - elapsedSec) }),
@@ -282,6 +282,9 @@ Deno.serve(async (req) => {
       }
       throw new Error(`Anthropic ${status}: ${await anthropicResp.text()}`);
     }
+
+    // Stamp rate-limit timestamp BEFORE returning stream — prevents bypass by closing mid-stream
+    await admin.from("profiles").update({ last_generation_at: new Date().toISOString() }).eq("id", user.id);
 
     const monthlyLimit = isAdmin ? -1 : isTeacher ? TEACHER_MONTHLY_LIMIT : isParent ? PARENT_MONTHLY_LIMIT : FREE_BOOKLET_LIMIT;
     const remaining = isAdmin ? -1 : monthlyLimit - (isPaid ? usedMonthly : usedTotal) - 1;

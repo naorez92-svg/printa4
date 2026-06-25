@@ -92,7 +92,7 @@ export default function QuickCreate({ student, onClose, onSaved, remaining, isPr
       return;
     }
 
-    const fnUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-booklet?apikey=${import.meta.env.VITE_SUPABASE_ANON_KEY}`;
+    const fnUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-booklet`;
     let resp;
     try {
       resp = await fetch(fnUrl, {
@@ -100,6 +100,7 @@ export default function QuickCreate({ student, onClose, onSaved, remaining, isPr
         headers: {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${session.access_token}`,
+          "apikey": import.meta.env.VITE_SUPABASE_ANON_KEY,
         },
         body: JSON.stringify(body),
       });
