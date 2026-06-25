@@ -59,6 +59,7 @@ Deno.serve(async (req) => {
     { data: allProfiles },
     { data: recentFeedback },
     { data: recentLeads },
+    { data: allBookletUserIds },
     { data: allBookletRows },
   ] = await Promise.all([
     admin.auth.admin.listUsers({ perPage: 1000 }),
@@ -69,6 +70,7 @@ Deno.serve(async (req) => {
     admin.from("profiles").select("id, plan, full_name, created_at, followup_sent_at"),
     admin.from("feedback").select("message, created_at, user_id").order("created_at", { ascending: false }).limit(15),
     admin.from("leads").select("name, phone, created_at").order("created_at", { ascending: false }).limit(15),
+    admin.from("booklets").select("user_id"),
     admin.from("booklets").select("user_id, title, world, goal, created_at, difficulty_feedback").order("created_at", { ascending: false }).limit(200),
   ]);
 
@@ -80,9 +82,9 @@ Deno.serve(async (req) => {
   const profileMap: Record<string, { plan: string; full_name: string | null; followup_sent_at: string | null }> = {};
   (allProfiles ?? []).forEach(p => { profileMap[p.id] = p; });
 
-  // Booklet count per user
+  // Booklet count per user (from ALL booklets for accurate retention metrics)
   const bookletsByUser: Record<string, number> = {};
-  (allBookletRows ?? []).forEach(b => {
+  (allBookletUserIds ?? []).forEach(b => {
     bookletsByUser[b.user_id] = (bookletsByUser[b.user_id] ?? 0) + 1;
   });
 
@@ -119,6 +121,32 @@ Deno.serve(async (req) => {
     const plan = profileMap[u.id]?.plan ?? "free";
     return plan !== "admin" && u.created_at < threeDaysAgo && (bookletsByUser[u.id] ?? 0) === 0;
   }).length;
+
+  // Retention metrics
+  const FREE_LIMIT_THRESHOLD = 3;
+  const totalNonAdminUsers = users.filter(u => (profileMap[u.id]?.plan ?? "free") !== "admin").length;
+  const usersWithAnyBooklet = users.filter(u => {
+    const plan = profileMap[u.id]?.plan ?? "free";
+    return plan !== "admin" && (bookletsByUser[u.id] ?? 0) >= 1;
+  }).length;
+  const retentionToSecond = users.filter(u => (bookletsByUser[u.id] ?? 0) >= 2).length;
+  const retentionToThird  = users.filter(u => (bookletsByUser[u.id] ?? 0) >= FREE_LIMIT_THRESHOLD).length;
+
+  // Free users who hit the free limit — prime upgrade opportunities
+  const freeAtLimitAllUsers = users.filter(u => {
+    const plan = profileMap[u.id]?.plan ?? "free";
+    return plan === "free" && (bookletsByUser[u.id] ?? 0) >= FREE_LIMIT_THRESHOLD;
+  });
+  const freeAtLimitCount = freeAtLimitAllUsers.length;
+  const freeAtLimitUsers = freeAtLimitAllUsers
+    .sort((a, b) => (bookletsByUser[b.id] ?? 0) - (bookletsByUser[a.id] ?? 0))
+    .slice(0, 20)
+    .map(u => ({
+      email: u.email,
+      name: profileMap[u.id]?.full_name ?? null,
+      bookletCount: bookletsByUser[u.id] ?? 0,
+      createdAt: u.created_at,
+    }));
 
   const recentUsers = users
     .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
@@ -182,13 +210,13 @@ Deno.serve(async (req) => {
     // ── Financial agent ──────────────────────────────
     const freeAtLimit = users.filter(u => {
       const plan = profileMap[u.id]?.plan ?? "free";
-      return plan === "free" && (bookletsByUser[u.id] ?? 0) >= 2;
+      return plan === "free" && (bookletsByUser[u.id] ?? 0) >= FREE_LIMIT_THRESHOLD;
     });
     if (freeAtLimit.length > 0) {
       newProposals.push({
         agent: "financial",
         title: `${freeAtLimit.length} משתמשים free הגיעו למכסה — פוטנציאל שדרוג`,
-        description: `${freeAtLimit.length} משתמשים יצרו 2+ חוברות וסביר שיזדקקו ליותר. שלח הודעת WhatsApp להצעת שדרוג.`,
+        description: `${freeAtLimit.length} משתמשים יצרו ${FREE_LIMIT_THRESHOLD}+ חוברות וסביר שיזדקקו ליותר. בדוק "הזדמנויות שדרוג" בדשבורד לרשימה המלאה.`,
         action_type: "whatsapp",
         action_payload: {
           phone: "972509139137",
@@ -301,6 +329,12 @@ Deno.serve(async (req) => {
     difficultyBreakdown,
     ratedBooklets,
     churnRiskCount,
+    totalNonAdminUsers,
+    usersWithAnyBooklet,
+    retentionToSecond,
+    retentionToThird,
+    freeAtLimitCount,
+    freeAtLimitUsers,
     proposals: pendingProposals,
   }), { headers: { ...cors, "content-type": "application/json" } });
 });

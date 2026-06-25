@@ -2,7 +2,7 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
 
 // v12 — security hardening: rate-limit via profiles.last_generation_at, script sanitization
 // ── Commercial limits ────────────────────────────────────────────
-const FREE_BOOKLET_LIMIT     = 2;   // free-tier total (lifetime)
+const FREE_BOOKLET_LIMIT     = 3;   // free-tier total (lifetime) — matches useProfile.js FREE_LIMIT
 const PARENT_MONTHLY_LIMIT   = 5;   // parent tier (19₪) per calendar month
 const TEACHER_MONTHLY_LIMIT  = 20;  // teacher tier (59₪) per calendar month — also "pro" legacy
 const RATE_LIMIT_SECONDS     = 60;  // min gap between generations per user

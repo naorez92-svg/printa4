@@ -40,8 +40,9 @@ export default function Preview({ html, onReset, shareToken, title, active = tru
   // Receive actual content height from iframe postMessage probe
   useEffect(() => {
     const handler = (e) => {
-      if (e.data?.type === "beshvili_height" && typeof e.data.height === "number" && e.data.height > A4_H) {
-        setIframeHeight(e.data.height);
+      const h = e.data?.height;
+      if (e.data?.type === "beshvili_height" && typeof h === "number" && h > A4_H && h < 60000) {
+        setIframeHeight(h);
       }
     };
     window.addEventListener("message", handler);
