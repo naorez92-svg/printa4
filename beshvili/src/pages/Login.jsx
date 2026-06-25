@@ -236,7 +236,7 @@ export default function Login() {
                 {/* Header */}
                 <div className="bg-gradient-to-l from-violet-100 to-blue-50 rounded-xl p-4 mb-4 border-2 border-dashed border-violet-300 text-center">
                   <div className="text-xs font-bold text-violet-700 mb-1 tracking-wide">🕵️ תיק משימה סודי</div>
-                  <div className="text-base font-bold text-ink">מסיון: הצל את ספינת החלל!</div>
+                  <div className="text-base font-bold text-ink">משימה: הצל את ספינת החלל!</div>
                   <div className="flex justify-center gap-3 mt-1.5 text-[10px] text-ink/50">
                     <span>⚠️ סכנה: מנוע ראשי כבוי</span>
                     <span>·</span>
