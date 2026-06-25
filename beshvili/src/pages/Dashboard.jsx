@@ -6,6 +6,7 @@ import Students from "../components/Students";
 import UpgradeModal from "../components/UpgradeModal";
 import FeedbackWidget from "../components/FeedbackWidget";
 import AdminPanel from "../components/AdminPanel";
+import InstallPWA from "../components/InstallPWA";
 import { useProfile, FREE_LIMIT } from "../hooks/useProfile";
 
 const NAV = [
@@ -70,7 +71,7 @@ export default function Dashboard() {
           {tabs.map(([id, icon, label]) => (
             <button key={id} onClick={() => setTab(id)}
               className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium transition-all text-right ${
-                tab === id ? "bg-white/15 text-white shadow-sm" : "text-white/50 hover:text-white/80 hover:bg-white/5"
+                tab === id ? "bg-white/15 text-white shadow-sm" : "text-white/50 hover:text-white/80 hover:bg-white/8"
               }`}>
               <span className="text-lg">{icon}</span>
               <span>{label}</span>
@@ -78,9 +79,10 @@ export default function Dashboard() {
           ))}
         </nav>
 
-        {/* Quota + sign out */}
+        {/* Quota + install + sign out */}
         <div className="px-5 py-4 border-t border-white/10 space-y-3">
           <QuotaBar />
+          <InstallPWA variant="sidebar" />
           <button onClick={() => supabase.auth.signOut()}
             className="w-full text-xs text-white/30 hover:text-white/60 transition-colors text-right">
             יציאה מהחשבון →
@@ -113,6 +115,7 @@ export default function Dashboard() {
           </div>
         </div>
         <QuotaBar className="px-4 pb-2" />
+        {/* Mobile tabs */}
         <div className="px-3 pb-2 flex gap-1 overflow-x-auto scrollbar-none">
           {tabs.map(([id, icon, label]) => (
             <button key={id} onClick={() => setTab(id)}
@@ -150,6 +153,7 @@ export default function Dashboard() {
 
       {showUpgrade && <UpgradeModal onClose={() => setShowUpgrade(false)} />}
       <FeedbackWidget />
+      <InstallPWA variant="banner" />
     </div>
   );
 }
