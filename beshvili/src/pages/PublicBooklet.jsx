@@ -9,7 +9,7 @@ export default function PublicBooklet({ token }) {
   const [scale, setScale]     = useState(1);
 
   useEffect(() => {
-    const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/view-booklet?token=${token}`;
+    const url = `${import.meta.env.VITE_SUPABASE_URL || "https://gywpdzkvkdisonuzhsib.supabase.co"}/functions/v1/view-booklet?token=${token}`;
     fetch(url)
       .then(r => r.ok ? r.json() : r.json().then(e => { throw new Error(e.error); }))
       .then(setBooklet)
@@ -25,11 +25,14 @@ export default function PublicBooklet({ token }) {
 
   const openAndPrint = () => {
     if (!booklet?.html) return;
-    const w = window.open("", "_blank");
-    if (!w) { alert("אפשר חלונות קופצים בדפדפן"); return; }
-    w.document.write(booklet.html);
-    w.document.close();
-    setTimeout(() => { w.focus(); w.print(); }, 800);
+    const blob = new Blob([booklet.html], { type: "text/html;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const w = window.open(url, "_blank");
+    if (!w) { alert("אפשר חלונות קופצים בדפדפן"); URL.revokeObjectURL(url); return; }
+    setTimeout(() => {
+      try { w.focus(); w.print(); } catch {}
+      setTimeout(() => URL.revokeObjectURL(url), 120000);
+    }, 1000);
   };
 
   if (error) return (
@@ -38,7 +41,7 @@ export default function PublicBooklet({ token }) {
         <div className="text-5xl">😕</div>
         <p className="text-ink font-semibold">החוברת לא נמצאה</p>
         <p className="text-ink/40 text-sm">ייתכן שהקישור שגוי או שהחוברת הוסרה</p>
-        <a href="https://beshvili.com" className="text-magic text-sm underline">לבשבילי ←</a>
+        <a href="https://www.beshvili.com" className="text-magic text-sm underline">לבשבילי ←</a>
       </div>
     </div>
   );
@@ -73,7 +76,7 @@ export default function PublicBooklet({ token }) {
             🖨️ הדפס
           </button>
           <a
-            href="https://beshvili.com"
+            href="https://www.beshvili.com"
             className="border border-ink/15 text-ink/50 rounded-xl px-3 py-2 text-xs hover:text-ink transition-colors"
           >
             צרי גם ✨
@@ -121,7 +124,7 @@ export default function PublicBooklet({ token }) {
           <p className="text-sm font-semibold text-ink">רוצה ליצור חוברות מותאמות אישית?</p>
           <p className="text-xs text-ink/50">בשבילי יוצרת חוברות AI בעברית בתוך דקה — חינם!</p>
           <a
-            href="https://beshvili.com"
+            href="https://www.beshvili.com"
             className="inline-block bg-gradient-to-l from-brand to-magic text-white rounded-xl px-6 py-2.5 text-sm font-semibold hover:opacity-90 transition-opacity"
           >
             נסי חינם ← בשבילי

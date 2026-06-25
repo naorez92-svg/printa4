@@ -162,12 +162,19 @@ export default function Create({ onSaved, remaining, isPro, active = true }) {
       return;
     }
 
+    // Screen Wake Lock — prevents Android battery optimizer from killing the connection
+    let wakeLock = null;
+    try {
+      if ("wakeLock" in navigator) wakeLock = await navigator.wakeLock.request("screen");
+    } catch {}
+
     // Read SSE stream — Anthropic sends content_block_delta events with text chunks
     const reader = resp.body.getReader();
     const decoder = new TextDecoder();
     let buffer = "";
     let htmlAccumulated = "";
     let updateTimer = 0;
+    let streamAborted = false;
 
     try {
       while (true) {
@@ -195,21 +202,32 @@ export default function Create({ onSaved, remaining, isPro, active = true }) {
         }
       }
     } catch (streamErr) {
-      setLoading(false);
-      setError("generic:שגיאה בקבלת הנתונים מהשרת");
-      return;
+      wakeLock?.release().catch(() => {});
+      // Save partial booklet if we got substantial HTML (e.g. connection dropped mid-stream)
+      const partial = htmlAccumulated.trim();
+      if (partial.length > 8000 && (partial.includes("<!DOCTYPE") || partial.includes("<html"))) {
+        if (!partial.includes("</html>")) htmlAccumulated = partial + "\n</body></html>";
+        streamAborted = true;
+        // Fall through to save the partial booklet below
+      } else {
+        setLoading(false);
+        setError("generic:החיבור נקטע — נסה שנית, רצוי עם פחות עמודים");
+        return;
+      }
     }
 
+    wakeLock?.release().catch(() => {});
     setLoading(false);
 
     const html = htmlAccumulated.trim();
     if (!html || !html.includes("<")) { setError("generic:לא התקבל HTML תקין מהשרת"); return; }
 
-    const title = mode === "free"
+    const baseTitle = mode === "free"
       ? freeText.trim().substring(0, 60) + (freeText.length > 60 ? "…" : "")
       : mode === "quick"
       ? `⚡ ${f.goal.trim().substring(0, 50)}`
       : `${f.childName} — ${f.goal}`;
+    const title = streamAborted ? `${baseTitle} (חלקי)` : baseTitle;
 
     const { data: u } = await supabase.auth.getUser();
     if (!u?.user) { setError("generic:שגיאת משתמש — נסה להתחבר מחדש"); return; }

@@ -45,19 +45,24 @@ export default function Preview({ html, onReset, shareToken, active = true }) {
         );
 
   const openInNewTab = () => {
-    const w = window.open("", "_blank");
-    if (!w) { alert("אפשרי חלונות קופצים בדפדפן"); return; }
-    w.document.write(getPrintHtml());
-    w.document.close();
+    const html = getPrintHtml();
+    const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const w = window.open(url, "_blank");
+    if (!w) { alert("אפשרי חלונות קופצים בדפדפן"); URL.revokeObjectURL(url); return; }
+    setTimeout(() => URL.revokeObjectURL(url), 120000);
   };
 
   const handlePrint = () => {
-    if (isMobile) { openInNewTab(); return; }
-    const w = window.open("", "_blank");
-    if (!w) { alert("אפשרי חלונות קופצים בדפדפן"); return; }
-    w.document.write(getPrintHtml());
-    w.document.close();
-    setTimeout(() => { w.focus(); w.print(); }, 800);
+    const html = getPrintHtml();
+    const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const w = window.open(url, "_blank");
+    if (!w) { alert("אפשרי חלונות קופצים בדפדפן"); URL.revokeObjectURL(url); return; }
+    setTimeout(() => {
+      try { w.focus(); w.print(); } catch {}
+      setTimeout(() => URL.revokeObjectURL(url), 120000);
+    }, 1000);
   };
 
   useEffect(() => {

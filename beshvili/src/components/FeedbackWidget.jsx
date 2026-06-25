@@ -15,6 +15,7 @@ export default function FeedbackWidget() {
   const [message, setMessage]   = useState("");
   const [sending, setSending]   = useState(false);
   const [done, setDone]         = useState(false);
+  const [submitError, setSubmitError] = useState(false);
 
   const close = () => { setOpen(false); };
 
@@ -22,13 +23,14 @@ export default function FeedbackWidget() {
     const text = [selected, message.trim()].filter(Boolean).join("\n");
     if (!text) return;
     setSending(true);
+    setSubmitError(false);
     const { data: { user } } = await supabase.auth.getUser();
     const { error } = await supabase.from("feedback").insert({ user_id: user?.id ?? null, message: text });
     setSending(false);
-    if (!error) setDone(true);
+    if (error) { setSubmitError(true); } else { setDone(true); }
   };
 
-  const reset = () => { setOpen(false); setDone(false); setSelected(""); setMessage(""); };
+  const reset = () => { setOpen(false); setDone(false); setSelected(""); setMessage(""); setSubmitError(false); };
 
   if (!open) {
     return (
@@ -90,6 +92,9 @@ export default function FeedbackWidget() {
               onChange={e => setMessage(e.target.value)}
             />
 
+            {submitError && (
+              <p className="text-red-500 text-xs text-center">שגיאה בשליחה — נסי שוב</p>
+            )}
             <button
               onClick={submit}
               disabled={sending || (!selected && !message.trim())}

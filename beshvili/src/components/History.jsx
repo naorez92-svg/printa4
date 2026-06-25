@@ -71,6 +71,8 @@ function BookletRow({ booklet: b, onDelete }) {
   const [html, setHtml] = useState(null);
   const [shareToken, setShareToken] = useState(null);
   const [loadingHtml, setLoadingHtml] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [delError, setDelError] = useState(false);
 
   const toggle = async () => {
     if (html) { setHtml(null); setShareToken(null); return; }
@@ -83,7 +85,11 @@ function BookletRow({ booklet: b, onDelete }) {
 
   const del = async () => {
     if (!confirm(`למחוק את "${b.title}"?`)) return;
-    await supabase.from("booklets").delete().eq("id", b.id);
+    setDeleting(true);
+    setDelError(false);
+    const { error } = await supabase.from("booklets").delete().eq("id", b.id);
+    setDeleting(false);
+    if (error) { setDelError(true); return; }
     onDelete(b.id);
   };
 
@@ -110,10 +116,11 @@ function BookletRow({ booklet: b, onDelete }) {
           </button>
           <button
             onClick={del}
-            className="text-red-400 text-sm hover:text-red-600"
-            title="מחק"
+            disabled={deleting}
+            className={`text-sm ${delError ? "text-red-600 font-medium" : "text-red-400 hover:text-red-600"} disabled:opacity-40`}
+            title={delError ? "מחיקה נכשלה — לחץ לנסות שוב" : "מחק"}
           >
-            ✕
+            {deleting ? "…" : delError ? "✕ שגיאה" : "✕"}
           </button>
         </div>
       </div>
