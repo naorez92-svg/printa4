@@ -108,7 +108,7 @@ export default function Dashboard() {
             ) : (
               <button onClick={() => setShowUpgrade(true)}
                 className="text-xs text-white/60 bg-white/10 border border-white/20 rounded-full px-2.5 py-1">
-                {remaining}/{FREE_LIMIT} ↑
+                {remaining > 0 ? `נותרו ${remaining} חינם ✨` : "שדרגי לפרו ↑"}
               </button>
             ))}
             <button onClick={() => supabase.auth.signOut()}

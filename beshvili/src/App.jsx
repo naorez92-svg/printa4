@@ -24,7 +24,15 @@ function AuthApp() {
     return () => sub.subscription.unsubscribe();
   }, []);
 
-  if (loading) return null;
+  if (loading) return (
+    <div className="min-h-screen bg-canvas flex items-center justify-center" dir="rtl">
+      <div className="flex gap-1">
+        {[0,1,2].map(i => (
+          <div key={i} className="w-2.5 h-2.5 rounded-full bg-magic animate-bounce" style={{ animationDelay: `${i * 0.15}s` }} />
+        ))}
+      </div>
+    </div>
+  );
   return session ? <Dashboard /> : <Login />;
 }
 
