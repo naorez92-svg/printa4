@@ -50,7 +50,9 @@ const LOADING_MSGS = [
 
 export default function Create({ onSaved, remaining, isPro, active = true }) {
   const [showUpgrade, setShowUpgrade] = useState(false);
-  const [mode, setMode]           = useState("form");
+  const [mode, setMode]           = useState(() => {
+    try { return localStorage.getItem("beshvili_mode") || "quick"; } catch { return "quick"; }
+  });
   const [f, setF]                 = useState(EMPTY);
   const [freeText, setFreeText]   = useState("");
   const [pageCount, setPageCount] = useState(5);
@@ -445,18 +447,23 @@ export default function Create({ onSaved, remaining, isPro, active = true }) {
         </div>
         <div className="flex gap-1 bg-white/70 rounded-xl p-1 w-fit">
           {[["form", "📋 טופס"], ["quick", "⚡ דף מהיר"], ["free", "✍️ חופשי"]].map(([m, label]) => (
-            <button key={m} onClick={() => setMode(m)}
+            <button key={m} onClick={() => { setMode(m); try { localStorage.setItem("beshvili_mode", m); } catch {} }}
               className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all ${mode === m ? "bg-white shadow text-ink" : "text-ink/50 hover:text-ink"}`}>
               {label}
             </button>
           ))}
         </div>
+        <p className="text-xs text-ink/40 mt-2">
+          {mode === "quick" && "⚡ דף תרגיל אחד, מוכן ב-30 שניות — מושלם לשיעורי בית"}
+          {mode === "form"  && "📋 חוברת מלאה עם שער אישי, תרגילים ורפלקציה — מותאמת לילד"}
+          {mode === "free"  && "✍️ כתוב בחופשיות מה שרוצה — ה-AI יייצר לפי הוראותיך"}
+        </p>
       </div>
 
       <div className="p-5 space-y-4">
         {/* Templates */}
         <div>
-          <p className="text-xs text-ink/40 mb-2 font-medium uppercase tracking-wide">תבניות מהירות</p>
+          <p className="text-xs text-ink/50 mb-2 font-semibold">👇 בחר נושא להתחיל — או מלא בעצמך למטה</p>
           <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
             {TEMPLATES.map((t) => (
               <button key={t.label} onClick={() => applyTmpl(t)}
