@@ -12,13 +12,23 @@ const FREE_MAX_PAGES         = 10;
 const PARENT_MAX_PAGES       = 10;
 const TEACHER_MAX_PAGES      = 20;
 
-// Supabase JS client sends apikey + x-client-info — must be in allow list
-const cors = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-  "Access-Control-Max-Age": "86400",
-};
+// Restrict CORS to known origins (production + Vercel previews + localhost dev)
+function getCors(req: Request) {
+  const origin = req.headers.get("origin") ?? "";
+  const allowed =
+    origin === "https://www.beshvili.com" ||
+    origin === "https://beshvili.com" ||
+    origin === "http://localhost:5173" ||
+    origin === "http://localhost:4173" ||
+    /^https:\/\/printa4-git-[^.]+\.vercel\.app$/.test(origin);
+  return {
+    "Access-Control-Allow-Origin": allowed ? origin : "https://www.beshvili.com",
+    "Vary": "Origin",
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Access-Control-Max-Age": "86400",
+  };
+}
 
 const BOOKLET_SYSTEM = `אתה "יוצר החוברות של חני 2.0" — מומחה פדגוגי בכיר, מעצב גרפי לפרינט ומפתח HTML/CSS.
 מטרתך: לייצר קוד HTML מלא לחוברות עבודה לימודיות לילדים ברמה עיצובית גבוהה, חסכוניות בדיו, מוכנות להדפסה בפורמט A4.
@@ -133,6 +143,7 @@ const BOOKLET_SYSTEM = `אתה "יוצר החוברות של חני 2.0" — מ�
 <p style="position:absolute;bottom:6mm;left:0;right:0;text-align:center;font-size:8px;color:#ccc;margin:0;">נוצר בחינם עם beshvili.com ✨</p>`;
 
 Deno.serve(async (req) => {
+  const cors = getCors(req);
   console.log("[generate-booklet] invoked:", req.method, "origin:", req.headers.get("origin") ?? "-");
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   if (req.method !== "POST") {
@@ -158,10 +169,10 @@ Deno.serve(async (req) => {
     }
 
     // ── 2. Plan check + quota (server-enforced, cannot be bypassed) ───────────
+    // usedTotal = lifetime booklets ever created (not current rows) — immune to deletion gaming
     const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString();
-    const [{ data: profile }, { count: bookletCount }, { count: monthlyCount }] = await Promise.all([
-      admin.from("profiles").select("plan").eq("id", user.id).single(),
-      admin.from("booklets").select("*", { count: "exact", head: true }).eq("user_id", user.id),
+    const [{ data: profile }, { count: monthlyCount }] = await Promise.all([
+      admin.from("profiles").select("plan, total_booklets_created").eq("id", user.id).single(),
       admin.from("booklets").select("*", { count: "exact", head: true }).eq("user_id", user.id).gte("created_at", startOfMonth),
     ]);
 
@@ -171,7 +182,7 @@ Deno.serve(async (req) => {
     const isParent  = plan === "parent";
     const isPaid    = isTeacher || isParent;
 
-    const usedTotal   = bookletCount ?? 0;
+    const usedTotal   = profile?.total_booklets_created ?? 0;
     const usedMonthly = monthlyCount ?? 0;
 
     if (!isPaid && usedTotal >= FREE_BOOKLET_LIMIT) {

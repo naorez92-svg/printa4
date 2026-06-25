@@ -1,13 +1,23 @@
 import { createClient } from "jsr:@supabase/supabase-js@2";
 
-const cors = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-  "Access-Control-Max-Age": "86400",
-};
+function getCors(req: Request) {
+  const origin = req.headers.get("origin") ?? "";
+  const allowed =
+    origin === "https://www.beshvili.com" ||
+    origin === "https://beshvili.com" ||
+    origin === "http://localhost:5173" ||
+    /^https:\/\/printa4-git-[^.]+\.vercel\.app$/.test(origin);
+  return {
+    "Access-Control-Allow-Origin": allowed ? origin : "https://www.beshvili.com",
+    "Vary": "Origin",
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+    "Access-Control-Max-Age": "86400",
+  };
+}
 
 Deno.serve(async (req) => {
+  const cors = getCors(req);
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
 
   const admin = createClient(

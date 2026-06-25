@@ -18,14 +18,15 @@ export function useProfile() {
     const now = new Date();
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
 
-    const [{ data: p }, { count: total }, { count: monthly }] = await Promise.all([
-      supabase.from("profiles").select("plan, full_name").eq("id", user.id).single(),
-      supabase.from("booklets").select("*", { count: "exact", head: true }).eq("user_id", user.id),
+    // bookletCount = total_booklets_created (lifetime, never decremented) so deleting
+    // a booklet cannot reset the free-tier quota
+    const [{ data: p }, { count: monthly }] = await Promise.all([
+      supabase.from("profiles").select("plan, full_name, total_booklets_created").eq("id", user.id).single(),
       supabase.from("booklets").select("*", { count: "exact", head: true }).eq("user_id", user.id).gte("created_at", monthStart),
     ]);
 
     setProfile(p);
-    setBookletCount(total ?? 0);
+    setBookletCount(p?.total_booklets_created ?? 0);
     setMonthlyBookletCount(monthly ?? 0);
     setLoading(false);
   }, []);
