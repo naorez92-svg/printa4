@@ -3,10 +3,16 @@ import { useEffect, useRef, useState } from "react";
 const A4_PX = 794;
 const A4_H  = 1123; // A4 at 96dpi: 297mm × (96/25.4) ≈ 1123px
 
+function injectHeightProbe(html) {
+  const probe = `<script>(function(){function s(){window.parent.postMessage({type:"beshvili_height",height:document.body.scrollHeight},"*")}if(document.readyState==="loading"){document.addEventListener("DOMContentLoaded",s)}else{s()}window.addEventListener("load",function(){setTimeout(s,300)})})()</script>`;
+  return html.includes("</body>") ? html.replace("</body>", probe + "</body>") : html + probe;
+}
+
 export default function PublicBooklet({ token }) {
   const [booklet, setBooklet] = useState(null);
   const [error, setError]     = useState(null);
   const [scale, setScale]     = useState(1);
+  const [iframeHeight, setIframeHeight] = useState(A4_H);
   const containerRef = useRef(null); // outer div — measures available width
 
   useEffect(() => {
@@ -30,6 +36,17 @@ export default function PublicBooklet({ token }) {
     const ro = new ResizeObserver(update);
     if (containerRef.current) ro.observe(containerRef.current);
     return () => ro.disconnect();
+  }, []);
+
+  // Receive actual content height from iframe postMessage probe
+  useEffect(() => {
+    const handler = (e) => {
+      if (e.data?.type === "beshvili_height" && typeof e.data.height === "number" && e.data.height > A4_H) {
+        setIframeHeight(e.data.height);
+      }
+    };
+    window.addEventListener("message", handler);
+    return () => window.removeEventListener("message", handler);
   }, []);
 
   const openAndPrint = () => {
@@ -66,7 +83,7 @@ export default function PublicBooklet({ token }) {
   );
 
   const scaledW = Math.round(A4_PX * scale);
-  const scaledH = Math.round(A4_H * scale);
+  const scaledH = Math.round(iframeHeight * scale);
 
   return (
     <div className="min-h-screen bg-canvas" dir="rtl">
@@ -105,11 +122,11 @@ export default function PublicBooklet({ token }) {
           >
             <iframe
               title={booklet.title || "חוברת"}
-              srcDoc={booklet.html}
+              srcDoc={injectHeightProbe(booklet.html)}
               sandbox="allow-scripts"
               style={{
                 width:  `${A4_PX}px`,
-                height: `${A4_H}px`,
+                height: `${iframeHeight}px`,
                 transform: `scale(${scale})`,
                 transformOrigin: "top left",
                 border: "none",
@@ -123,7 +140,6 @@ export default function PublicBooklet({ token }) {
           </div>
         </div>
 
-        <p className="text-center text-xs text-ink/30">גלול בתוך התצוגה לצפייה בכל העמודים</p>
 
         <button
           onClick={openAndPrint}
