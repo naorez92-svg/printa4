@@ -13,7 +13,7 @@ function extractText(html) {
   return (doc.body.textContent || "").replace(/\s+/g, " ").trim();
 }
 
-export default function Preview({ html, onReset, shareToken, active = true }) {
+export default function Preview({ html, onReset, shareToken, title, active = true }) {
   const wrapperRef = useRef(null);
   const [scale, setScale]   = useState(1);
   const [copied, setCopied] = useState(false);
@@ -107,7 +107,8 @@ export default function Preview({ html, onReset, shareToken, active = true }) {
     const link = shareToken
       ? `${window.location.origin}/b/${shareToken}`
       : window.location.origin;
-    const msg = encodeURIComponent(`יצרתי חוברת לימוד מותאמת אישית עם בשבילי AI 📚\n${link}`);
+    const bookletPart = title ? `"${title}" ` : "";
+    const msg = encodeURIComponent(`יצרתי חוברת לימוד ${bookletPart}עם בשבילי AI 📚\n${link}`);
     window.open("https://wa.me/?text=" + msg, "_blank");
   };
 

@@ -61,6 +61,7 @@ export default function Create({ onSaved, remaining, isPro, active = true }) {
   const [html, setHtml]           = useState(null);
   const [bookletId, setBookletId] = useState(null);
   const [shareToken, setShareToken] = useState(null);
+  const [bookletTitle, setBookletTitle] = useState(null);
   const [showRating, setShowRating] = useState(false);
   const [error, setError]         = useState(null); // null | "quota" | "quota_monthly" | "rate:{wait}" | "generic:{msg}"
   const [rateCountdown, setRateCountdown] = useState(null);
@@ -240,6 +241,7 @@ export default function Create({ onSaved, remaining, isPro, active = true }) {
 
     setBookletId(inserted?.id ?? null);
     setShareToken(inserted?.share_token ?? null);
+    setBookletTitle(title);
     setShowRating(true);
     setHtml(generatedHtml);
     track("booklet_completed", { booklet_id: inserted?.id, pages: pageCount, mode });
@@ -281,7 +283,7 @@ export default function Create({ onSaved, remaining, isPro, active = true }) {
     e.target.value = "";
   }, []);
 
-  const reset = () => { setHtml(null); setF(EMPTY); setFreeText(""); setError(null); setBookletId(null); setShareToken(null); setShowRating(false); setChildSaved(false); setPhotoUrl(null); };
+  const reset = () => { setHtml(null); setF(EMPTY); setFreeText(""); setError(null); setBookletId(null); setShareToken(null); setBookletTitle(null); setShowRating(false); setChildSaved(false); setPhotoUrl(null); };
   const set   = (k) => (e) => setF((p) => ({ ...p, [k]: e.target.value }));
   const applyTmpl = (tmpl) => {
     setF((p) => ({ ...p, ...tmpl.f }));
@@ -394,7 +396,7 @@ export default function Create({ onSaved, remaining, isPro, active = true }) {
         )}
 
         {/* Booklet preview — shown immediately, always first */}
-        <Preview html={html} onReset={reset} shareToken={shareToken} active={active} />
+        <Preview html={html} onReset={reset} shareToken={shareToken} title={bookletTitle} active={active} />
 
         {/* Rating widget — shown below the booklet, optional */}
         {showRating && bookletId && (
