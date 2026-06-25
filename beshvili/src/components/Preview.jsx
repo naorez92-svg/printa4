@@ -14,7 +14,7 @@ function extractText(html) {
 }
 
 export default function Preview({ html, onReset, shareToken, title, active = true }) {
-  const wrapperRef = useRef(null);
+  const containerRef = useRef(null); // outer div — measures available width
   const [scale, setScale]   = useState(1);
   const [copied, setCopied] = useState(false);
   const [reading, setReading] = useState(false);
@@ -22,18 +22,19 @@ export default function Preview({ html, onReset, shareToken, title, active = tru
 
   useEffect(() => {
     const update = () => {
-      if (!wrapperRef.current) return;
-      setScale(Math.min(1, wrapperRef.current.offsetWidth / A4_PX));
+      if (!containerRef.current) return;
+      setScale(Math.min(1, containerRef.current.offsetWidth / A4_PX));
     };
     update();
     const ro = new ResizeObserver(update);
-    if (wrapperRef.current) ro.observe(wrapperRef.current);
+    if (containerRef.current) ro.observe(containerRef.current);
     return () => ro.disconnect();
   }, []);
 
   // Cancel speech when component unmounts
   useEffect(() => () => window.speechSynthesis?.cancel(), []);
 
+  const scaledW = Math.round(A4_PX * scale);
   const scaledHeight = Math.round(A4_H * scale);
 
   const getPrintHtml = () =>
@@ -140,11 +141,12 @@ export default function Preview({ html, onReset, shareToken, title, active = tru
 
   return (
     <div className="space-y-3">
-      {/* Scaled iframe */}
+      {/* Scaled iframe — containerRef measures available width; inner div gets exact scaled dims */}
+      <div ref={containerRef} className="w-full">
       <div
-        ref={wrapperRef}
+        dir="ltr"
         className="rounded-2xl overflow-hidden border border-ink/10 shadow-lg bg-white relative"
-        style={{ height: `${scaledHeight}px` }}
+        style={{ width: `${scaledW}px`, height: `${scaledHeight}px` }}
       >
         <iframe
           title="תצוגה מקדימה"
@@ -172,6 +174,7 @@ export default function Preview({ html, onReset, shareToken, title, active = tru
         </button>
         {/* Fade-out hint */}
         <div className="absolute bottom-0 inset-x-0 h-10 bg-gradient-to-t from-white/70 to-transparent pointer-events-none" />
+      </div>
       </div>
 
       <p className="text-center text-xs text-ink/30">גלול בתוך התצוגה לצפייה בכל העמודים</p>
