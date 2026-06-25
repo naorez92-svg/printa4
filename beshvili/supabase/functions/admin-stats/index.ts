@@ -44,10 +44,10 @@ Deno.serve(async (req) => {
   } catch {}
 
   const now = new Date();
-  const weekAgo     = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
+  const weekAgo      = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
   const threeDaysAgo = new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000).toISOString();
-  const todayStart  = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
-  const monthStart  = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+  const todayStart   = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
+  const monthStart   = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
 
   // Fetch all core data in parallel
   const [
@@ -192,7 +192,7 @@ Deno.serve(async (req) => {
         action_type: "whatsapp",
         action_payload: {
           phone: "972509139137",
-          message: `שלום! ראיתי שיצרת כמה חוברות יפות עם בשבילי 📚\nאם תרצה ליצור עוד חוברות — יש מנוי הורה ב-19 ₪/חודש (5 חוברות) ומנוי מורה ב-59 ₪/חודש (20 חוברות).\nאשמח לעזור!`,
+          message: "שלום! ראיתי שיצרת כמה חוברות יפות עם בשבילי 📚\nאם תרצה ליצור עוד חוברות — יש מנוי הורה ב-19 ₪/חודש (5 חוברות) ומנוי מורה ב-59 ₪/חודש (20 חוברות).\nאשמח לעזור!",
         },
       });
     }
@@ -219,7 +219,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Difficulty signal: if ≥30% of rated booklets got "too hard"
+    // Difficulty signal: if >=30% of rated booklets got "too hard"
     const tooHardCount = difficultyBreakdown["too_hard"] ?? 0;
     const tooHardPct   = ratedBooklets >= 10 ? Math.round((tooHardCount / ratedBooklets) * 100) : 0;
     if (tooHardPct >= 30) {

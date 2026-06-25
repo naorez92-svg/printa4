@@ -137,7 +137,7 @@ export default function AdminPanel() {
   return (
     <div className="space-y-6">
 
-      {/* ── Agent proposals ── */}
+      {/* Agent proposals */}
       {proposals.length > 0 ? (
         <div className="space-y-3">
           <div className="flex items-center justify-between">
@@ -170,7 +170,7 @@ export default function AdminPanel() {
         </div>
       )}
 
-      {/* ── Funnel (last 7 days) ── */}
+      {/* Funnel (last 7 days) */}
       <div className="bg-white rounded-2xl p-4 border border-ink/5 shadow-sm">
         <h3 className="font-bold text-ink mb-3 text-sm">📊 משפך 7 ימים אחרונים</h3>
         {fs.sessions === 0 && fs.started === 0 ? (
@@ -197,7 +197,7 @@ export default function AdminPanel() {
         )}
       </div>
 
-      {/* ── Quality signals ── */}
+      {/* Quality signals */}
       {(data.ratedBooklets > 0 || data.churnRiskCount > 0) && (
         <div className="bg-white rounded-2xl p-4 border border-ink/5 shadow-sm">
           <h3 className="font-bold text-ink mb-3 text-sm">🎯 איכות ונטישה</h3>
@@ -237,7 +237,7 @@ export default function AdminPanel() {
         </div>
       )}
 
-      {/* ── Stats grid ── */}
+      {/* Stats grid */}
       <div className="grid grid-cols-3 gap-3">
         {statCards.map(({ label, value, icon }) => (
           <div key={label} className="bg-white rounded-2xl p-4 border border-ink/5 text-center shadow-sm">
@@ -248,7 +248,7 @@ export default function AdminPanel() {
         ))}
       </div>
 
-      {/* ── Economics / P&L ── */}
+      {/* Economics / P&L */}
       <div className="bg-white rounded-2xl p-4 border border-ink/5 shadow-sm">
         <h3 className="font-bold text-ink mb-3 text-sm">💰 כלכלה — חודש נוכחי</h3>
         <div className="space-y-1.5 mb-3">
@@ -307,7 +307,7 @@ export default function AdminPanel() {
         <p className="text-[10px] text-ink/25 mt-2 text-center">עלות API מחושבת לפי הערכה — ~0.80 ₪/חוברת</p>
       </div>
 
-      {/* ── Plan breakdown ── */}
+      {/* Plan breakdown */}
       <div className="bg-white rounded-2xl p-4 border border-ink/5 shadow-sm">
         <h3 className="font-bold text-ink mb-3 text-sm">פילוח תוכניות</h3>
         <div className="flex gap-2 flex-wrap text-sm">
@@ -325,7 +325,7 @@ export default function AdminPanel() {
         </div>
       </div>
 
-      {/* ── Popular topics ── */}
+      {/* Popular topics */}
       {data.topTopics?.length > 0 && (
         <div className="bg-white rounded-2xl p-4 border border-ink/5 shadow-sm">
           <h3 className="font-bold text-ink mb-3 text-sm">נושאים פופולריים 🔥 (200 אחרונים)</h3>
@@ -352,7 +352,7 @@ export default function AdminPanel() {
         </div>
       )}
 
-      {/* ── Automation triggers ── */}
+      {/* Automation triggers */}
       <div className="grid grid-cols-2 gap-3">
         <div className="bg-canvas rounded-2xl p-4 border border-ink/5">
           <h3 className="font-bold text-ink mb-1 text-sm">פולואפ D+2</h3>
@@ -374,7 +374,7 @@ export default function AdminPanel() {
         </div>
       </div>
 
-      {/* ── Recent users ── */}
+      {/* Recent users */}
       <div className="bg-white rounded-2xl p-4 border border-ink/5 shadow-sm">
         <h3 className="font-bold text-ink mb-3 text-sm">משתמשים אחרונים ({data.recentUsers?.length})</h3>
         <div className="overflow-x-auto">
@@ -418,7 +418,7 @@ export default function AdminPanel() {
         </div>
       </div>
 
-      {/* ── Recent feedback ── */}
+      {/* Recent feedback */}
       {data.recentFeedback?.length > 0 && (
         <div className="bg-white rounded-2xl p-4 border border-ink/5 shadow-sm">
           <h3 className="font-bold text-ink mb-3 text-sm">פידבקים אחרונים ({data.recentFeedback.length})</h3>
@@ -433,7 +433,7 @@ export default function AdminPanel() {
         </div>
       )}
 
-      {/* ── Recent leads ── */}
+      {/* Recent leads */}
       {data.recentLeads?.length > 0 && (
         <div className="bg-white rounded-2xl p-4 border border-ink/5 shadow-sm">
           <h3 className="font-bold text-ink mb-3 text-sm">ליידים — בקשות שדרוג ({data.recentLeads.length})</h3>
