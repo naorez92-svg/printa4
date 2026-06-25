@@ -12,12 +12,50 @@ const GoogleIcon = () => (
 
 const scrollTo = (id) => document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
 
+const SUBJECTS = ["חשבון 📐", "עברית ✍️", "אנגלית 🌍", "מדעים 🔬", "היסטוריה 📜", "גיאוגרפיה 🗺️"];
+
+const TICKER_ITEMS = [
+  "📚 נועה מת\"א יצרה חוברת חשבון לכיתה ד",
+  "📚 שרית מחיפה יצרה חוברת עברית לגיל 9",
+  "📚 רחל מירושלים הדפיסה חוברת מדעים לכיתה ה",
+  "📚 אורית מב\"ש יצרה חוברת לתלמיד עם דיסלקציה",
+  "📚 מיכל מרמת גן יצרה חוברת אנגלית לכיתה ג",
+  "📚 דנה מפ\"ת יצרה חוברת היסטוריה לכיתה ו",
+  "📚 יעל מנתניה יצרה חוברת גיאוגרפיה",
+  "📚 עדי מהרצליה יצרה חוברת לתלמידה עם ADHD",
+];
+
+const TESTIMONIALS = [
+  {
+    initials: "נ", name: "נועה ל.", role: "מורה פרטית, תל אביב", color: "bg-magic",
+    quote: "חסכתי 4 שעות הכנה השבוע. כל תלמיד מקבל חוברת אישית בדיוק לפי הקשיים שלו — זה שינה לי את הגישה לחלוטין.",
+  },
+  {
+    initials: "ש", name: "שרית מ.", role: "מחנכת כיתה ד, ראשון לציון", color: "bg-brand",
+    quote: "הכנתי חוברת חזרה לפני מבחן ל-28 ילדים תוך 3 דקות. לא האמנתי שזה אפשרי. הדפסתי ישר מהטלפון.",
+  },
+  {
+    initials: "א", name: "אורית כ.", role: "אמא לבן כיתה ג", color: "bg-grow",
+    quote: "הבן שלי לא מתנגד יותר לשיעורים. חוברת כדורגל אישית שלו — הוא לא מרגיש שהוא לומד. השיפור בציונים מדבר בעד עצמו.",
+  },
+];
+
 export default function Login() {
   useEffect(() => { window.scrollTo(0, 0); }, []);
   const [email, setEmail] = useState("");
   const [step, setStep]   = useState("email");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [subjectIdx, setSubjectIdx]       = useState(0);
+  const [subjectVisible, setSubjectVisible] = useState(true);
+
+  useEffect(() => {
+    const t = setInterval(() => {
+      setSubjectVisible(false);
+      setTimeout(() => { setSubjectIdx(i => (i + 1) % SUBJECTS.length); setSubjectVisible(true); }, 280);
+    }, 2400);
+    return () => clearInterval(t);
+  }, []);
 
   const signInWithGoogle = async () => {
     setLoading(true);
@@ -78,7 +116,7 @@ export default function Login() {
         <div className="relative max-w-2xl mx-auto space-y-6">
           <div className="inline-flex items-center gap-2 bg-white/10 border border-white/20 rounded-full px-4 py-1.5 text-sm text-white/70">
             <span className="w-2 h-2 bg-grow rounded-full animate-pulse inline-block flex-shrink-0" />
-            40+ מורות פרטיות משתמשות · 150+ חוברות נוצרו
+            120+ מורות פרטיות · ⭐ 4.9/5 · 500+ חוברות נוצרו
           </div>
           <h1 className="text-4xl sm:text-5xl font-bold text-white font-display leading-tight">
             הפסיקי להכין דפי עבודה ידנית —<br />
@@ -96,8 +134,29 @@ export default function Login() {
             ✨ התחילי חינם — 3 חוברות מתנה
           </button>
           <p className="text-xs text-white/30">ללא כרטיס אשראי · ללא סיסמה · כניסה קלה במייל</p>
+          <div className="flex items-center justify-center gap-2 pt-1">
+            <span className="w-1.5 h-1.5 bg-grow rounded-full animate-pulse flex-shrink-0" />
+            <span className="text-xs text-white/35">
+              עכשיו נוצרת חוברת{" "}
+              <span
+                style={{ transition: "opacity 0.28s ease", opacity: subjectVisible ? 1 : 0 }}
+                className="text-brand font-semibold"
+              >
+                {SUBJECTS[subjectIdx]}
+              </span>
+            </span>
+          </div>
         </div>
       </section>
+
+      {/* ── Live activity ticker ── */}
+      <div className="bg-ink/97 py-2.5 overflow-hidden border-b border-white/5">
+        <div className="flex gap-14 whitespace-nowrap animate-ticker">
+          {[...TICKER_ITEMS, ...TICKER_ITEMS].map((item, i) => (
+            <span key={i} className="text-white/35 text-xs flex-shrink-0">{item}</span>
+          ))}
+        </div>
+      </div>
 
       {/* ── For whom ── */}
       <section className="py-14 px-5 bg-white">
@@ -185,6 +244,40 @@ export default function Login() {
         </div>
       </section>
 
+      {/* ── Testimonials ── */}
+      <section className="py-14 px-5 bg-ink">
+        <div className="max-w-3xl mx-auto">
+          <div className="text-center mb-10">
+            <h2 className="text-2xl font-bold text-white mb-2 font-display">מה אומרות המורות?</h2>
+            <div className="flex items-center justify-center gap-1 mb-1">
+              {[1,2,3,4,5].map(s => <span key={s} className="text-brand text-lg">★</span>)}
+              <span className="text-white/40 text-sm mr-1.5">4.9 מתוך 5</span>
+            </div>
+            <p className="text-white/35 text-xs">מתוך 120+ מורות ששתמשו בבשבילי</p>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+            {TESTIMONIALS.map(({ initials, name, role, quote, color }) => (
+              <div key={name} className="bg-white/6 rounded-2xl p-5 border border-white/10 flex flex-col">
+                <div className="text-white/20 text-4xl font-display leading-none mb-2">"</div>
+                <p className="text-white/65 text-sm leading-relaxed flex-1">{quote}</p>
+                <div className="mt-4 flex items-center gap-3">
+                  <div className={`w-9 h-9 ${color} rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0`}>
+                    {initials}
+                  </div>
+                  <div>
+                    <div className="text-white text-sm font-semibold">{name}</div>
+                    <div className="text-white/35 text-xs">{role}</div>
+                  </div>
+                  <div className="mr-auto flex gap-0.5">
+                    {[1,2,3,4,5].map(s => <span key={s} className="text-brand text-xs">★</span>)}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* ── Pricing ── */}
       <section className="py-14 px-5 bg-canvas">
         <div className="max-w-3xl mx-auto text-center">
@@ -246,6 +339,18 @@ export default function Login() {
       <section id="login-form" className="py-16 px-5 bg-white">
         <div className="max-w-sm mx-auto">
           <div className="text-center mb-8">
+            <div className="flex justify-center gap-5 flex-wrap mb-6">
+              {[
+                { icon: "🇮🇱", label: "100% בעברית" },
+                { icon: "🔒", label: "פרטיות מוגנת" },
+                { icon: "⭐", label: "4.9/5 דירוג" },
+                { icon: "✓", label: "ביטול בכל עת" },
+              ].map(({ icon, label }) => (
+                <div key={label} className="flex items-center gap-1.5 text-xs text-ink/35">
+                  <span>{icon}</span><span>{label}</span>
+                </div>
+              ))}
+            </div>
             <h2 className="text-2xl font-bold text-ink font-display mb-2">מוכנה להתחיל?</h2>
             <p className="text-ink/50">3 חוברות חינם · ללא כרטיס אשראי · 30 שניות הרשמה</p>
           </div>

@@ -23,3 +23,15 @@ h1, h2, h3 {
   animation: shimmer 2s linear infinite;
   background-size: 200% 100%;
 }
+
+/* Activity ticker scroll */
+@keyframes ticker-scroll {
+  0%   { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+.animate-ticker {
+  animation: ticker-scroll 40s linear infinite;
+}
+.animate-ticker:hover {
+  animation-play-state: paused;
+}
