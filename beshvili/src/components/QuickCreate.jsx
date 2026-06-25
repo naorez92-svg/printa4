@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { supabase } from "../lib/supabase";
 import Preview from "./Preview";
 import BookletRating from "./BookletRating";
@@ -42,6 +42,7 @@ export default function QuickCreate({ student, onClose, onSaved, remaining, isPr
   const [error, setError]           = useState(null);
   const [shareToken, setShareToken] = useState(null);
   const [rateCountdown, setRateCountdown] = useState(null);
+  const streamAbortRef = useRef(null);
 
   useEffect(() => {
     if (!loading) { setLoadingMsgIdx(0); setStreamChars(0); return; }
@@ -62,6 +63,9 @@ export default function QuickCreate({ student, onClose, onSaved, remaining, isPr
     const t = setTimeout(() => setRateCountdown(c => c - 1), 1000);
     return () => clearTimeout(t);
   }, [rateCountdown]);
+
+  // Abort any in-flight SSE stream on unmount
+  useEffect(() => () => streamAbortRef.current?.abort(), []);
 
   const canSubmit = !loading && subject.length > 0;
 
@@ -93,10 +97,13 @@ export default function QuickCreate({ student, onClose, onSaved, remaining, isPr
     }
 
     const fnUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-booklet`;
+    const ctrl = new AbortController();
+    streamAbortRef.current = ctrl;
     let resp;
     try {
       resp = await fetch(fnUrl, {
         method: "POST",
+        signal: ctrl.signal,
         headers: {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${session.access_token}`,
@@ -106,6 +113,7 @@ export default function QuickCreate({ student, onClose, onSaved, remaining, isPr
       });
     } catch (e) {
       setLoading(false);
+      if (ctrl.signal.aborted) return;
       setError(`שגיאת רשת — ${String(e)}`);
       return;
     }
@@ -147,9 +155,15 @@ export default function QuickCreate({ student, onClose, onSaved, remaining, isPr
         }
       }
     } catch {
-      setLoading(false);
-      setError("שגיאה בקבלת הנתונים מהשרת");
-      return;
+      const partial = htmlAccumulated.trim();
+      if (partial.length > 8000 && (partial.includes("<!DOCTYPE") || partial.includes("<html"))) {
+        if (!partial.includes("</html>")) htmlAccumulated = partial + "\n</body></html>";
+        // Fall through to save the partial booklet
+      } else {
+        setLoading(false);
+        setError("החיבור נקטע — נסה שנית, רצוי עם פחות עמודים");
+        return;
+      }
     }
 
     setLoading(false);

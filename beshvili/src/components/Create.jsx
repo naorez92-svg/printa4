@@ -535,9 +535,12 @@ export default function Create({ onSaved, remaining, isPro, active = true }) {
             {/* Child photo upload */}
             <input type="file" ref={photoInputRef} accept="image/*" onChange={handlePhotoUpload} className="hidden" />
             <div className="flex items-center gap-3">
-              <div
+              <button
+                type="button"
+                aria-label="העלה תמונת פרופיל"
                 onClick={() => !loading && !photoUploading && photoInputRef.current?.click()}
-                className={`relative flex-shrink-0 w-12 h-12 rounded-full border-2 border-dashed cursor-pointer overflow-hidden flex items-center justify-center transition-colors ${photoUrl ? "border-grow" : "border-magic/30 hover:border-magic/60"}`}
+                disabled={loading || photoUploading}
+                className={`relative flex-shrink-0 w-12 h-12 rounded-full border-2 border-dashed overflow-hidden flex items-center justify-center transition-colors ${photoUrl ? "border-grow" : "border-magic/30 hover:border-magic/60"}`}
               >
                 {photoUploading ? (
                   <div className="w-4 h-4 border-2 border-magic border-t-transparent rounded-full animate-spin" />
@@ -546,7 +549,7 @@ export default function Create({ onSaved, remaining, isPro, active = true }) {
                 ) : (
                   <span className="text-lg">📷</span>
                 )}
-              </div>
+              </button>
               <div className="flex-1 text-right">
                 {photoUploading ? (
                   <p className="text-xs text-ink/50">טוען תמונה...</p>
@@ -669,18 +672,23 @@ export default function Create({ onSaved, remaining, isPro, active = true }) {
 
         {/* Answer key toggle — hidden in quick mode */}
         {mode !== "quick" && (
-          <label className="flex items-center justify-between gap-3 cursor-pointer select-none">
+          <div className="flex items-center justify-between gap-3">
             <div>
               <span className="text-sm font-medium text-ink">מפתח תשובות</span>
               <span className="text-xs text-ink/40 mr-2">דף תשובות בסוף החוברת</span>
             </div>
-            <div
+            <button
+              type="button"
+              role="switch"
+              aria-checked={withAnswerKey}
+              aria-label="מפתח תשובות"
               onClick={() => !loading && setWithAnswerKey(v => !v)}
-              className={`relative w-11 h-6 rounded-full transition-colors cursor-pointer ${withAnswerKey ? "bg-magic" : "bg-ink/20"}`}
+              disabled={loading}
+              className={`relative w-11 h-6 rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-magic ${withAnswerKey ? "bg-magic" : "bg-ink/20"}`}
             >
               <div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all ${withAnswerKey ? "right-0.5" : "left-0.5"}`} />
-            </div>
-          </label>
+            </button>
+          </div>
         )}
 
         {/* Rate limit countdown */}
