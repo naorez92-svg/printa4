@@ -7,13 +7,13 @@ import { FREE_LIMIT } from "../hooks/useProfile";
 import { useChildren } from "../hooks/useChildren";
 import { track } from "../hooks/useEvents";
 
-const WORLDS = ["כדורגל", "גיימינג", "חיות", "חלל", "בישול", "מוזיקה", "סוסים", "נינג'א", "פוקימון", "מינקראפט"];
+const WORLDS = ["כדורגל", "גיימינג", "חיות", "חלל", "בישול", "מוזיקה", "סוסים", "נינג'ה", "פוקימון", "מינקראפט"];
 const LEVELS = [["basic", "🌱 בסיסי"], ["medium", "⚡ בינוני"], ["advanced", "🚀 מתקדם"]];
 const TEMPLATES = [
   { icon: "📖", label: "הבנת הנקרא ג-ד",   f: { grade: "כיתה ג",  world: "כדורגל",  goal: "הבנת הנקרא: טקסט ספרותי, שאלות הבנה ואוצר מילים",            level: "basic"    } },
   { icon: "📖", label: "הבנת הנקרא ה-ו",   f: { grade: "כיתה ה",  world: "כדורגל",  goal: "הבנת הנקרא: טקסט ספרותי, שאלות הבנה ואסטרטגיות קריאה",       level: "medium"   } },
   { icon: "🔢", label: "מספרים עשרוניים",   f: { grade: "כיתה ה",  world: "גיימינג", goal: "מספרים עשרוניים: קריאה, כתיבה, השוואה, חיבור וחיסור",          level: "medium"   } },
-  { icon: "📖", label: "כיתה א — קריאה",   f: { grade: "כיתה א",  world: "חיות",    goal: "קריאת מילות בניקוד מלא ומשפטים פשוטים",                        level: "basic"    } },
+  { icon: "📖", label: "כיתה א — קריאה",   f: { grade: "כיתה א",  world: "חיות",    goal: "קריאת מילים בניקוד מלא ומשפטים פשוטים",                        level: "basic"    } },
   { icon: "➕", label: "כיתה ב — חיבור",   f: { grade: "כיתה ב",  world: "כדורגל",  goal: "חיבור וחיסור עד 100 ללא מעבר עשרת",                            level: "medium"   } },
   { icon: "✖️", label: "כיתה ג — כפל",     f: { grade: "כיתה ג",  world: "גיימינג", goal: "לוח כפל 6, 7, 8 — שינון ויישום",                               level: "medium"   } },
   { icon: "½",  label: "כיתה ד — שברים",   f: { grade: "כיתה ד",  world: "חלל",     goal: "שברים: חצי, שליש, רבע — זיהוי, חיבור, השוואה",                 level: "medium"   } },
@@ -211,7 +211,7 @@ export default function Create({ onSaved, remaining, isPro, active = true }) {
         // Fall through to save the partial booklet below
       } else {
         setLoading(false);
-        setError("גונריק:החיבור נקטע — נסה שנית, רצוי עם פחות עמודים");
+        setError("generic:החיבור נקטע — נסה שנית, רצוי עם פחות עמודים");
         return;
       }
     }
@@ -315,7 +315,7 @@ export default function Create({ onSaved, remaining, isPro, active = true }) {
     );
   }
 
-  // ── Quota exceeded screen ──────────────────────────────────────────────
+  // ── Quota exceeded screen ──────────────────────────────────────────────────
   if (error === "quota") {
     return (
       <>
@@ -361,7 +361,7 @@ export default function Create({ onSaved, remaining, isPro, active = true }) {
     );
   }
 
-  // ── Generated ─────────────────────────────────────────────────────
+  // ── Generated ──────────────────────────────────────────────────────────────
   if (html) {
     return (
       <section className="space-y-4">
@@ -385,7 +385,7 @@ export default function Create({ onSaved, remaining, isPro, active = true }) {
             <span className="text-2xl">⭐</span>
             <div className="flex-1">
               <p className="font-semibold text-ink text-sm">אהבת? נשארה לך עוד חוברת אחת חינמית</p>
-              <p className="text-xs text-ink/50 mt-0.5">שדרגי ל-₪19/חודש וצרי 5 חוברות בחודש</p>
+              <p className="text-xs text-ink/50 mt-0.5">שדרגי ל-₪19/חודש וצור 5 חוברות בחודש</p>
             </div>
             <button onClick={() => setShowUpgrade(true)} className="flex-shrink-0 bg-gradient-to-l from-brand to-magic text-white text-xs rounded-xl px-3 py-2 font-semibold hover:opacity-90 transition-opacity">
               שדרגי
@@ -438,18 +438,12 @@ export default function Create({ onSaved, remaining, isPro, active = true }) {
           )}
         </div>
         <div className="flex gap-1 bg-white/70 rounded-xl p-1 w-fit">
-          {[["טופס form", "📋 טופס"], ["מהיר quick", "⚡ דף מהיר"], ["חופשי free", "✍️ חופשי"]].map(([m, label]) => {
-            const modeKey = m.split(" ")[1] || m;
-            // map label prefix to mode key
-            const modeMap = { "טופס": "form", "מהיר": "quick", "חופשי": "free" };
-            const mk = Object.entries(modeMap).find(([k]) => label.includes(k))?.[1] || "form";
-            return (
-              <button key={mk} onClick={() => setMode(mk)}
-                className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all ${mode === mk ? "bg-white shadow text-ink" : "text-ink/50 hover:text-ink"}`}>
-                {label}
-              </button>
-            );
-          })}
+          {[["form", "📋 טופס"], ["quick", "⚡ דף מהיר"], ["free", "✍️ חופשי"]].map(([m, label]) => (
+            <button key={m} onClick={() => setMode(m)}
+              className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all ${mode === m ? "bg-white shadow text-ink" : "text-ink/50 hover:text-ink"}`}>
+              {label}
+            </button>
+          ))}
         </div>
       </div>
 
