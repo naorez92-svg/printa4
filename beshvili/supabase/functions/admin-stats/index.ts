@@ -48,8 +48,9 @@ Deno.serve(async (req) => {
   } catch {}
 
   const now = new Date();
-  const weekAgo      = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
-  const threeDaysAgo = new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000).toISOString();
+  const weekAgo      = new Date(now.getTime() - 7  * 24 * 60 * 60 * 1000).toISOString();
+  const threeDaysAgo = new Date(now.getTime() - 3  * 24 * 60 * 60 * 1000).toISOString();
+  const fourDaysAgo  = new Date(now.getTime() - 4  * 24 * 60 * 60 * 1000).toISOString();
   const todayStart   = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
   const monthStart   = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
 
@@ -74,7 +75,7 @@ Deno.serve(async (req) => {
     admin.from("profiles").select("id, plan, full_name, created_at, followup_sent_at"),
     admin.from("feedback").select("message, created_at, user_id").order("created_at", { ascending: false }).limit(15),
     admin.from("leads").select("name, phone, created_at").order("created_at", { ascending: false }).limit(15),
-    admin.from("booklets").select("user_id"),
+    admin.from("booklets").select("user_id, created_at"),
     admin.from("booklets").select("user_id, title, world, goal, created_at, difficulty_feedback").order("created_at", { ascending: false }).limit(200),
   ]);
 
@@ -86,10 +87,14 @@ Deno.serve(async (req) => {
   const profileMap: Record<string, { plan: string; full_name: string | null; followup_sent_at: string | null }> = {};
   (allProfiles ?? []).forEach(p => { profileMap[p.id] = p; });
 
-  // Booklet count per user (from ALL booklets for accurate retention metrics)
+  // Booklet count + last booklet date per user (from ALL booklets for accurate retention metrics)
   const bookletsByUser: Record<string, number> = {};
-  (allBookletUserIds ?? []).forEach(b => {
+  const lastBookletByUser: Record<string, string> = {};
+  (allBookletUserIds ?? []).forEach((b: { user_id: string; created_at: string }) => {
     bookletsByUser[b.user_id] = (bookletsByUser[b.user_id] ?? 0) + 1;
+    if (!lastBookletByUser[b.user_id] || b.created_at > lastBookletByUser[b.user_id]) {
+      lastBookletByUser[b.user_id] = b.created_at;
+    }
   });
 
   const planBreakdown: Record<string, number> = {};
@@ -125,6 +130,29 @@ Deno.serve(async (req) => {
     const plan = profileMap[u.id]?.plan ?? "free";
     return plan !== "admin" && u.created_at < threeDaysAgo && (bookletsByUser[u.id] ?? 0) === 0;
   }).length;
+
+  // Dormant: created 1+ booklets but last one was 4+ days ago — high-value retention targets
+  const dormantAll = users.filter(u => {
+    const plan = profileMap[u.id]?.plan ?? "free";
+    if (plan === "admin") return false;
+    const lastBooklet = lastBookletByUser[u.id];
+    return (bookletsByUser[u.id] ?? 0) >= 1 && lastBooklet && lastBooklet < fourDaysAgo;
+  });
+  const dormantCount = dormantAll.length;
+  const dormantUsers = dormantAll
+    .sort((a, b) => {
+      const la = lastBookletByUser[a.id] ?? "";
+      const lb = lastBookletByUser[b.id] ?? "";
+      return lb > la ? -1 : 1;
+    })
+    .slice(0, 20)
+    .map(u => ({
+      email: u.email,
+      name: profileMap[u.id]?.full_name ?? null,
+      bookletCount: bookletsByUser[u.id] ?? 0,
+      lastBookletAt: lastBookletByUser[u.id] ?? null,
+      plan: profileMap[u.id]?.plan ?? "free",
+    }));
 
   // Retention metrics
   const FREE_LIMIT_THRESHOLD = 3;
@@ -164,6 +192,7 @@ Deno.serve(async (req) => {
       plan: profileMap[u.id]?.plan ?? "free",
       name: profileMap[u.id]?.full_name,
       followupSent: profileMap[u.id]?.followup_sent_at,
+      lastBookletAt: lastBookletByUser[u.id] ?? null,
     }));
 
   // Funnel stats from events (last 7 days)
@@ -339,6 +368,8 @@ Deno.serve(async (req) => {
     retentionToThird,
     freeAtLimitCount,
     freeAtLimitUsers,
+    dormantCount,
+    dormantUsers,
     proposals: pendingProposals,
   }), { headers: { ...cors, "content-type": "application/json" } });
 });
