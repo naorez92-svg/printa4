@@ -8,7 +8,13 @@ import { FREE_LIMIT } from "../hooks/useProfile";
 import { useChildren } from "../hooks/useChildren";
 import { track } from "../hooks/useEvents";
 
-const WORLDS = ["כדורגל", "גיימינג", "חיות", "חלל", "בישול", "מוזיקה", "סוסים", "נינג'ה", "פוקימון", "מינקראפט"];
+const WORLDS = [
+  "כדורגל", "כדורסל", "גיימינג", "מינקראפט", "פוקימון",
+  "חיות", "סוסים", "דינוזאורים", "חלל", "ים וגלים",
+  "בישול ואפייה", "מוזיקה", "ריקוד", "אמנות וציור",
+  "נינג'ה", "קסמים", "רובוטיקה", "טבע ויערות",
+  "ספורט כללי", "מחשבים", "אחר",
+];
 const EXAM_GRADES   = ["כיתה ג", "כיתה ד", "כיתה ה", "כיתה ו"];
 const EXAM_SUBJECTS = [
   { id: "math",    label: "חשבון" },
@@ -74,6 +80,7 @@ export default function Create({ onSaved, remaining, isPro, active = true, bookl
   const [examSubject, setExamSubject] = useState("");
   const [examTopic,   setExamTopic]   = useState("");
   const [noEmojis,    setNoEmojis]    = useState(true);             // formal by default
+  const [customWorld, setCustomWorld] = useState("");
   const [loading, setLoading]     = useState(false);
   const [loadingMsgIdx, setLoadingMsgIdx] = useState(0);
   const [streamChars, setStreamChars] = useState(0);
@@ -134,14 +141,15 @@ export default function Create({ onSaved, remaining, isPro, active = true, bookl
     setLoading(true);
     setHtml(null);
     setError(null);
-    track("booklet_started", { mode, goal: mode === "exam" ? examTopic : f.goal, grade: mode === "exam" ? examGrade : f.grade, world: f.world });
+    const effectiveWorld = f.world === "אחר" ? customWorld.trim() || "נושא חופשי" : f.world;
+    track("booklet_started", { mode, goal: mode === "exam" ? examTopic : f.goal, grade: mode === "exam" ? examGrade : f.grade, world: effectiveWorld });
 
     // Ask for notification permission so we can alert when done (non-blocking)
     if ("Notification" in window && Notification.permission === "default") {
       Notification.requestPermission();
     }
 
-    const quickText = `דף תרגיל מהיר${f.childName ? ` עבור ${f.childName.trim()}` : ""}${f.grade ? `, כיתה ${f.grade}` : ""}. נושא: ${f.goal.trim()}${f.world ? `, עולם תוכן: ${f.world}` : ""}. צור עמוד A4 אחד עם 8–12 תרגילים מגוונים ומהנים. ללא שער ורפלקציה. קוד HTML גולמי בלבד.`;
+    const quickText = `דף תרגיל מהיר${f.childName ? ` עבור ${f.childName.trim()}` : ""}${f.grade ? `, כיתה ${f.grade}` : ""}. נושא: ${f.goal.trim()}${effectiveWorld ? `, עולם תוכן: ${effectiveWorld}` : ""}. צור עמוד A4 אחד עם 8–12 תרגילים מגוונים ומהנים. ללא שער ורפלקציה. קוד HTML גולמי בלבד.`;
 
     const body = mode === "free"
       ? { freeText: freeText.trim(), pageCount, withAnswerKey }
@@ -149,7 +157,7 @@ export default function Create({ onSaved, remaining, isPro, active = true, bookl
       ? { freeText: quickText, pageCount: 1, withAnswerKey: false }
       : mode === "exam"
       ? { examMode: true, examGrade, examSubject, examTopic, noEmojis, pageCount, withAnswerKey }
-      : { ...f, pageCount, withAnswerKey, ...(photoUrl ? { childPhotoUrl: photoUrl } : {}) };
+      : { ...f, world: effectiveWorld, pageCount, withAnswerKey, ...(photoUrl ? { childPhotoUrl: photoUrl } : {}) };
 
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) {
@@ -279,7 +287,7 @@ export default function Create({ onSaved, remaining, isPro, active = true, bookl
     const { data: inserted, error: insertErr } = await supabase.from("booklets").insert({
       user_id: session.user.id, title,
       child_name: f.childName || null, grade: f.grade || null,
-      world: f.world || null,
+      world: effectiveWorld || null,
       goal: mode === "free" ? freeText.trim().substring(0, 200) : f.goal,
       level: f.level, html: generatedHtml,
     }).select("id, share_token").single();
@@ -621,6 +629,16 @@ export default function Create({ onSaved, remaining, isPro, active = true, bookl
               <select className="w-full border border-ink/20 rounded-xl p-3 outline-none focus:border-magic bg-canvas/50 text-right" value={f.world} onChange={set("world")} disabled={loading}>
                 {WORLDS.map((w) => <option key={w}>{w}</option>)}
               </select>
+              {f.world === "אחר" && (
+                <input
+                  className="w-full border border-ink/20 rounded-xl p-3 mt-2 outline-none focus:border-magic text-right bg-canvas/50"
+                  placeholder="למשל: בלט, כדורעף, כישוף, ספרים... (כתוב כאן את הנושא)"
+                  value={customWorld}
+                  onChange={(e) => setCustomWorld(e.target.value)}
+                  disabled={loading}
+                  autoFocus
+                />
+              )}
             </div>
             <div>
               <textarea id="inp-goal" className="w-full border border-ink/20 rounded-xl p-3 outline-none focus:border-magic text-right resize-none bg-canvas/50" placeholder="מה לתרגל? * — למשל: חיבור וחיסור עד 100, הבנת הנקרא..." rows={2} value={f.goal} onChange={set("goal")} disabled={loading} />
@@ -691,6 +709,16 @@ export default function Create({ onSaved, remaining, isPro, active = true, bookl
             >
               {WORLDS.map((w) => <option key={w}>{w}</option>)}
             </select>
+            {f.world === "אחר" && (
+              <input
+                className="w-full border border-ink/20 rounded-xl p-3 mt-2 outline-none focus:border-magic text-right bg-canvas/50"
+                placeholder="למשל: בלט, כדורעף, כישוף, ספרים... (כתוב כאן את הנושא)"
+                value={customWorld}
+                onChange={(e) => setCustomWorld(e.target.value)}
+                disabled={loading}
+                autoFocus
+              />
+            )}
           </div>
         )}
 
