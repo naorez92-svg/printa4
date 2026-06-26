@@ -21,7 +21,7 @@ export function useProfile() {
     // bookletCount = total_booklets_created (lifetime, never decremented) so deleting
     // a booklet cannot reset the free-tier quota
     const [{ data: p }, { count: monthly }] = await Promise.all([
-      supabase.from("profiles").select("plan, full_name, total_booklets_created").eq("id", user.id).single(),
+      supabase.from("profiles").select("plan, full_name, total_booklets_created, teacher_display_name, teacher_tagline, teacher_phone, teacher_logo_url, teacher_color").eq("id", user.id).single(),
       supabase.from("booklets").select("*", { count: "exact", head: true }).eq("user_id", user.id).gte("created_at", monthStart),
     ]);
 

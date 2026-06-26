@@ -6,6 +6,7 @@ import Students from "../components/Students";
 import UpgradeModal from "../components/UpgradeModal";
 import FeedbackWidget from "../components/FeedbackWidget";
 import AdminPanel from "../components/AdminPanel";
+import BrandingSettings from "../components/BrandingSettings";
 import { useProfile, FREE_LIMIT } from "../hooks/useProfile";
 import InstallPWA from "../components/InstallPWA";
 
@@ -40,7 +41,11 @@ export default function Dashboard() {
   const [showUpgrade, setShowUpgrade] = useState(false);
   const { profile, plan, bookletCount, monthlyBookletCount, monthlyLimit, remaining, isPro, isAdmin, loading, refresh } = useProfile();
 
-  const tabs = [...NAV, ...(isAdmin ? [["admin", "🔐", "ניהול"]] : [])];
+  const tabs = [
+    ...NAV,
+    ...(isPro ? [["branding", "🎨", "מיתוג"]] : []),
+    ...(isAdmin ? [["admin", "🔐", "ניהול"]] : []),
+  ];
 
   return (
     <div className="min-h-screen bg-canvas" dir="rtl">
@@ -204,6 +209,7 @@ export default function Dashboard() {
           </div>
           {tab === "students" && <Students onBookletSaved={() => { refresh(); setTab("history"); }} remaining={remaining} isPro={isPro} />}
           {tab === "history" && <History />}
+          {tab === "branding" && isPro && <BrandingSettings profile={profile} onSaved={refresh} />}
           {tab === "admin" && isAdmin && <AdminPanel />}
         </main>
 
