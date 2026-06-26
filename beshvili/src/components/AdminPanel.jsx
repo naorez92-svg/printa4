@@ -10,7 +10,7 @@ const daysSince = (iso) => {
 
 // P&L constants
 const PLAN_PRICE          = { parent: 19, teacher: 59, pro: 30 };
-const COST_PER_BOOKLET_NIS = 0.80;
+const COST_PER_BOOKLET_NIS = 0.65;
 const SUPABASE_MONTHLY_NIS = 0;
 const VERCEL_MONTHLY_NIS   = 0;
 
@@ -412,7 +412,7 @@ export default function AdminPanel() {
             <div className="text-[10px] text-ink/40">ARPU</div>
           </div>
         </div>
-        <p className="text-[10px] text-ink/25 mt-2 text-center">עלות API מחושבת לפי הערכה — ~0.80 ₪/חוברת</p>
+        <p className="text-[10px] text-ink/25 mt-2 text-center">עלות API מחושבת לפי הערכה — ~0.65 ₪/חוברת (Sonnet + adaptive thinking)</p>
         {paidUsers > 0 && (
           <div className="mt-2 bg-grow/8 rounded-xl px-3 py-2 text-center border border-grow/15">
             <p className="text-xs font-bold text-grow">
