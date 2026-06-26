@@ -3,6 +3,10 @@ import { supabase } from "../lib/supabase";
 
 const fmt     = (iso) => iso ? new Date(iso).toLocaleDateString("he-IL", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) : "—";
 const fmtDate = (iso) => iso ? new Date(iso).toLocaleDateString("he-IL", { day: "2-digit", month: "2-digit" }) : "—";
+const daysSince = (iso) => {
+  if (!iso) return null;
+  return Math.floor((Date.now() - new Date(iso).getTime()) / (1000 * 60 * 60 * 24));
+};
 
 // P&L constants
 const PLAN_PRICE          = { parent: 19, teacher: 59, pro: 30 };
@@ -237,6 +241,51 @@ export default function AdminPanel() {
         </div>
       )}
 
+      {/* Dormant users — created booklets but stopped: highest-value retention targets */}
+      {(data.dormantCount ?? 0) > 0 && (
+        <div className="bg-white rounded-2xl p-4 border border-amber-200 shadow-sm">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="font-bold text-ink text-sm">😴 שקטות — היו פעילות, לא חזרו</h3>
+            <span className="bg-amber-100 text-amber-700 text-xs font-bold px-2.5 py-1 rounded-full">
+              {data.dormantCount}
+            </span>
+          </div>
+          <p className="text-[11px] text-ink/40 mb-3">
+            יצרו לפחות חוברת אחת — לא חזרו 4+ ימים. אלה הכי קרובות לחזרה — כבר הגיעו ל-aha moment.
+          </p>
+          <div className="space-y-1.5 max-h-48 overflow-y-auto">
+            {(data.dormantUsers ?? []).map((u, i) => {
+              const days = daysSince(u.lastBookletAt);
+              return (
+                <div key={i} className="flex justify-between items-center bg-canvas rounded-xl px-3 py-2">
+                  <div className="min-w-0 flex-1">
+                    {u.name && <p className="text-xs font-medium text-ink truncate">{u.name}</p>}
+                    <p className="text-xs text-ink/60 font-mono truncate">{u.email}</p>
+                    <p className="text-[10px] text-ink/30">{u.bookletCount} חוברות</p>
+                  </div>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    {days !== null && (
+                      <span className={`text-[11px] font-semibold px-1.5 py-0.5 rounded ${
+                        days <= 5 ? "text-amber-600 bg-amber-50" : "text-red-500 bg-red-50"
+                      }`}>
+                        {days}י' שקט
+                      </span>
+                    )}
+                    <button
+                      onClick={() => { try { navigator.clipboard?.writeText(u.email); } catch {} }}
+                      className="text-[10px] text-ink/30 hover:text-magic transition-colors px-2 py-1 rounded"
+                      title="העתק מייל"
+                    >
+                      📋
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Stats grid */}
       <div className="grid grid-cols-3 gap-3">
         {statCards.map(({ label, value, icon }) => (
@@ -364,6 +413,16 @@ export default function AdminPanel() {
           </div>
         </div>
         <p className="text-[10px] text-ink/25 mt-2 text-center">עלות API מחושבת לפי הערכה — ~0.80 ₪/חוברת</p>
+        {paidUsers > 0 && (
+          <div className="mt-2 bg-grow/8 rounded-xl px-3 py-2 text-center border border-grow/15">
+            <p className="text-xs font-bold text-grow">
+              LTV:CAC ≈ {Math.round((59 * 6) / (2.5 * COST_PER_BOOKLET_NIS))}x
+            </p>
+            <p className="text-[10px] text-ink/40 mt-0.5">
+              LTV ~₪{59 * 6} (מורה × 6 חודש) ÷ CAC ~₪{(2.5 * COST_PER_BOOKLET_NIS).toFixed(1)} (API free tier)
+            </p>
+          </div>
+        )}
       </div>
 
       {/* Plan breakdown + conversion rate */}
@@ -457,7 +516,7 @@ export default function AdminPanel() {
               <tr className="text-ink/40 border-b border-ink/5">
                 <th className="text-right pb-2 pr-1">מייל</th>
                 <th className="text-right pb-2 pr-1">הצטרף</th>
-                <th className="text-right pb-2 pr-1">כניסה</th>
+                <th className="text-right pb-2 pr-1">יצירה אחרונה</th>
                 <th className="text-right pb-2 pr-1">חוברות</th>
                 <th className="text-right pb-2 pr-1">תוכנית</th>
                 <th className="text-right pb-2 pr-1">פולואפ</th>
@@ -468,7 +527,15 @@ export default function AdminPanel() {
                 <tr key={u.id} className="border-b border-ink/5 last:border-0">
                   <td className="py-1.5 pr-1 text-ink/70 font-mono">{u.email}</td>
                   <td className="py-1.5 pr-1 text-ink/50">{fmtDate(u.createdAt)}</td>
-                  <td className="py-1.5 pr-1 text-ink/50">{fmtDate(u.lastSignIn)}</td>
+                  <td className="py-1.5 pr-1">
+                    {(() => {
+                      const days = daysSince(u.lastBookletAt);
+                      if (days === null) return <span className="text-ink/25 text-xs">—</span>;
+                      if (days === 0)    return <span className="text-grow text-xs font-medium">היום</span>;
+                      if (days <= 3)    return <span className="text-brand text-xs">{days}י'</span>;
+                      return <span className="text-red-400 text-xs font-medium">{days}י'</span>;
+                    })()}
+                  </td>
                   <td className="py-1.5 pr-1">
                     <span className={`font-bold ${
                       u.bookletCount === 0 ? "text-red-400" :
