@@ -20,7 +20,7 @@ function getCors(req: Request) {
     origin === "https://beshvili.com" ||
     origin === "http://localhost:5173" ||
     origin === "http://localhost:4173" ||
-    /^https:\/\/printa4-git-[^.]+\.vercel\.app$/.test(origin);
+    /^https:\/\/printa4-git-[a-z0-9-]+-naor-s-projects\.vercel\.app$/.test(origin);
   return {
     "Access-Control-Allow-Origin": allowed ? origin : "https://www.beshvili.com",
     "Vary": "Origin",
@@ -493,10 +493,11 @@ Deno.serve(async (req) => {
       .replace(/<\/?instructions?\b[^>]*>/gi, "")
       .replace(/<\/?INST\b[^>]*>/gi, "");
 
+    const stripNewlines = (s: string) => s.replace(/[\r\n\t]/g, " ").trim();
     // Teacher branding (only for teacher-plan users who set up their branding)
-    const teacherName    = isTeacher ? (profile?.teacher_display_name?.trim() ?? "") : "";
-    const teacherTagline = isTeacher ? (profile?.teacher_tagline?.trim() ?? "") : "";
-    const teacherPhone   = isTeacher ? (profile?.teacher_phone?.trim() ?? "") : "";
+    const teacherName    = isTeacher ? stripNewlines(profile?.teacher_display_name ?? "") : "";
+    const teacherTagline = isTeacher ? stripNewlines(profile?.teacher_tagline ?? "") : "";
+    const teacherPhone   = isTeacher ? stripNewlines(profile?.teacher_phone ?? "") : "";
     const teacherColor   = isTeacher ? (profile?.teacher_color ?? "purple") : "";
     const brandingBlock  = teacherName
       ? `\n\nמיתוג מורה:\nteacher_name: ${esc(teacherName)}\nteacher_tagline: ${esc(teacherTagline)}\nteacher_phone: ${esc(teacherPhone)}\nteacher_logo: ${safeTeacherLogo}\nteacher_color: ${teacherColor}`

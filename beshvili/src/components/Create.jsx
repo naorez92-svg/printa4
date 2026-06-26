@@ -206,6 +206,7 @@ export default function Create({ onSaved, remaining, isPro, active = true, bookl
       if (code === "rate_limited") { setError(`rate:${errData?.wait ?? 60}`); return; }
       if (code === "ai_overloaded") { setError("generic:השרת עמוס כרגע — נסי שוב בעוד דקה 🙏"); return; }
       if (code === "ai_timeout")    { setError("generic:הייצור לקח יותר מדי זמן — נסי עם פחות עמודים"); return; }
+      if (resp.status === 401)      { setError("generic:הסשן פג תוקף — רענן את הדף וכנסי מחדש"); return; }
       const detail = code || (rawBody.length < 80 ? rawBody : rawBody.substring(0, 60) + "…");
       setError(`generic:שגיאת שרת ${resp.status}${detail ? ` — ${detail}` : ""}`);
       return;
@@ -224,6 +225,8 @@ export default function Create({ onSaved, remaining, isPro, active = true, bookl
     let htmlAccumulated = "";
     let updateTimer = 0;
     let streamAborted = false;
+    let streamHadError = false;
+    let streamErrorMsg = null;
 
     try {
       while (true) {
@@ -246,9 +249,17 @@ export default function Create({ onSaved, remaining, isPro, active = true, bookl
                 setStreamChars(htmlAccumulated.length);
                 updateTimer = now;
               }
+            } else if (ev.type === "error") {
+              streamHadError = true;
+              const errType = ev.error?.type ?? "unknown";
+              streamErrorMsg = errType === "overloaded_error"
+                ? "generic:השרת עמוס כרגע — נסי שוב בעוד דקה 🙏"
+                : `generic:שגיאת AI — ${errType}`;
             }
           } catch {}
+          if (streamHadError) break;
         }
+        if (streamHadError) break;
       }
     } catch (streamErr) {
       wakeLock?.release().catch(() => {});
@@ -269,6 +280,8 @@ export default function Create({ onSaved, remaining, isPro, active = true, bookl
     wakeLock?.release().catch(() => {});
     setLoading(false);
     creatingRef.current = false;
+
+    if (streamHadError) { setError(streamErrorMsg); return; }
 
     // Strip all scripts + event-handler attributes from AI-generated HTML,
     // then restore the Tailwind CDN script (see src/lib/sanitize.js).
