@@ -20,6 +20,7 @@ function extractText(html) {
 
 export default function Preview({ html, onReset, shareToken, title, active = true }) {
   const containerRef = useRef(null); // outer div — measures available width
+  const iframeRef = useRef(null);
   const [scale, setScale]   = useState(1);
   const [iframeHeight, setIframeHeight] = useState(A4_H);
   const [copied, setCopied] = useState(false);
@@ -42,6 +43,7 @@ export default function Preview({ html, onReset, shareToken, title, active = tru
   useEffect(() => {
     const handler = (e) => {
       if (e.origin !== "null" && e.origin !== window.location.origin) return;
+      if (iframeRef.current && e.source !== iframeRef.current.contentWindow) return;
       const h = e.data?.height;
       if (e.data?.type === "beshvili_height" && typeof h === "number" && h > A4_H && h < 60000) {
         setIframeHeight(h);
@@ -169,6 +171,7 @@ export default function Preview({ html, onReset, shareToken, title, active = tru
         style={{ width: `${scaledW}px`, height: `${scaledHeight}px` }}
       >
         <iframe
+          ref={iframeRef}
           title="תצוגה מקדימית"
           srcDoc={injectHeightProbe(html)}
           sandbox="allow-scripts"
