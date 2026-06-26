@@ -131,7 +131,7 @@ export default function Create({ onSaved, remaining, isPro, active = true, bookl
   const canSubmit = !loading && (
     mode === "free"  ? freeText.trim().length > 5 :
     mode === "quick" ? f.goal.trim().length > 2 :
-    mode === "exam"  ? (examSubject.trim().length > 0 && examTopic.trim().length > 5) :
+    mode === "exam"  ? (examSubject.trim().length > 0 && examTopic.trim().length > 1) :
     !!(f.childName.trim() && f.goal.trim())
   );
 
@@ -142,7 +142,7 @@ export default function Create({ onSaved, remaining, isPro, active = true, bookl
     setHtml(null);
     setError(null);
     const effectiveWorld = f.world === "אחר" ? customWorld.trim() || "נושא חופשי" : f.world;
-    track("booklet_started", { mode, goal: mode === "exam" ? examTopic : f.goal, grade: mode === "exam" ? examGrade : f.grade, world: effectiveWorld });
+    track("booklet_started", { mode, goal: mode === "exam" ? examTopic : f.goal, grade: mode === "exam" ? examGrade : f.grade, world: mode === "exam" ? null : effectiveWorld });
 
     // Ask for notification permission so we can alert when done (non-blocking)
     if ("Notification" in window && Notification.permission === "default") {
@@ -287,8 +287,8 @@ export default function Create({ onSaved, remaining, isPro, active = true, bookl
     const { data: inserted, error: insertErr } = await supabase.from("booklets").insert({
       user_id: session.user.id, title,
       child_name: f.childName || null, grade: f.grade || null,
-      world: effectiveWorld || null,
-      goal: mode === "free" ? freeText.trim().substring(0, 200) : f.goal,
+      world: mode === "exam" ? null : (effectiveWorld || null),
+      goal: mode === "free" ? freeText.trim().substring(0, 200) : mode === "exam" ? examTopic : f.goal,
       level: f.level, html: generatedHtml,
     }).select("id, share_token").single();
     if (insertErr) { setError(`generic:שמירה נכשלה — ${insertErr.message}`); return; }

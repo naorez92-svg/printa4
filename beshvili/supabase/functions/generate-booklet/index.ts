@@ -524,10 +524,12 @@ Deno.serve(async (req) => {
     //   • Correct Bloom's taxonomy ordering across pages
     //   • Balanced page density (no empty or overflowing pages)
     // Net: ~31% cost reduction after thinking overhead, with quality improvement.
-    // max_tokens = HTML budget + 6000 thinking buffer, capped at 32K (Sonnet limit).
-    const htmlBudget = Math.max(8000, pageCount * 3800);
-    const THINKING_BUFFER = 6000;
-    const maxTokens = Math.min(32000, htmlBudget + THINKING_BUFFER);
+    // max_tokens = HTML budget + generous thinking buffer. Root-cause of "לא התקבל HTML תקין":
+    // adaptive thinking can consume 10-20K tokens before any text is generated; a 6K buffer
+    // left the HTML budget starved to zero. Sonnet 4.6 supports up to 64K output tokens.
+    const htmlBudget = Math.max(12000, pageCount * 4500);
+    const THINKING_BUFFER = 20000;
+    const maxTokens = Math.min(64000, htmlBudget + THINKING_BUFFER);
 
     const anthropicResp = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
