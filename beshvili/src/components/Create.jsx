@@ -447,7 +447,7 @@ export default function Create({ onSaved, remaining, isPro, active = true, bookl
                 שדרגי
               </button>
             </div>
-            <div className="text-[10px] text-ink/40 text-center">הצטרפי ל-50+ מורות שכבר חוסכות זמן עם בשבילי 🎓</div>
+            <div className="text-[10px] text-ink/40 text-center">הצטרפי ל-120+ מורות שכבר חוסכות זמן עם בשבילי 🎓</div>
           </div>
         )}
 

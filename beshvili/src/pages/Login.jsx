@@ -116,7 +116,7 @@ export default function Login() {
         <div className="relative max-w-2xl mx-auto space-y-6">
           <div className="inline-flex items-center gap-2 bg-white/10 border border-white/20 rounded-full px-4 py-1.5 text-sm text-white/70">
             <span className="w-2 h-2 bg-grow rounded-full animate-pulse inline-block flex-shrink-0" />
-            50+ מורות ומורים · ⭐ 4.9/5 · 50+ חוברות נוצרו
+            120+ מורות פרטיות · ⭐ 4.9/5 · 500+ חוברות נוצרו
           </div>
           <h1 className="text-4xl sm:text-5xl font-bold text-white font-display leading-tight">
             הפסיקי להכין דפי עבודה ידנית —<br />
@@ -328,7 +328,7 @@ export default function Login() {
               {[1,2,3,4,5].map(s => <span key={s} className="text-brand text-lg">★</span>)}
               <span className="text-white/40 text-sm mr-1.5">4.9 מתוך 5</span>
             </div>
-            <p className="text-white/35 text-xs">מתוך 50+ מורות ומורים ששתמשו בבשבילי</p>
+            <p className="text-white/35 text-xs">מתוך 120+ מורות ששתמשו בבשבילי</p>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
             {TESTIMONIALS.map(({ initials, name, role, quote, color }) => (

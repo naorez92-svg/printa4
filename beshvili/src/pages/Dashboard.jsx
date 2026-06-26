@@ -155,7 +155,7 @@ export default function Dashboard() {
               <div className="flex gap-2 flex-wrap">
                 <div className="flex items-center gap-1.5 bg-white/60 rounded-full px-2.5 py-1 text-[10px] text-ink/60">
                   <span className="w-1.5 h-1.5 bg-grow rounded-full" />
-                  50+ מורות כבר חוסכות זמן
+                  120+ מורות כבר חוסכות זמן
                 </div>
                 <div className="flex items-center gap-1.5 bg-white/60 rounded-full px-2.5 py-1 text-[10px] text-ink/60">
                   <span>⚡</span>
