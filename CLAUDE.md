@@ -92,3 +92,21 @@ Fonts: `font-display` = Baloo 2, `font-sans` = Assistant (Hebrew), `font-mono` =
 - Development branch: `claude/local-setup-question-r1i1jb`
 - Production: `main`
 - Push frontend/UI changes to both branches. For git conflicts with `main`, use `mcp__github__push_files` to push directly rather than rebasing.
+
+## Periodic Bug & Security Review — REQUIRED
+
+After every batch of **3 or more file changes** (new feature, bugfix, or refactor), run BOTH of the following before pushing:
+1. `/code-review` — scan for correctness bugs, logic errors, and regressions
+2. `/security-review` — scan for XSS, SSRF, injection, auth bypass, exposed secrets
+
+Do this proactively without being asked. If findings are found, fix them before the push.
+
+## Manual Steps — ALWAYS Send Exact Links
+
+Whenever a task requires the user to take a manual action (run a migration, create a bucket, set a secret, trigger a workflow, etc.), **always include the exact URL** the user should open. Never describe where to click — give the direct link.
+
+Examples:
+- DB migration → `https://github.com/naorez92-svg/printa4/actions/workflows/deploy-supabase.yml` → click **Run workflow**
+- Supabase Storage → `https://supabase.com/dashboard/project/gywpdzkvkdisonuzhsib/storage/buckets`
+- Supabase Edge Function secrets → `https://supabase.com/dashboard/project/gywpdzkvkdisonuzhsib/settings/functions`
+- Supabase Table Editor → `https://supabase.com/dashboard/project/gywpdzkvkdisonuzhsib/editor`
