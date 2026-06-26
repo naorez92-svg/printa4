@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { supabase } from "../lib/supabase";
+import { sanitizeBookletHtml } from "../lib/sanitize";
 import Preview from "./Preview";
 import BookletRating from "./BookletRating";
 import UpgradeModal from "./UpgradeModal";
@@ -167,8 +168,9 @@ export default function QuickCreate({ student, onClose, onSaved, remaining, isPr
     }
 
     setLoading(false);
-    const finalHtml = htmlAccumulated.trim();
-    if (!finalHtml || !finalHtml.includes("<")) { setError("לא התקבל HTML תקין מהשרת"); return; }
+    const rawHtml = htmlAccumulated.trim();
+    if (!rawHtml || !rawHtml.includes("<")) { setError("לא התקבל HTML תקין מהשרת"); return; }
+    const finalHtml = sanitizeBookletHtml(rawHtml);
 
     const { data: { user } } = await supabase.auth.getUser();
     const { data: inserted } = await supabase.from("booklets").insert({
