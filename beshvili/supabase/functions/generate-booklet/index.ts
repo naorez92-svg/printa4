@@ -516,20 +516,13 @@ Deno.serve(async (req) => {
 
     // ── 6. Generate (streaming — client receives SSE, sees HTML in real time) ──
     //
-    // Model: claude-sonnet-4-6 + adaptive thinking
-    // Reasoning: Sonnet output costs $15/1M vs Opus $25/1M (40% cheaper).
-    // Adaptive thinking adds ~2-4K planning tokens but produces:
-    //   • More coherent multi-page quest narratives
-    //   • Better SVG design for color-by-answer activities
-    //   • Correct Bloom's taxonomy ordering across pages
-    //   • Balanced page density (no empty or overflowing pages)
-    // Net: ~31% cost reduction after thinking overhead, with quality improvement.
-    // max_tokens = HTML budget + generous thinking buffer. Root-cause of "לא התקבל HTML תקין":
-    // adaptive thinking can consume 10-20K tokens before any text is generated; a 6K buffer
-    // left the HTML budget starved to zero. Sonnet 4.6 supports up to 64K output tokens.
-    const htmlBudget = Math.max(12000, pageCount * 4500);
-    const THINKING_BUFFER = 20000;
-    const maxTokens = Math.min(64000, htmlBudget + THINKING_BUFFER);
+    // Model: claude-sonnet-4-6, thinking DISABLED.
+    // Root-cause of persistent "לא התקבל HTML תקין" errors: adaptive thinking consumed
+    // the ENTIRE token budget (20-33K tokens) on reasoning before generating any HTML,
+    // leaving htmlAccumulated empty on the client. For structured HTML generation with
+    // a 260-line system prompt, thinking adds zero quality benefit — the instructions
+    // are explicit and exhaustive. Disabling thinking means all max_tokens go to HTML.
+    const maxTokens = Math.min(64000, Math.max(20000, pageCount * 6000));
 
     const anthropicResp = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
@@ -544,7 +537,6 @@ Deno.serve(async (req) => {
         model: "claude-sonnet-4-6",
         max_tokens: maxTokens,
         stream: true,
-        thinking: { type: "adaptive" },
         system: [{ type: "text", text: activeSystem, cache_control: { type: "ephemeral" } }],
         messages: [{ role: "user", content: activeUserMsg }],
       }),
