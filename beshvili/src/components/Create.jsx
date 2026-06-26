@@ -9,6 +9,15 @@ import { useChildren } from "../hooks/useChildren";
 import { track } from "../hooks/useEvents";
 
 const WORLDS = ["כדורגל", "גיימינג", "חיות", "חלל", "בישול", "מוזיקה", "סוסים", "נינג'ה", "פוקימון", "מינקראפט"];
+const EXAM_GRADES   = ["כיתה ג", "כיתה ד", "כיתה ה", "כיתה ו"];
+const EXAM_SUBJECTS = [
+  { id: "math",    label: "חשבון" },
+  { id: "hebrew",  label: "שפה עברית" },
+  { id: "science", label: "מדעים" },
+  { id: "english", label: "אנגלית" },
+  { id: "bible",   label: "תנ\"ך" },
+  { id: "history", label: "היסטוריה" },
+];
 const LEVELS = [["basic", "🌱 בסיסי"], ["medium", "⚡ בינוני"], ["advanced", "🚀 מתקדם"]];
 const TEMPLATES = [
   { icon: "📖", label: "הבנת הנקרא ג-ד",   f: { grade: "כיתה ג",  world: "כדורגל",  goal: "הבנת הנקרא: טקסט ספרותי, שאלות הבנה ואוצר מילים",            level: "basic"    } },
@@ -61,6 +70,10 @@ export default function Create({ onSaved, remaining, isPro, active = true, bookl
   const [freeText, setFreeText]   = useState("");
   const [pageCount, setPageCount] = useState(5);
   const [withAnswerKey, setWithAnswerKey] = useState(false);
+  const [examGrade,   setExamGrade]   = useState(EXAM_GRADES[2]);  // כיתה ה default
+  const [examSubject, setExamSubject] = useState("");
+  const [examTopic,   setExamTopic]   = useState("");
+  const [noEmojis,    setNoEmojis]    = useState(true);             // formal by default
   const [loading, setLoading]     = useState(false);
   const [loadingMsgIdx, setLoadingMsgIdx] = useState(0);
   const [streamChars, setStreamChars] = useState(0);
@@ -111,7 +124,8 @@ export default function Create({ onSaved, remaining, isPro, active = true, bookl
   const canSubmit = !loading && (
     mode === "free"  ? freeText.trim().length > 5 :
     mode === "quick" ? f.goal.trim().length > 2 :
-    f.childName.trim() && f.goal.trim()
+    mode === "exam"  ? (examSubject.trim().length > 0 && examTopic.trim().length > 5) :
+    !!(f.childName.trim() && f.goal.trim())
   );
 
   const create = useCallback(async () => {
@@ -120,7 +134,7 @@ export default function Create({ onSaved, remaining, isPro, active = true, bookl
     setLoading(true);
     setHtml(null);
     setError(null);
-    track("booklet_started", { mode, goal: f.goal, grade: f.grade, world: f.world });
+    track("booklet_started", { mode, goal: mode === "exam" ? examTopic : f.goal, grade: mode === "exam" ? examGrade : f.grade, world: f.world });
 
     // Ask for notification permission so we can alert when done (non-blocking)
     if ("Notification" in window && Notification.permission === "default") {
@@ -133,6 +147,8 @@ export default function Create({ onSaved, remaining, isPro, active = true, bookl
       ? { freeText: freeText.trim(), pageCount, withAnswerKey }
       : mode === "quick"
       ? { freeText: quickText, pageCount: 1, withAnswerKey: false }
+      : mode === "exam"
+      ? { examMode: true, examGrade, examSubject, examTopic, noEmojis, pageCount, withAnswerKey }
       : { ...f, pageCount, withAnswerKey, ...(photoUrl ? { childPhotoUrl: photoUrl } : {}) };
 
     const { data: { session } } = await supabase.auth.getSession();
@@ -255,6 +271,8 @@ export default function Create({ onSaved, remaining, isPro, active = true, bookl
       ? freeText.trim().substring(0, 60) + (freeText.length > 60 ? "…" : "")
       : mode === "quick"
       ? `⚡ ${f.goal.trim().substring(0, 50)}`
+      : mode === "exam"
+      ? `📝 מבחן ${examSubject}${examGrade ? ` — ${examGrade}` : ""}${examTopic ? `: ${examTopic.substring(0, 40)}` : ""}`
       : `${f.childName} — ${f.goal}`;
     const title = streamAborted ? `${baseTitle} (חלקי)` : baseTitle;
 
@@ -397,7 +415,7 @@ export default function Create({ onSaved, remaining, isPro, active = true, bookl
 
   // ── Generated ──────────────────────────────────────────────────────────────
   if (html) {
-    const timeSaved = mode === "quick" ? 15 : pageCount * 8;
+    const timeSaved = mode === "quick" ? 15 : mode === "exam" ? pageCount * 6 : pageCount * 8;
     // Total lifetime savings (45 min avg × total booklets ever created, including this one)
     const totalSavedMin = (bookletCount) * 45; // bookletCount already includes the new one after onSaved()
     const totalSavedStr = totalSavedMin >= 120
@@ -495,10 +513,10 @@ export default function Create({ onSaved, remaining, isPro, active = true, bookl
             <span className="text-xs text-red-500 font-medium">נגמרה המכסה החינמית</span>
           )}
         </div>
-        <div className="flex gap-1 bg-white/70 rounded-xl p-1 w-fit">
-          {[["form", "📋 טופס"], ["quick", "⚡ דף מהיר"], ["free", "✍️ חופשי"]].map(([m, label]) => (
+        <div className="flex gap-1 bg-white/70 rounded-xl p-1 w-fit flex-wrap">
+          {[["form", "📋 טופס"], ["quick", "⚡ דף מהיר"], ["free", "✍️ חופשי"], ["exam", "📝 מבחן"]].map(([m, label]) => (
             <button key={m} onClick={() => { setMode(m); try { localStorage.setItem("beshvili_mode", m); } catch {} }}
-              className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all ${mode === m ? "bg-white shadow text-ink" : "text-ink/50 hover:text-ink"}`}>
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${mode === m ? "bg-white shadow text-ink" : "text-ink/50 hover:text-ink"}`}>
               {label}
             </button>
           ))}
@@ -507,6 +525,7 @@ export default function Create({ onSaved, remaining, isPro, active = true, bookl
           {mode === "quick" && "⚡ דף תרגיל אחד, מוכן ב-30 שניות — מושלם לשיעורי בית"}
           {mode === "form"  && "📋 חוברת מלאה עם שער אישי, תרגילים ורפלקציה — מותאמת לילד"}
           {mode === "free"  && "✍️ כתוב בחופשיות מה שרוצה — ה-AI יייצר לפי הוראותיך"}
+          {mode === "exam"  && "📝 מבחן רשמי לכיתות ג-ו — מוכן להגשה לבית ספר ללא עיצוב מוגזם"}
         </p>
       </div>
 
@@ -684,19 +703,103 @@ export default function Create({ onSaved, remaining, isPro, active = true, bookl
           />
         )}
 
+        {/* Exam mode */}
+        {mode === "exam" && (
+          <div className="space-y-4">
+            <div className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs text-slate-600 flex items-center gap-2">
+              <span>📋</span>
+              <span>מבחן רשמי מוכן להגשה · עיצוב קלאסי · שחור-לבן</span>
+            </div>
+
+            {/* Grade */}
+            <div>
+              <p className="text-xs text-ink/40 mb-1.5 font-medium">כיתה</p>
+              <div className="flex gap-2">
+                {EXAM_GRADES.map(g => (
+                  <button key={g} type="button" onClick={() => setExamGrade(g)} disabled={loading}
+                    className={`flex-1 rounded-xl p-2 text-sm font-medium border transition-colors ${examGrade === g ? "bg-ink text-white border-ink shadow-sm" : "bg-canvas/50 border-ink/15 text-ink/60 hover:border-ink/40"}`}>
+                    {g.replace("כיתה ", "")}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Subject */}
+            <div>
+              <p className="text-xs text-ink/40 mb-1.5 font-medium">מקצוע <span className="text-red-400">*</span></p>
+              <div className="flex flex-wrap gap-2">
+                {EXAM_SUBJECTS.map(s => (
+                  <button key={s.id} type="button" onClick={() => setExamSubject(s.label)} disabled={loading}
+                    className={`rounded-xl px-3 py-2 text-sm font-medium border transition-colors ${examSubject === s.label ? "bg-ink text-white border-ink shadow-sm" : "bg-canvas/50 border-ink/15 text-ink/60 hover:border-ink/40"}`}>
+                    {s.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Topic */}
+            <div>
+              <p className="text-xs text-ink/40 mb-1.5 font-medium">נושא המבחן <span className="text-red-400">*</span></p>
+              <textarea
+                className="w-full border border-ink/20 rounded-xl p-3 outline-none focus:border-magic text-right resize-none bg-canvas/50"
+                placeholder="למשל: כפל וחילוק עד 100 · שברים פשוטים · הבנת הנקרא — טקסט עיוני"
+                rows={2}
+                value={examTopic}
+                onChange={e => setExamTopic(e.target.value)}
+                disabled={loading}
+                autoFocus
+              />
+            </div>
+
+            {/* No-emoji toggle */}
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <span className="text-sm font-medium text-ink">ללא אימוג'ים</span>
+                <span className="text-xs text-ink/40 mr-2">מסמך רשמי לבית ספר</span>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={noEmojis}
+                aria-label="ללא אימוג'ים"
+                onClick={() => !loading && setNoEmojis(v => !v)}
+                disabled={loading}
+                className={`relative w-11 h-6 rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ink ${noEmojis ? "bg-ink" : "bg-ink/20"}`}
+              >
+                <div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all ${noEmojis ? "right-0.5" : "left-0.5"}`} />
+              </button>
+            </div>
+          </div>
+        )}
+
         <div className="border-t border-ink/5" />
 
         {/* Page count selector — hidden in quick mode */}
         {mode !== "quick" && <div>
           <p className="text-xs text-ink/40 mb-2 font-medium">כמות עמודים</p>
           <div className="flex gap-2">
-            {PAGE_OPTIONS.map((n) => (
-              <button key={n} onClick={() => setPageCount(n)} disabled={loading}
-                className={`flex-1 rounded-xl p-2 text-sm font-medium border transition-colors ${pageCount === n ? "bg-brand text-white border-brand shadow-sm" : "bg-canvas/50 border-ink/15 text-ink/60 hover:border-brand/50"}`}>
-                {n} עמ'
-              </button>
-            ))}
+            {PAGE_OPTIONS.map((n) => {
+              const isLocked = !isPro && n > 5;
+              return (
+                <button
+                  key={n}
+                  onClick={() => { if (isLocked) { openUpgrade(); return; } setPageCount(n); }}
+                  disabled={loading}
+                  className={`flex-1 rounded-xl p-2 text-sm font-medium border transition-colors relative ${
+                    isLocked
+                      ? "bg-canvas/30 border-ink/10 text-ink/30 cursor-pointer"
+                      : pageCount === n
+                      ? "bg-brand text-white border-brand shadow-sm"
+                      : "bg-canvas/50 border-ink/15 text-ink/60 hover:border-brand/50"
+                  }`}
+                >
+                  {isLocked && <span className="absolute -top-1 -right-1 text-[9px]">🔒</span>}
+                  {n} עמ'
+                </button>
+              );
+            })}
           </div>
+          {!isPro && <p className="text-[10px] text-ink/30 mt-1 text-center">7 ו-10 עמודים זמינים בתוכנית בתשלום</p>}
         </div>}
 
         {/* Answer key toggle — hidden in quick mode */}
@@ -737,9 +840,11 @@ export default function Create({ onSaved, remaining, isPro, active = true, bookl
         {/* Submit / loading */}
         {loading ? (
           <div className="text-center py-8 space-y-3">
-            {f.childName && (
+            {mode === "exam" ? (
+              <p className="text-ink font-display font-semibold">📝 מכין מבחן {examSubject}{examGrade ? ` — ${examGrade}` : ""}</p>
+            ) : f.childName ? (
               <p className="text-magic font-display font-semibold">✨ יוצרת חוברת עבור {f.childName}</p>
-            )}
+            ) : null}
             <div className="flex justify-center gap-1">
               {[0, 1, 2].map((i) => (
                 <div key={i} className="w-2.5 h-2.5 rounded-full bg-magic animate-bounce" style={{ animationDelay: `${i * 0.15}s` }} />
@@ -773,7 +878,7 @@ export default function Create({ onSaved, remaining, isPro, active = true, bookl
         ) : (
           <button onClick={create} disabled={!canSubmit}
             className="w-full bg-gradient-to-l from-brand to-magic text-white rounded-xl p-3.5 font-display font-semibold disabled:opacity-40 hover:opacity-90 transition-opacity shadow-sm">
-            {mode === "quick" ? "⚡ צור דף מהיר (עמוד אחד)" : `✨ צור חוברת (${pageCount} עמ')`}
+            {mode === "quick" ? "⚡ צור דף מהיר (עמוד אחד)" : mode === "exam" ? `📝 צור מבחן (${pageCount} עמ')` : `✨ צור חוברת (${pageCount} עמ')`}
             {canSubmit && <span className="mr-2 text-white/60 text-xs font-normal">Ctrl+Enter</span>}
           </button>
         )}

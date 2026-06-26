@@ -367,7 +367,7 @@ export default function Login() {
               <div className="text-3xl font-bold text-magic mb-1 font-display">₪59<span className="text-sm font-normal text-ink/40">/חודש</span></div>
               <div className="text-xs text-magic/60 font-semibold mb-4">≈ ₪3 לחוברת · 20 שעות הכנה שנחסכות</div>
               <ul className="space-y-2 text-sm text-ink/70 mb-5 flex-1">
-                {["20 חוברות לחודש", "עד 20 עמודים לחוברת", "מפתח תשובות אוטומטי", "ניהול תלמידים", "שמירה בענן לצמיתות", "תמיכה אישית ישירה"].map((f) => (
+                {["20 חוברות לחודש", "עד 20 עמודים לחוברת", "מיתוג אישי — לוגו + שם על כל חוברת", "מבחנים רשמיים ללא אימוג'ים", "מפתח תשובות אוטומטי", "ניהול תלמידים + ארכיון בענן", "תמיכה אישית ישירה"].map((f) => (
                   <li key={f} className="flex items-center gap-2"><span className="text-magic font-bold">✓</span>{f}</li>
                 ))}
               </ul>
@@ -382,7 +382,7 @@ export default function Login() {
               <div className="text-3xl font-bold text-ink mb-1 font-display">₪0</div>
               <div className="text-xs text-ink/40 mb-4">לתמיד · ללא כרטיס אשראי</div>
               <ul className="space-y-2 text-sm text-ink/70 mb-5">
-                {["3 חוברות להתנסות", "עד 10 עמודים", "שמירה בענן"].map((f) => (
+                {["3 חוברות להתנסות", "עד 5 עמודים", "שמירה בענן"].map((f) => (
                   <li key={f} className="flex items-center gap-2"><span className="text-grow">✓</span>{f}</li>
                 ))}
               </ul>
