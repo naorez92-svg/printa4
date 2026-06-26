@@ -311,7 +311,7 @@ export default function Create({ onSaved, remaining, isPro, active = true, bookl
         });
       } catch {}
     }
-  }, [canSubmit, mode, freeText, f, pageCount, withAnswerKey, onSaved, photoUrl]);
+  }, [canSubmit, mode, freeText, f, pageCount, withAnswerKey, onSaved, photoUrl, examGrade, examSubject, examTopic, noEmojis, customWorld]);
 
   useEffect(() => {
     if (!active) return;
