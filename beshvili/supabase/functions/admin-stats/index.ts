@@ -39,11 +39,13 @@ Deno.serve(async (req) => {
 
   // Parse body for flags
   let shouldGenerateProposals = false;
+  let shouldGenerateInsight = false;
   try {
     const text = await req.text();
     if (text) {
       const parsed = JSON.parse(text);
       shouldGenerateProposals = parsed.generateProposals === true;
+      shouldGenerateInsight = parsed.generateInsight === true;
     }
   } catch {}
 
@@ -430,6 +432,84 @@ Deno.serve(async (req) => {
     }
   }
 
+  // ── AI strategic insight (on-demand) ──────────────────────────────────────
+  // One agent that crunches every metric into a single conclusion: are we on the
+  // right track, what does the data mean, and the #1 thing to fix next.
+  let insight: Record<string, unknown> | null = null;
+  if (shouldGenerateInsight) {
+    try {
+      const apiKey = Deno.env.get("ANTHROPIC_API_KEY");
+      if (apiKey) {
+        const PLAN_PRICE: Record<string, number> = { parent: 19, teacher: 59, pro: 30 };
+        const mrr = Object.entries(planBreakdown)
+          .reduce((s, [plan, n]) => s + (PLAN_PRICE[plan] ?? 0) * (n as number), 0);
+        const paidUsers = Object.entries(planBreakdown)
+          .reduce((s, [plan, n]) => s + (PLAN_PRICE[plan] ? (n as number) : 0), 0);
+
+        // Compact, factual snapshot — everything the agent reasons over.
+        const snapshot = {
+          users_total: users.length,
+          users_this_week: usersThisWeek,
+          non_admin_users: totalNonAdminUsers,
+          paid_users: paidUsers,
+          mrr_ils: mrr,
+          plan_breakdown: planBreakdown,
+          booklets_total: totalBooklets ?? 0,
+          booklets_this_month: bookletsThisMonth ?? 0,
+          activation_made_a_booklet: usersWithAnyBooklet,
+          retention_2nd_booklet: retentionToSecond,
+          retention_3rd_booklet: retentionToThird,
+          churn_risk_users: churnRiskCount,
+          dormant_users: dormantCount,
+          free_users_at_limit: freeAtLimitCount,
+          leads_7d: funnelStats.leads,
+          funnel_7d: funnelStats,
+          acquisition_7d: {
+            visitors: analytics.visitors,
+            signups: analytics.signups,
+            activated: analytics.activated,
+            email_submitted: analytics.emailSubmitted,
+          },
+          traffic_sources_7d: analytics.sources,
+          virality_7d: { shares: analytics.shares, public_views: analytics.publicViews },
+          generation_errors_7d: analytics.errors,
+          paywall_hits_7d: analytics.paywallHits,
+        };
+
+        const sys = `אתה אנליסט מוצר וצמיחה בכיר. נתונים על SaaS ישראלי קטן בשלב מוקדם שמייצר חוברות עבודה לילדים ב-AI (תוכניות: חינם 3 חוברות, הורה 19₪, מורה 59₪). תפקידך: לקמט את כל הנתונים למסקנה אחת ברורה. היה כן, חד, וספציפי — בלי קלישאות. אם הדאטה דלילה מדי למסקנה בטוחה, אמור זאת. החזר אך ורק JSON תקין בלי טקסט מסביב, במבנה: {"direction":"good"|"mixed"|"needs_attention","headline":"משפט אחד שמסכם איפה אנחנו","reading":"2-4 משפטים: מה הנתונים אומרים באמת, מה עובד ומה לא","biggest_lever":"הדבר הבודד הכי חשוב לשפר עכשיו ולמה דווקא הוא","watch":"מדד אחד לעקוב אחריו בשבוע הקרוב"}. כל הטקסט בעברית.`;
+        const userMsg = `הנתונים (חלון 7 ימים היכן שמצוין):\n${JSON.stringify(snapshot, null, 2)}`;
+
+        const aiResp = await fetch("https://api.anthropic.com/v1/messages", {
+          method: "POST",
+          signal: AbortSignal.timeout(60_000),
+          headers: { "content-type": "application/json", "x-api-key": apiKey, "anthropic-version": "2023-06-01" },
+          body: JSON.stringify({
+            model: "claude-opus-4-8",
+            max_tokens: 1500,
+            system: sys,
+            messages: [{ role: "user", content: userMsg }],
+          }),
+        });
+        if (aiResp.ok) {
+          const data = await aiResp.json();
+          const textOut = (data?.content ?? []).filter((b: { type: string }) => b.type === "text").map((b: { text: string }) => b.text).join("").trim();
+          const fallback = { direction: "mixed", headline: textOut.slice(0, 200), reading: textOut, biggest_lever: "", watch: "" };
+          const jsonMatch = textOut.match(/\{[\s\S]*\}/);
+          try {
+            insight = jsonMatch ? JSON.parse(jsonMatch[0]) : fallback;
+          } catch {
+            insight = fallback; // model emitted prose with a stray brace — show the text
+          }
+          (insight as Record<string, unknown>).generated_at = new Date().toISOString();
+        } else {
+          console.error("insight AI error:", await aiResp.text());
+        }
+      }
+    } catch (e) {
+      console.error("insight generation failed:", e);
+    }
+  }
+
   return new Response(JSON.stringify({
     totalUsers: users.length,
     usersThisWeek,
@@ -444,6 +524,8 @@ Deno.serve(async (req) => {
     recentFeedback:     recentFeedback ?? [],
     recentLeads:        recentLeads ?? [],
     funnelStats,
+    analytics,
+    insight,
     difficultyBreakdown,
     ratedBooklets,
     churnRiskCount,

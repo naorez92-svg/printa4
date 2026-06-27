@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { supabase } from "../lib/supabase";
 import { track } from "../hooks/useEvents";
+import Logo from "../components/Logo";
 
 const GoogleIcon = () => (
   <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
@@ -136,12 +137,13 @@ export default function Login() {
       <nav className="sticky top-0 z-20 bg-white/90 backdrop-blur border-b border-ink/5">
         <div className="max-w-4xl mx-auto px-5 py-3 flex justify-between items-center">
           <div className="flex items-center gap-2">
-            <span className="text-2xl">📚</span>
+            <Logo size={28} />
             <span className="font-bold text-ink text-lg font-display">בשבילי<span className="text-brand">·</span></span>
           </div>
+          {/* Outline (not gradient) so the single hero CTA wins the eye. */}
           <button
             onClick={() => goToLoginForm("nav")}
-            className="bg-gradient-to-l from-brand to-magic text-white text-sm rounded-xl px-4 py-2 font-medium hover:opacity-90 transition-opacity shadow-sm"
+            className="border border-magic/40 text-magic text-sm rounded-xl px-4 py-2 font-medium hover:bg-magic/5 transition-colors"
           >
             כניסה חינמית ✨
           </button>
@@ -401,7 +403,7 @@ export default function Login() {
           <p className="text-xs text-magic/70 font-medium mb-10">מורה פרטית = ₪120/שעה · חוברת בבשבילי = ₪3 · החישוב פשוט 🧮</p>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
             {/* Teacher — most prominent, shown first on mobile */}
-            <div className="bg-gradient-to-br from-magic/10 to-brand/10 rounded-2xl p-6 border-2 border-magic/30 shadow-lg text-right relative overflow-hidden flex flex-col order-first sm:order-last">
+            <div className="bg-gradient-to-br from-magic/10 to-brand/10 rounded-2xl p-6 border-2 border-magic/40 shadow-float sm:scale-105 text-right relative overflow-hidden flex flex-col order-first sm:order-last">
               <div className="absolute top-3 left-3 bg-magic text-white text-xs rounded-full px-2.5 py-1 font-semibold">מומלץ למורות</div>
               <div className="text-2xl mb-2">🚀 מורה פרטית</div>
               <div className="text-3xl font-bold text-magic mb-1 font-display">₪59<span className="text-sm font-normal text-ink/40">/חודש</span></div>

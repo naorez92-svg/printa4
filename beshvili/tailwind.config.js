@@ -14,6 +14,12 @@ export default {
         sans: ['"Assistant"', "sans-serif"],
         mono: ['"Rubik"', "sans-serif"],
       },
+      boxShadow: {
+        // Layered, brand-tinted depth — replaces flat shadow-sm for real hierarchy.
+        card:  "0 4px 24px -8px rgba(32,24,74,0.12)",
+        float: "0 12px 40px -12px rgba(108,92,231,0.30), 0 4px 12px -6px rgba(32,24,74,0.10)",
+        glow:  "0 0 0 1px rgba(108,92,231,0.10), 0 8px 30px -8px rgba(108,92,231,0.35)",
+      },
     },
   },
   plugins: [],

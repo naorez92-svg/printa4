@@ -9,6 +9,7 @@ import AdminPanel from "../components/AdminPanel";
 import BrandingSettings from "../components/BrandingSettings";
 import { useProfile, FREE_LIMIT } from "../hooks/useProfile";
 import InstallPWA from "../components/InstallPWA";
+import Logo from "../components/Logo";
 
 const NAV = [
   ["create",   "✨", "צור חוברת"],
@@ -55,7 +56,7 @@ export default function Dashboard() {
         {/* Logo */}
         <div className="px-6 py-5 border-b border-white/10">
           <div className="flex items-center gap-2">
-            <span className="text-2xl">📚</span>
+            <Logo size={30} />
             <span className="font-bold text-white text-xl font-display">בשבילי<span className="text-brand">·</span></span>
           </div>
           {!loading && (
@@ -108,7 +109,7 @@ export default function Dashboard() {
       <header className="lg:hidden sticky top-0 z-10 bg-ink shadow-md">
         <div className="px-4 py-3 flex justify-between items-center">
           <div className="flex items-center gap-2">
-            <span className="text-xl">📚</span>
+            <Logo size={24} />
             <span className="font-bold text-white text-base font-display">בשבילי<span className="text-brand">·</span></span>
           </div>
           <div className="flex items-center gap-2">

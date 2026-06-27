@@ -56,6 +56,8 @@ export default function AdminPanel() {
   const [error, setError]         = useState("");
   const [proposals, setProposals] = useState([]);
   const [regenerating, setRegenerating] = useState(false);
+  const [insight, setInsight] = useState(null);
+  const [insightLoading, setInsightLoading] = useState(false);
 
   const [sending, setSending]           = useState(false);
   const [sendResult, setSendResult]     = useState("");
@@ -85,6 +87,15 @@ export default function AdminPanel() {
       const phone = proposal.action_payload?.phone ?? "972509139137";
       window.open(`https://wa.me/${phone}?text=${msg}`, "_blank");
     }
+  };
+
+  const generateInsight = async () => {
+    setInsightLoading(true);
+    const { data: res } = await supabase.functions.invoke("admin-stats", {
+      body: { generateInsight: true },
+    });
+    if (res?.insight) setInsight(res.insight);
+    setInsightLoading(false);
   };
 
   const regenerateProposals = async () => {
@@ -154,8 +165,51 @@ export default function AdminPanel() {
   const convSignupActive = pct(an.activated, an.signups + an.logins);
   const errorTotal = (an.errors ?? []).reduce((s, e) => s + e.count, 0);
 
+  const INSIGHT_META = {
+    good:            { label: "כיוון חיובי",      emoji: "🟢", ring: "border-grow/30",  bg: "from-grow/10 to-grow/5",   text: "text-grow"  },
+    mixed:           { label: "תמונה מעורבת",     emoji: "🟡", ring: "border-brand/30", bg: "from-brand/10 to-brand/5", text: "text-brand" },
+    needs_attention: { label: "דורש תשומת לב",    emoji: "🔴", ring: "border-red-300",  bg: "from-red-50 to-red-50/40", text: "text-red-600" },
+  };
+  const im = INSIGHT_META[insight?.direction] ?? INSIGHT_META.mixed;
+
   return (
     <div className="space-y-6">
+
+      {/* ── AI strategic insight — one conclusion from all the data ──────── */}
+      <div className={`rounded-2xl p-5 border-2 shadow-sm bg-gradient-to-bl ${insight ? `${im.ring} ${im.bg}` : "border-magic/20 from-magic/5 to-brand/5"}`}>
+        <div className="flex items-center justify-between mb-2">
+          <h3 className="font-bold text-ink text-sm flex items-center gap-2">
+            <span className="text-lg">🧠</span> תובנת AI — המסקנה מכל הנתונים
+          </h3>
+          <button
+            onClick={generateInsight}
+            disabled={insightLoading}
+            className="text-xs bg-magic/10 text-magic px-3 py-1.5 rounded-xl font-medium disabled:opacity-40 hover:bg-magic/20 transition-colors flex-shrink-0"
+          >
+            {insightLoading ? "מנתח…" : insight ? "↻ רענן" : "⚡ נתח עכשיו"}
+          </button>
+        </div>
+        {insight ? (
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <span className={`text-xs font-bold px-2.5 py-1 rounded-full bg-white/70 ${im.text}`}>{im.emoji} {im.label}</span>
+            </div>
+            <p className="text-base font-bold text-ink leading-snug">{insight.headline}</p>
+            {insight.reading && <p className="text-sm text-ink/70 leading-relaxed">{insight.reading}</p>}
+            {insight.biggest_lever && (
+              <div className="bg-white/70 rounded-xl p-3 border border-ink/5">
+                <p className="text-[11px] font-bold text-magic mb-0.5">🎯 המהלך הכי חשוב עכשיו</p>
+                <p className="text-sm text-ink/80 leading-relaxed">{insight.biggest_lever}</p>
+              </div>
+            )}
+            {insight.watch && (
+              <p className="text-xs text-ink/50">👁 מדד לעקוב אחריו השבוע: <span className="font-medium text-ink/70">{insight.watch}</span></p>
+            )}
+          </div>
+        ) : (
+          <p className="text-xs text-ink/50">לחצי "נתח עכשיו" — ה-AI יקרא את כל המשפך, ההמרות, הצמיחה והתקלות, ויחזיר מסקנה אחת: האם אנחנו בכיוון הנכון ומה הדבר הבא לשפר.</p>
+        )}
+      </div>
 
       {/* Agent proposals */}
       {proposals.length > 0 ? (
