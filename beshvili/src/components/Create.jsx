@@ -25,20 +25,21 @@ const EXAM_SUBJECTS = [
   { id: "history", label: "היסטוריה" },
 ];
 const LEVELS = [["basic", "🌱 בסיסי"], ["medium", "⚡ בינוני"], ["advanced", "🚀 מתקדם"]];
+// First 6 are the most broadly-useful (shown by default); the rest appear under the "עוד" toggle.
 const TEMPLATES = [
   { icon: "📖", label: "הבנת הנקרא ג-ד",   f: { grade: "כיתה ג",  world: "כדורגל",  goal: "הבנת הנקרא: טקסט ספרותי, שאלות הבנה ואוצר מילים",            level: "basic"    } },
-  { icon: "📖", label: "הבנת הנקרא ה-ו",   f: { grade: "כיתה ה",  world: "כדורגל",  goal: "הבנת הנקרא: טקסט ספרותי, שאלות הבנה ואסטרטגיות קריאה",       level: "medium"   } },
-  { icon: "🔢", label: "מספרים עשרוניים",   f: { grade: "כיתה ה",  world: "גיימינג", goal: "מספרים עשרוניים: קריאה, כתיבה, השוואה, חיבור וחיסור",          level: "medium"   } },
-  { icon: "📖", label: "כיתה א — קריאה",   f: { grade: "כיתה א",  world: "חיות",    goal: "קריאת מילים בניקוד מלא ומשפטים פשוטים",                        level: "basic"    } },
   { icon: "➕", label: "כיתה ב — חיבור",   f: { grade: "כיתה ב",  world: "כדורגל",  goal: "חיבור וחיסור עד 100 ללא מעבר עשרת",                            level: "medium"   } },
   { icon: "✖️", label: "כיתה ג — כפל",     f: { grade: "כיתה ג",  world: "גיימינג", goal: "לוח כפל 6, 7, 8 — שינון ויישום",                               level: "medium"   } },
   { icon: "½",  label: "כיתה ד — שברים",   f: { grade: "כיתה ד",  world: "חלל",     goal: "שברים: חצי, שליש, רבע — זיהוי, חיבור, השוואה",                 level: "medium"   } },
+  { icon: "🔄", label: "חזרה לפני בחינה",  f: { grade: "",         world: "גיימינג", goal: "חזרה כללית: ארבע פעולות, שברים, אחוזים, בעיות",                level: "medium"   } },
+  { icon: "📋", label: "שיעורי בית שבועיים", f: { grade: "כיתה ג", world: "כדורגל", goal: "שיעורי בית שבועיים: קריאה, כתיבה וחשבון — תרגילים לכל יום", level: "medium" } },
+  { icon: "📖", label: "הבנת הנקרא ה-ו",   f: { grade: "כיתה ה",  world: "כדורגל",  goal: "הבנת הנקרא: טקסט ספרותי, שאלות הבנה ואסטרטגיות קריאה",       level: "medium"   } },
+  { icon: "🔢", label: "מספרים עשרוניים",   f: { grade: "כיתה ה",  world: "גיימינג", goal: "מספרים עשרוניים: קריאה, כתיבה, השוואה, חיבור וחיסור",          level: "medium"   } },
+  { icon: "📖", label: "כיתה א — קריאה",   f: { grade: "כיתה א",  world: "חיות",    goal: "קריאת מילים בניקוד מלא ומשפטים פשוטים",                        level: "basic"    } },
   { icon: "📐", label: "כיתה ה — שטח",     f: { grade: "כיתה ה",  world: "בישול",   goal: "שטח והיקף: ריבוע, מלבן, משולש",                                level: "advanced" } },
   { icon: "%",  label: "כיתה ו — אחוזים",  f: { grade: "כיתה ו",  world: "מוזיקה",  goal: "אחוזים: חישוב, הסקה, בעיות מילוליות",                          level: "advanced" } },
   { icon: "📝", label: "מבחן חצי שנתי",    f: { grade: "",         world: "כללי",    goal: "מבחן חצי שנתי: חשבון, שפה, הבנת הנקרא",                        level: "advanced" } },
-  { icon: "🔄", label: "חזרה לפני בחינה",  f: { grade: "",         world: "גיימינג", goal: "חזרה כללית: ארבע פעולות, שברים, אחוזים, בעיות",                level: "medium"   } },
   { icon: "🌟", label: "העשרה מתקדמת",     f: { grade: "",         world: "חלל",     goal: "חשיבה מתמטית: פאזלים, לוגיקה, חשיבה מחוץ לקופסה",             level: "advanced" } },
-  { icon: "📋", label: "שיעורי בית שבועיים", f: { grade: "כיתה ג", world: "כדורגל", goal: "שיעורי בית שבועיים: קריאה, כתיבה וחשבון — תרגילים לכל יום", level: "medium" } },
   { icon: "🎯", label: "תרגול ממוקד דיסלקציה", f: { grade: "כיתה ב", world: "חיות", goal: "קריאה וכתיבה: אותיות דומות, מילים בניקוד, הבנת משפט קצר", level: "basic" } },
 ];
 const GOAL_PICKS = [
@@ -98,6 +99,9 @@ export default function Create({ onSaved, remaining, isPro, active = true, bookl
   const [photoUploading, setPhotoUploading] = useState(false);
   const photoInputRef = useRef(null);
   const [recentTmpl, setRecentTmpl] = useState(null);
+  const [showAllTemplates, setShowAllTemplates] = useState(false);  // collapse 14→6 by default
+  const firstTimer = bookletCount === 0;
+  const [showMoreModes, setShowMoreModes] = useState(false);        // first-timers: hide free/exam behind disclosure
   const creatingRef   = useRef(false);   // prevent double-submit
   const streamAbortRef = useRef(null);   // cancel in-flight SSE on unmount
 
@@ -553,14 +557,34 @@ export default function Create({ onSaved, remaining, isPro, active = true, bookl
             <span className="text-xs text-red-500 font-medium">נגמרה המכסה החינמית</span>
           )}
         </div>
-        <div className="flex gap-1 bg-white/70 rounded-xl p-1 w-fit flex-wrap">
-          {[["form", "📋 טופס"], ["quick", "⚡ דף מהיר"], ["free", "✍️ חופשי"], ["exam", "📝 מבחן"]].map(([m, label]) => (
-            <button key={m} onClick={() => { if (m !== mode) track("create_mode_switched", { from: mode, to: m }); setMode(m); try { localStorage.setItem("beshvili_mode", m); } catch {} }}
+        {(() => {
+          const switchMode = (m) => { if (m !== mode) track("create_mode_switched", { from: mode, to: m }); setMode(m); try { localStorage.setItem("beshvili_mode", m); } catch {} };
+          const primaryModes  = [["quick", "⚡ דף מהיר"], ["form", "📋 טופס"]];
+          const advancedModes = [["free", "✍️ חופשי"], ["exam", "📝 מבחן"]];
+          // First-timers (bookletCount === 0) see only the two primary modes up front;
+          // free/exam sit behind an "עוד אפשרויות" disclosure to cut first-impression overload.
+          const showAdvanced = !firstTimer || showMoreModes || mode === "free" || mode === "exam";
+          const visibleModes = firstTimer && !showAdvanced ? primaryModes : [...primaryModes, ...advancedModes];
+          const tabBtn = ([m, label]) => (
+            <button key={m} onClick={() => switchMode(m)}
               className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${mode === m ? "bg-white shadow text-ink" : "text-ink/50 hover:text-ink"}`}>
               {label}
             </button>
-          ))}
-        </div>
+          );
+          return (
+            <div className="flex items-center gap-2 flex-wrap">
+              <div className="flex gap-1 bg-white/70 rounded-xl p-1 w-fit flex-wrap">
+                {visibleModes.map(tabBtn)}
+              </div>
+              {firstTimer && !showAdvanced && (
+                <button type="button" onClick={() => setShowMoreModes(true)}
+                  className="text-xs text-ink/40 hover:text-magic transition-colors underline underline-offset-2">
+                  עוד אפשרויות ▾
+                </button>
+              )}
+            </div>
+          );
+        })()}
         <p className="text-xs text-ink/40 mt-2">
           {mode === "quick" && "⚡ דף תרגיל אחד, מוכן ב-30 שניות — מושלם לשיעורי בית"}
           {mode === "form"  && "📋 חוברת מלאה עם שער אישי, תרגילים ורפלקציה — מותאמת לילד"}
@@ -570,16 +594,22 @@ export default function Create({ onSaved, remaining, isPro, active = true, bookl
       </div>
 
       <div className="p-5 space-y-4">
-        {/* Templates */}
+        {/* Templates — show 6 by default, rest behind "עוד" toggle to reduce overload */}
         <div>
           <p className="text-xs text-ink/50 mb-2 font-semibold">👇 בחר נושא להתחיל — או מלא בעצמך למטה</p>
           <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
-            {TEMPLATES.map((t) => (
+            {(showAllTemplates ? TEMPLATES : TEMPLATES.slice(0, 6)).map((t) => (
               <button key={t.label} onClick={() => applyTmpl(t)}
                 className={`flex-shrink-0 border rounded-full px-3 py-1 text-xs transition-colors whitespace-nowrap ${recentTmpl === t.label ? "border-magic bg-magic/10 text-magic font-semibold" : "border-ink/15 text-ink/70 hover:border-magic hover:text-magic"}`}>
                 {t.icon} {t.label}
               </button>
             ))}
+            {TEMPLATES.length > 6 && (
+              <button type="button" onClick={() => setShowAllTemplates(v => !v)}
+                className="flex-shrink-0 text-xs text-ink/40 hover:text-magic transition-colors whitespace-nowrap px-2 py-1 underline underline-offset-2">
+                {showAllTemplates ? "פחות ▴" : "עוד ▾"}
+              </button>
+            )}
           </div>
         </div>
 

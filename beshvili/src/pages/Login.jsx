@@ -12,6 +12,70 @@ const GoogleIcon = () => (
   </svg>
 );
 
+// ── Branded inline-SVG icon system ──
+// Flat, geometric, rounded — matches Logo.jsx style (1–3 brand colors per icon).
+// Brand: ink #20184A · brand #F4A02C · magic #6C5CE7 · grow #1FB58F
+const iconBase = { viewBox: "0 0 100 100", "aria-hidden": "true" };
+
+// Teacher / private tutor — a graduation cap (flat).
+const IconTeacher = ({ size = 32, className = "" }) => (
+  <svg width={size} height={size} {...iconBase} className={className}>
+    <path d="M50 22 92 40 50 58 8 40z" fill="#6C5CE7" />
+    <path d="M28 50v16c0 6 10 12 22 12s22-6 22-12V50L50 60z" fill="#F4A02C" />
+    <rect x="89" y="40" width="4" height="26" rx="2" fill="#6C5CE7" />
+    <circle cx="91" cy="68" r="5" fill="#F4A02C" />
+  </svg>
+);
+
+// Classroom teacher — a school building (flat).
+const IconClass = ({ size = 32, className = "" }) => (
+  <svg width={size} height={size} {...iconBase} className={className}>
+    <path d="M50 14 88 36H12z" fill="#1FB58F" />
+    <rect x="20" y="36" width="60" height="48" rx="6" fill="#1FB58F" />
+    <rect x="34" y="50" width="14" height="14" rx="3" fill="#F7F6FB" />
+    <rect x="52" y="50" width="14" height="14" rx="3" fill="#F7F6FB" />
+    <rect x="42" y="68" width="16" height="16" rx="3" fill="#20184A" />
+  </svg>
+);
+
+// Parent / child — figure with a star (flat).
+const IconParent = ({ size = 32, className = "" }) => (
+  <svg width={size} height={size} {...iconBase} className={className}>
+    <circle cx="42" cy="30" r="16" fill="#F4A02C" />
+    <path d="M16 84c0-16 12-26 26-26s26 10 26 26z" fill="#F4A02C" />
+    <path d="M74 18l5 11 12 2-9 9 2 12-10-6-10 6 2-12-9-9 12-2z" fill="#6C5CE7" />
+  </svg>
+);
+
+// Step 1 — write / pencil (flat).
+const IconWrite = ({ size = 32, className = "" }) => (
+  <svg width={size} height={size} {...iconBase} className={className}>
+    <rect x="20" y="18" width="40" height="64" rx="20" transform="rotate(-45 40 50)" fill="#6C5CE7" />
+    <path d="M26 70l-6 14 14-6z" fill="#F4A02C" />
+    <rect x="58" y="22" width="14" height="14" rx="3" transform="rotate(45 65 29)" fill="#20184A" />
+  </svg>
+);
+
+// Step 2 — AI spark / wand (flat).
+const IconSpark = ({ size = 32, className = "" }) => (
+  <svg width={size} height={size} {...iconBase} className={className}>
+    <path d="M48 8l8 26 26 8-26 8-8 26-8-26-26-8 26-8z" fill="#6C5CE7" />
+    <path d="M78 60l4 12 12 4-12 4-4 12-4-12-12-4 12-4z" fill="#F4A02C" />
+  </svg>
+);
+
+// Step 3 — printer (flat).
+const IconPrint = ({ size = 32, className = "" }) => (
+  <svg width={size} height={size} {...iconBase} className={className}>
+    <rect x="28" y="14" width="44" height="22" rx="4" fill="#20184A" />
+    <rect x="16" y="34" width="68" height="34" rx="8" fill="#6C5CE7" />
+    <circle cx="72" cy="48" r="4" fill="#1FB58F" />
+    <rect x="30" y="58" width="40" height="28" rx="4" fill="#F4A02C" />
+    <rect x="38" y="66" width="24" height="4" rx="2" fill="#20184A" opacity="0.4" />
+    <rect x="38" y="74" width="24" height="4" rx="2" fill="#20184A" opacity="0.4" />
+  </svg>
+);
+
 const scrollTo = (id) => document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
 
 const SUBJECTS = ["חשבון 📐", "עברית ✍️", "אנגלית 🌍", "מדעים 🔬", "היסטוריה 📜", "גיאוגרפיה 🗺️"];
@@ -191,78 +255,6 @@ export default function Login() {
         </div>
       </section>
 
-      {/* ── Live activity ticker ── */}
-      <div className="bg-ink/97 py-2.5 overflow-hidden border-b border-white/5">
-        <div className="flex gap-14 whitespace-nowrap animate-ticker">
-          {[...TICKER_ITEMS, ...TICKER_ITEMS].map((item, i) => (
-            <span key={i} className="text-white/35 text-xs flex-shrink-0">{item}</span>
-          ))}
-        </div>
-      </div>
-
-      {/* ── For whom ── */}
-      <section className="py-14 px-5 bg-white">
-        <div className="max-w-3xl mx-auto text-center">
-          <h2 className="text-2xl font-bold text-ink mb-2 font-display">בנויה עבור אנשי חינוך</h2>
-          <p className="text-ink/50 mb-10 text-sm">מורה פרטית, מחנכת, או הורה שרוצה לעזור — בשבילי עובדת בשבילך</p>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-            {[
-              { icon: "🎓", title: "מורה פרטית", desc: "חוברת ייחודית לכל תלמיד, בדיוק לפי הקשיים שלו. לא עוד שעות הכנה — 60 שניות במקום שעה", bg: "bg-gradient-to-br from-magic/15 to-magic/5", border: "border-magic/30", highlight: true },
-              { icon: "🏫", title: "מחנכת כיתה", desc: "מבחן חצי שנתי, חוברת חזרה לפני בחינה, חוברת העשרה — לכל הכיתה בכמה לחיצות", bg: "bg-gradient-to-br from-grow/10 to-grow/5", border: "border-grow/20" },
-              { icon: "👩‍👧", title: "הורה", desc: "תרגול בעולם שהילד אוהב — כדורגל, גיימינג, חיות. לומד בלי להרגיש שהוא לומד", bg: "bg-gradient-to-br from-brand/10 to-brand/5", border: "border-brand/20" },
-            ].map(({ icon, title, desc, bg, border, highlight }) => (
-              <div key={title} className={`${bg} rounded-2xl p-6 text-center border ${border} shadow-sm ${highlight ? "ring-2 ring-magic/20 shadow-magic/10" : ""}`}>
-                {highlight && <div className="text-xs font-bold text-magic bg-magic/10 rounded-full px-3 py-1 inline-block mb-3">הכי פופולרי ⭐</div>}
-                <div className="text-4xl mb-3">{icon}</div>
-                <h3 className="font-bold text-ink mb-2 font-display">{title}</h3>
-                <p className="text-ink/60 text-sm leading-relaxed">{desc}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ── ROI strip ── */}
-      <section className="py-8 px-5 bg-gradient-to-l from-magic/10 to-brand/10 border-y border-magic/10">
-        <div className="max-w-3xl mx-auto">
-          <div className="grid grid-cols-3 gap-4 text-center">
-            {[
-              { num: "3+", label: "שעות חינם בשבוע", sub: "שחוסכת מורה פרטית" },
-              { num: "60″", label: "זמן יצירת חוברת", sub: "במקום שעה של הכנה" },
-              { num: "₪3", label: "עלות לחוברת", sub: "בתוכנית מורה" },
-            ].map(({ num, label, sub }) => (
-              <div key={label}>
-                <div className="text-2xl sm:text-3xl font-bold text-magic font-display">{num}</div>
-                <div className="text-xs sm:text-sm font-semibold text-ink mt-0.5">{label}</div>
-                <div className="text-xs text-ink/40 mt-0.5 hidden sm:block">{sub}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ── How it works ── */}
-      <section className="py-14 px-5 bg-canvas">
-        <div className="max-w-3xl mx-auto text-center">
-          <h2 className="text-2xl font-bold text-ink mb-2 font-display">איך זה עובד?</h2>
-          <p className="text-ink/50 mb-10 text-sm">3 שלבים פשוטים — תוך פחות מדקה</p>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-            {[
-              { num: "01", icon: "✍️", title: "בחרי תלמיד ונושא", desc: "שם, כיתה, העולם האהוב, יעד פדגוגי — או פשוט כתבי מה תרצי בחופשיות" },
-              { num: "02", icon: "⚡", title: "AI יוצר תוך 60 שניות", desc: "חוברת עבודה מלאה עם תרגילים, עמודים ומפתח תשובות — הכל בעברית, מותאם לרמת הילד" },
-              { num: "03", icon: "🖨️", title: "הדפסי ומסרי", desc: "לחצי הדפס ← שמרי כ-PDF — קובץ A4 מוכן, כיתה של 30 ילדים תוך 3 דקות" },
-            ].map(({ num, icon, title, desc }) => (
-              <div key={num} className="relative bg-white rounded-2xl p-6 border border-ink/5 shadow-sm">
-                <div className="absolute -top-3 right-4 text-xs font-bold text-white bg-gradient-to-l from-brand to-magic rounded-full px-2.5 py-1">{num}</div>
-                <div className="text-3xl mb-3 mt-2">{icon}</div>
-                <h3 className="font-bold text-ink mb-2">{title}</h3>
-                <p className="text-ink/60 text-sm leading-relaxed">{desc}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
       {/* ── Booklet Preview ── */}
       <section className="py-14 px-5 bg-white">
         <div className="max-w-4xl mx-auto">
@@ -334,6 +326,78 @@ export default function Login() {
                 <span className="text-white/60 text-xs font-normal">חינם, 60 שניות</span>
               </button>
             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ── Live activity ticker ── */}
+      <div className="bg-ink/97 py-2.5 overflow-hidden border-b border-white/5">
+        <div className="flex gap-14 whitespace-nowrap animate-ticker">
+          {[...TICKER_ITEMS, ...TICKER_ITEMS].map((item, i) => (
+            <span key={i} className="text-white/35 text-xs flex-shrink-0">{item}</span>
+          ))}
+        </div>
+      </div>
+
+      {/* ── For whom ── */}
+      <section className="py-14 px-5 bg-white">
+        <div className="max-w-3xl mx-auto text-center">
+          <h2 className="text-2xl font-bold text-ink mb-2 font-display">בנויה עבור אנשי חינוך</h2>
+          <p className="text-ink/50 mb-10 text-sm">מורה פרטית, מחנכת, או הורה שרוצה לעזור — בשבילי עובדת בשבילך</p>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+            {[
+              { Icon: IconTeacher, title: "מורה פרטית", desc: "חוברת ייחודית לכל תלמיד, בדיוק לפי הקשיים שלו. לא עוד שעות הכנה — 60 שניות במקום שעה", bg: "bg-gradient-to-br from-magic/15 to-magic/5", border: "border-magic/30", highlight: true },
+              { Icon: IconClass, title: "מחנכת כיתה", desc: "מבחן חצי שנתי, חוברת חזרה לפני בחינה, חוברת העשרה — לכל הכיתה בכמה לחיצות", bg: "bg-gradient-to-br from-grow/10 to-grow/5", border: "border-grow/20" },
+              { Icon: IconParent, title: "הורה", desc: "תרגול בעולם שהילד אוהב — כדורגל, גיימינג, חיות. לומד בלי להרגיש שהוא לומד", bg: "bg-gradient-to-br from-brand/10 to-brand/5", border: "border-brand/20" },
+            ].map(({ Icon, title, desc, bg, border, highlight }) => (
+              <div key={title} className={`${bg} rounded-2xl p-6 text-center border ${border} shadow-sm ${highlight ? "ring-2 ring-magic/20 shadow-magic/10" : ""}`}>
+                {highlight && <div className="text-xs font-bold text-magic bg-magic/10 rounded-full px-3 py-1 inline-block mb-3">הכי פופולרי ⭐</div>}
+                <div className="flex justify-center mb-3"><Icon size={44} /></div>
+                <h3 className="font-bold text-ink mb-2 font-display">{title}</h3>
+                <p className="text-ink/60 text-sm leading-relaxed">{desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── ROI strip ── */}
+      <section className="py-8 px-5 bg-gradient-to-l from-magic/10 to-brand/10 border-y border-magic/10">
+        <div className="max-w-3xl mx-auto">
+          <div className="grid grid-cols-3 gap-4 text-center">
+            {[
+              { num: "3+", label: "שעות חינם בשבוע", sub: "שחוסכת מורה פרטית" },
+              { num: "60″", label: "זמן יצירת חוברת", sub: "במקום שעה של הכנה" },
+              { num: "₪3", label: "עלות לחוברת", sub: "בתוכנית מורה" },
+            ].map(({ num, label, sub }) => (
+              <div key={label}>
+                <div className="text-2xl sm:text-3xl font-bold text-magic font-display">{num}</div>
+                <div className="text-xs sm:text-sm font-semibold text-ink mt-0.5">{label}</div>
+                <div className="text-xs text-ink/40 mt-0.5 hidden sm:block">{sub}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── How it works ── */}
+      <section className="py-14 px-5 bg-canvas">
+        <div className="max-w-3xl mx-auto text-center">
+          <h2 className="text-2xl font-bold text-ink mb-2 font-display">איך זה עובד?</h2>
+          <p className="text-ink/50 mb-10 text-sm">3 שלבים פשוטים — תוך פחות מדקה</p>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+            {[
+              { num: "01", Icon: IconWrite, title: "בחרי תלמיד ונושא", desc: "שם, כיתה, העולם האהוב, יעד פדגוגי — או פשוט כתבי מה תרצי בחופשיות" },
+              { num: "02", Icon: IconSpark, title: "AI יוצר תוך 60 שניות", desc: "חוברת עבודה מלאה עם תרגילים, עמודים ומפתח תשובות — הכל בעברית, מותאם לרמת הילד" },
+              { num: "03", Icon: IconPrint, title: "הדפסי ומסרי", desc: "לחצי הדפס ← שמרי כ-PDF — קובץ A4 מוכן, כיתה של 30 ילדים תוך 3 דקות" },
+            ].map(({ num, Icon, title, desc }) => (
+              <div key={num} className="relative bg-white rounded-2xl p-6 border border-ink/5 shadow-sm">
+                <div className="absolute -top-3 right-4 text-xs font-bold text-white bg-gradient-to-l from-brand to-magic rounded-full px-2.5 py-1">{num}</div>
+                <div className="flex justify-center mb-3 mt-2"><Icon size={40} /></div>
+                <h3 className="font-bold text-ink mb-2">{title}</h3>
+                <p className="text-ink/60 text-sm leading-relaxed">{desc}</p>
+              </div>
+            ))}
           </div>
         </div>
       </section>
