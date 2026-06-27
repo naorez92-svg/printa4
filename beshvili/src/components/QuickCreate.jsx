@@ -5,6 +5,7 @@ import Preview from "./Preview";
 import BookletRating from "./BookletRating";
 import UpgradeModal from "./UpgradeModal";
 import { FREE_LIMIT } from "../hooks/useProfile";
+import { track } from "../hooks/useEvents";
 
 const SUBJECTS = [
   ["חשבון", "➕"],
@@ -76,6 +77,9 @@ export default function QuickCreate({ student, onClose, onSaved, remaining, isPr
     setHtml(null);
     setError(null);
 
+    const trackError = (type, extra = {}) => track("booklet_error", { type, mode: "student_quick", ...extra });
+    track("booklet_started", { mode: "student_quick", subject, world, grade: student?.grade, pages: pageCount });
+
     const goal = specificGoal.trim() ? `${subject} — ${specificGoal.trim()}` : subject;
 
     const body = {
@@ -93,6 +97,7 @@ export default function QuickCreate({ student, onClose, onSaved, remaining, isPr
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) {
       setLoading(false);
+      trackError("no_session");
       setError("אתה לא מחובר — נסה להתחבר מחדש");
       return;
     }
@@ -115,6 +120,7 @@ export default function QuickCreate({ student, onClose, onSaved, remaining, isPr
     } catch (e) {
       setLoading(false);
       if (ctrl.signal.aborted) return;
+      trackError("network");
       setError(`שגיאת רשת — ${String(e)}`);
       return;
     }
@@ -122,8 +128,18 @@ export default function QuickCreate({ student, onClose, onSaved, remaining, isPr
     if (!resp.ok) {
       const errData = await resp.json().catch(() => ({}));
       setLoading(false);
-      if (errData?.error === "quota_exceeded") { setError("quota"); return; }
-      if (errData?.error === "rate_limited") { setError(`rate:${errData?.wait ?? 60}`); return; }
+      if (errData?.error === "quota_exceeded") {
+        trackError(errData?.period === "monthly" ? "quota_monthly" : "quota");
+        setError("quota");
+        return;
+      }
+      if (errData?.error === "rate_limited") {
+        const wait = errData?.wait ?? 60;
+        trackError("rate_limited", { wait });
+        setError(`rate:${wait}`);
+        return;
+      }
+      trackError("server_error", { status: resp.status });
       setError(`שגיאת שרת ${resp.status}`);
       return;
     }
@@ -162,6 +178,7 @@ export default function QuickCreate({ student, onClose, onSaved, remaining, isPr
         // Fall through to save the partial booklet
       } else {
         setLoading(false);
+        trackError("stream_dropped");
         setError("החיבור נקטע — נסה שנית, רצוי עם פחות עמודים");
         return;
       }
@@ -169,12 +186,17 @@ export default function QuickCreate({ student, onClose, onSaved, remaining, isPr
 
     setLoading(false);
     const rawHtml = htmlAccumulated.trim();
-    if (!rawHtml || !rawHtml.includes("<")) { setError("לא התקבל HTML תקין מהשרת"); return; }
+    if (!rawHtml || !rawHtml.includes("<")) { trackError("empty_html"); setError("לא התקבל HTML תקין מהשרת"); return; }
     const finalHtml = sanitizeBookletHtml(rawHtml);
 
-    const { data: { user } } = await supabase.auth.getUser();
-    const { data: inserted } = await supabase.from("booklets").insert({
-      user_id: user.id,
+    const userId = session.user?.id;
+    if (!userId) {
+      trackError("no_session");
+      setError("אתה לא מחובר — נסה להתחבר מחדש");
+      return;
+    }
+    const { data: inserted, error: insertErr } = await supabase.from("booklets").insert({
+      user_id: userId,
       child_id: student.id,
       title: `${student.name} — ${goal}`,
       child_name: student.name,
@@ -184,11 +206,17 @@ export default function QuickCreate({ student, onClose, onSaved, remaining, isPr
       level: student.level || "medium",
       html: finalHtml,
     }).select("id, share_token").single();
+    if (insertErr) {
+      trackError("db_insert_failed");
+      setError(`generic:שמירה נכשלה — ${insertErr.message}`);
+      return;
+    }
 
     setBookletId(inserted?.id ?? null);
     setShareToken(inserted?.share_token ?? null);
     setShowRating(true);
     setHtml(finalHtml);
+    track("booklet_completed", { booklet_id: inserted?.id, pages: pageCount, mode: "student_quick", child_id: student?.id });
     onSaved?.();
   }, [canSubmit, student, subject, world, specificGoal, pageCount, onSaved]);
 
@@ -207,7 +235,7 @@ export default function QuickCreate({ student, onClose, onSaved, remaining, isPr
               <span className="text-xl">✅</span>
               <span>החוברת נוצרה עבור {student.name}!</span>
             </div>
-            <Preview html={html} onReset={onClose} shareToken={shareToken} />
+            <Preview html={html} onReset={onClose} shareToken={shareToken} context="quick" />
           </div>
         )}
       </section>
@@ -230,7 +258,7 @@ export default function QuickCreate({ student, onClose, onSaved, remaining, isPr
               )}
             </p>
           </div>
-          <button onClick={onClose} className="text-ink/30 hover:text-ink text-2xl leading-none mt-0.5">×</button>
+          <button onClick={() => { track("quick_create_closed", { generated: !!html }); onClose?.(); }} className="text-ink/30 hover:text-ink text-2xl leading-none mt-0.5">×</button>
         </div>
       </div>
 
@@ -242,7 +270,7 @@ export default function QuickCreate({ student, onClose, onSaved, remaining, isPr
             {SUBJECTS.map(([s, icon]) => (
               <button
                 key={s}
-                onClick={() => setSubject(s)}
+                onClick={() => { setSubject(s); track("subject_chip_clicked", { subject: s }); }}
                 disabled={loading}
                 className={`rounded-full px-4 py-1.5 text-sm font-medium border transition-colors ${
                   subject === s
@@ -262,7 +290,7 @@ export default function QuickCreate({ student, onClose, onSaved, remaining, isPr
           <select
             className="w-full border border-ink/20 rounded-xl p-3 bg-canvas/50 text-right outline-none focus:border-magic"
             value={world}
-            onChange={e => setWorld(e.target.value)}
+            onChange={e => { setWorld(e.target.value); track("world_selected", { world: e.target.value }); }}
             disabled={loading}
           >
             {WORLDS.map(w => <option key={w}>{w}</option>)}
@@ -282,21 +310,32 @@ export default function QuickCreate({ student, onClose, onSaved, remaining, isPr
         <div>
           <p className="text-xs text-ink/40 mb-2 font-medium">כמות עמודים</p>
           <div className="flex gap-2">
-            {PAGE_OPTIONS.map(n => (
-              <button
-                key={n}
-                onClick={() => setPageCount(n)}
-                disabled={loading}
-                className={`flex-1 rounded-xl p-2 text-sm font-medium border transition-colors ${
-                  pageCount === n
-                    ? "bg-brand text-white border-brand shadow-sm"
-                    : "bg-canvas/50 border-ink/15 text-ink/60 hover:border-brand/50"
-                }`}
-              >
-                {n} עמ'
-              </button>
-            ))}
+            {PAGE_OPTIONS.map(n => {
+              const isLocked = !isPro && n > 5;
+              return (
+                <button
+                  key={n}
+                  onClick={() => {
+                    if (isLocked) { track("upgrade_intent_clicked", { source: "quick_create_pages" }); setShowUpgrade(true); return; }
+                    setPageCount(n);
+                    track("page_count_selected", { pages: n });
+                  }}
+                  disabled={loading}
+                  className={`flex-1 rounded-xl p-2 text-sm font-medium border transition-colors relative ${
+                    isLocked
+                      ? "bg-canvas/30 border-ink/10 text-ink/30 cursor-pointer"
+                      : pageCount === n
+                      ? "bg-brand text-white border-brand shadow-sm"
+                      : "bg-canvas/50 border-ink/15 text-ink/60 hover:border-brand/50"
+                  }`}
+                >
+                  {isLocked && <span className="absolute -top-1 -right-1 text-[9px]">🔒</span>}
+                  {n} עמ'
+                </button>
+              );
+            })}
           </div>
+          {!isPro && <p className="text-[10px] text-ink/30 mt-1 text-center">7 ו-10 עמודים זמינים בתוכנית בתשלום</p>}
         </div>
 
         {/* Errors */}
@@ -306,13 +345,13 @@ export default function QuickCreate({ student, onClose, onSaved, remaining, isPr
           </div>
         )}
         {error && error !== "quota" && !rateCountdown && (
-          <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-red-600 text-sm">{error}</div>
+          <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-red-600 text-sm">{error.replace(/^generic:/, "")}</div>
         )}
         {error === "quota" && (
           <div className="space-y-3">
             <p className="text-ink/60 text-sm text-center">ניצלת את {FREE_LIMIT} החוברות החינמיות</p>
             <button
-              onClick={() => setShowUpgrade(true)}
+              onClick={() => { track("upgrade_intent_clicked", { source: "quick_create_quota" }); setShowUpgrade(true); }}
               className="w-full bg-gradient-to-l from-brand to-magic text-white rounded-xl p-3.5 font-semibold text-center hover:opacity-90 transition-opacity"
             >
               🚀 שדרגי — מ-₪19/חודש

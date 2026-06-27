@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { supabase } from "../lib/supabase";
+import { track } from "../hooks/useEvents";
 
 const GoogleIcon = () => (
   <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
@@ -57,18 +58,54 @@ export default function Login() {
     return () => clearInterval(t);
   }, []);
 
+  // Fire auth_verify_screen_view once when the verify screen renders.
+  useEffect(() => {
+    if (step === "verify") track("auth_verify_screen_view", {});
+  }, [step]);
+
+  // Section views — observe key sections once each via IntersectionObserver.
+  useEffect(() => {
+    const ids = ["pricing", "login-form"];
+    const seen = new Set();
+    const observer = new IntersectionObserver((entries) => {
+      for (const entry of entries) {
+        if (entry.isIntersecting && !seen.has(entry.target.id)) {
+          seen.add(entry.target.id);
+          track("section_view", { section: entry.target.id });
+          observer.unobserve(entry.target);
+        }
+      }
+    }, { threshold: 0.3 });
+    ids.forEach((id) => {
+      const el = document.getElementById(id);
+      if (el) observer.observe(el);
+    });
+    return () => observer.disconnect();
+  }, []);
+
+  const goToLoginForm = (location) => {
+    track("cta_click", { location });
+    scrollTo("login-form");
+  };
+
   const signInWithGoogle = async () => {
+    track("auth_google_click", { method: "google" });
     setLoading(true);
     setError("");
     const { error: err } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: { redirectTo: window.location.origin },
     });
-    if (err) { setError(err.message || "שגיאה בכניסה עם Google"); setLoading(false); }
+    if (err) {
+      track("auth_google_error", { error: err.message });
+      setError(err.message || "שגיאה בכניסה עם Google");
+      setLoading(false);
+    }
   };
 
   const send = async () => {
     if (!email.trim()) return;
+    track("auth_email_submitted", { method: "magic_link" });
     setLoading(true);
     setError("");
     const { error: err } = await supabase.auth.signInWithOtp({
@@ -80,11 +117,14 @@ export default function Login() {
       const msg = err.message || "";
       const alreadySent = /after \d+ second/i.test(msg) || /rate|security/i.test(msg);
       if (alreadySent) {
+        track("auth_email_rate_limited", {});
         setStep("verify");
       } else {
+        track("auth_email_error", { error: msg });
         setError(msg || "שגיאה בשליחה — נסה שנית");
       }
     } else {
+      track("auth_email_sent", { method: "magic_link" });
       setStep("verify");
     }
   };
@@ -100,7 +140,7 @@ export default function Login() {
             <span className="font-bold text-ink text-lg font-display">בשבילי<span className="text-brand">·</span></span>
           </div>
           <button
-            onClick={() => scrollTo("login-form")}
+            onClick={() => goToLoginForm("nav")}
             className="bg-gradient-to-l from-brand to-magic text-white text-sm rounded-xl px-4 py-2 font-medium hover:opacity-90 transition-opacity shadow-sm"
           >
             כניסה חינמית ✨
@@ -128,7 +168,7 @@ export default function Login() {
             מורות פרטיות חוסכות <strong className="text-brand">3+ שעות הכנה בשבוע</strong>. חוברת עבודה מלאה בעברית, מותאמת לכל תלמיד — מוכנה להדפסה תוך 60 שניות
           </p>
           <button
-            onClick={() => scrollTo("login-form")}
+            onClick={() => goToLoginForm("hero")}
             className="inline-block bg-gradient-to-l from-brand to-magic text-white rounded-2xl px-10 py-4 text-xl font-display font-semibold hover:scale-105 transition-all shadow-2xl shadow-magic/30 active:scale-100"
           >
             ✨ התחילי חינם — 3 חוברות מתנה
@@ -285,7 +325,7 @@ export default function Login() {
                 </div>
               ))}
               <button
-                onClick={() => scrollTo("login-form")}
+                onClick={() => goToLoginForm("booklet_preview")}
                 className="inline-flex items-center gap-2 bg-gradient-to-l from-brand to-magic text-white rounded-xl px-5 py-2.5 text-sm font-semibold hover:opacity-90 transition-opacity shadow-md mt-2"
               >
                 <span>✨ רוצי לראות חוברת אמיתית?</span>
@@ -354,7 +394,7 @@ export default function Login() {
       </section>
 
       {/* ── Pricing ── */}
-      <section className="py-14 px-5 bg-canvas">
+      <section id="pricing" className="py-14 px-5 bg-canvas">
         <div className="max-w-3xl mx-auto text-center">
           <h2 className="text-2xl font-bold text-ink mb-2 font-display">מחירים שקופים</h2>
           <p className="text-ink/50 mb-2 text-sm">מתחילים חינם, משדרגים כשרוצים</p>
@@ -373,6 +413,7 @@ export default function Login() {
               </ul>
               <a href={"https://wa.me/972509139137?text=" + encodeURIComponent("שלום! אני רוצה לשדרג לתוכנית מורה בבשבילי 🚀")}
                 target="_blank" rel="noopener noreferrer"
+                onClick={() => track("pricing_cta_click", { plan: "teacher", price: 59, dest: "whatsapp" })}
                 className="block w-full bg-gradient-to-l from-brand to-magic text-white rounded-xl px-4 py-2.5 text-sm font-semibold text-center hover:opacity-90 transition-opacity shadow-md">
                 💬 שדרגי עכשיו — ₪59
               </a>
@@ -386,7 +427,7 @@ export default function Login() {
                   <li key={f} className="flex items-center gap-2"><span className="text-grow">✓</span>{f}</li>
                 ))}
               </ul>
-              <button onClick={() => scrollTo("login-form")}
+              <button onClick={() => goToLoginForm("pricing_free")}
                 className="block w-full border border-ink/20 text-ink/60 rounded-xl px-4 py-2.5 text-sm font-semibold text-center hover:border-magic/40 hover:text-magic transition-colors">
                 התחילי חינם ✨
               </button>
@@ -402,6 +443,7 @@ export default function Login() {
               </ul>
               <a href={"https://wa.me/972509139137?text=" + encodeURIComponent("שלום! אני רוצה לשדרג לתוכנית הורה בבשבילי 🌟")}
                 target="_blank" rel="noopener noreferrer"
+                onClick={() => track("pricing_cta_click", { plan: "parent", price: 19, dest: "whatsapp" })}
                 className="block w-full bg-brand text-white rounded-xl px-4 py-2.5 text-sm font-semibold text-center hover:opacity-90 transition-opacity shadow-sm">
                 💙 שדרגי — ₪19
               </a>
@@ -445,7 +487,7 @@ export default function Login() {
                   <p className="mt-1">לחץ על הכפתור בתוך המייל — תיכנס ישירות לאפליקציה ✨</p>
                 </div>
                 {error && <p className="text-red-500 text-sm text-center">{error}</p>}
-                <button onClick={() => { setStep("email"); setError(""); }}
+                <button onClick={() => { track("auth_change_email_click", {}); setStep("email"); setError(""); }}
                   className="w-full text-sm text-ink/50 hover:text-magic transition-colors border border-ink/15 rounded-xl px-4 py-2.5 hover:border-magic/40">
                   שנה מייל / שלח קישור מחדש
                 </button>
@@ -486,13 +528,13 @@ export default function Login() {
       {/* ── Footer ── */}
       <footer className="bg-canvas border-t border-ink/5 py-8 px-5 text-center text-xs text-ink/25">
         <div className="flex justify-center gap-4 flex-wrap mb-2">
-          <a href="https://wa.me/972509139137" target="_blank" rel="noopener noreferrer" className="hover:text-ink/50 transition-colors">צור קשר</a>
+          <a href="https://wa.me/972509139137" target="_blank" rel="noopener noreferrer" onClick={() => track("outbound_click", { dest: "whatsapp_contact" })} className="hover:text-ink/50 transition-colors">צור קשר</a>
           <span>·</span>
-          <a href="/privacy.html" target="_blank" className="hover:text-ink/50 transition-colors">מדיניות פרטיות</a>
+          <a href="/privacy.html" target="_blank" onClick={() => track("legal_link_click", { page: "privacy" })} className="hover:text-ink/50 transition-colors">מדיניות פרטיות</a>
           <span>·</span>
-          <a href="/terms.html" target="_blank" className="hover:text-ink/50 transition-colors">תנאי שימוש</a>
+          <a href="/terms.html" target="_blank" onClick={() => track("legal_link_click", { page: "terms" })} className="hover:text-ink/50 transition-colors">תנאי שימוש</a>
           <span>·</span>
-          <a href="/accessibility.html" target="_blank" className="hover:text-ink/50 transition-colors">נגישות</a>
+          <a href="/accessibility.html" target="_blank" onClick={() => track("legal_link_click", { page: "accessibility" })} className="hover:text-ink/50 transition-colors">נגישות</a>
         </div>
         <p>בשבילי © {new Date().getFullYear()} · כל הזכויות שמורות</p>
       </footer>

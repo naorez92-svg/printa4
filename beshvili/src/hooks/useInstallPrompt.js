@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { track } from "./useEvents";
 
 export function useInstallPrompt() {
   const [deferredPrompt, setDeferredPrompt] = useState(null);
@@ -15,7 +16,7 @@ export function useInstallPrompt() {
     if (standalone) { setIsInstalled(true); return; }
 
     const onPrompt = (e) => { e.preventDefault(); setDeferredPrompt(e); };
-    const onInstalled = () => { setIsInstalled(true); setDeferredPrompt(null); };
+    const onInstalled = () => { track("pwa_installed", {}); setIsInstalled(true); setDeferredPrompt(null); };
 
     window.addEventListener("beforeinstallprompt", onPrompt);
     window.addEventListener("appinstalled", onInstalled);

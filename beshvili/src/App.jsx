@@ -3,7 +3,7 @@ import { supabase } from "./lib/supabase";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import PublicBooklet from "./pages/PublicBooklet";
-import { track } from "./hooks/useEvents";
+import { track, pageView, identify } from "./hooks/useEvents";
 
 // /b/:token — public booklet share page (no auth needed)
 const shareMatch = window.location.pathname.match(/^\/b\/([0-9a-f-]{36})$/i);
@@ -19,10 +19,39 @@ function AuthApp() {
     });
     const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => {
       setSession(s);
-      if (_e === "SIGNED_IN") track("session_start", {});
+      if (_e === "SIGNED_IN" && s?.user) {
+        // supabase fires SIGNED_IN on token refresh / tab-refocus / reload too,
+        // not just real logins. Count once per tab-session (sessionStorage
+        // survives reloads within a tab, resets per tab) to avoid inflation.
+        let alreadyCounted = false;
+        try {
+          alreadyCounted = sessionStorage.getItem("beshvili_session_counted") === s.user.id;
+          sessionStorage.setItem("beshvili_session_counted", s.user.id);
+        } catch { /* ignore */ }
+        if (alreadyCounted) return;
+
+        track("session_start", {});
+        identify(s.user.id);
+        // Distinguish first-ever signup from a returning login (no extra query —
+        // the auth user carries created_at).
+        const createdMs = new Date(s.user.created_at).getTime();
+        const isNew = Number.isFinite(createdMs) && Date.now() - createdMs < 2 * 60 * 1000;
+        track(isNew ? "signup_completed" : "login_completed", {
+          method: s.user.app_metadata?.provider ?? "magic_link",
+        });
+      } else if (_e === "SIGNED_OUT") {
+        try { sessionStorage.removeItem("beshvili_session_counted"); } catch { /* ignore */ }
+        track("sign_out", {});
+      }
     });
     return () => sub.subscription.unsubscribe();
   }, []);
+
+  // Landing vs app page-view — fired once after the session resolves.
+  useEffect(() => {
+    if (loading) return;
+    pageView(session ? "app" : "landing");
+  }, [loading]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (loading) return (
     <div className="min-h-screen bg-canvas flex items-center justify-center" dir="rtl">

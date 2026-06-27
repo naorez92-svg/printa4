@@ -1,5 +1,6 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { supabase } from "../lib/supabase";
+import { track } from "../hooks/useEvents";
 
 const OPTIONS = [
   { key: "too_hard",   emoji: "😓", label: "קשה מדי"  },
@@ -14,8 +15,12 @@ export default function BookletRating({ bookletId, studentName, onDone }) {
   const [saveError, setSaveError] = useState(null);
   const savingRef = useRef(false);
 
+  useEffect(() => {
+    track("booklet_rating_shown", { booklet_id: bookletId });
+  }, [bookletId]);
+
   const save = async () => {
-    if (!selected || !bookletId) { onDone(); return; }
+    if (!selected || !bookletId) { track("booklet_rating_dismissed", { booklet_id: bookletId }); onDone(); return; }
     if (savingRef.current) return;
     savingRef.current = true;
     setSaving(true);
@@ -27,6 +32,7 @@ export default function BookletRating({ bookletId, studentName, onDone }) {
     savingRef.current = false;
     setSaving(false);
     if (error) { setSaveError("השמירה נכשלה — נסה שנית"); return; }
+    track("booklet_rating_submitted", { booklet_id: bookletId, difficulty: selected, has_notes: !!notes.trim() });
     onDone();
   };
 
@@ -74,7 +80,7 @@ export default function BookletRating({ bookletId, studentName, onDone }) {
           {saving ? "שומר..." : "שמור ✓"}
         </button>
         <button
-          onClick={onDone}
+          onClick={() => { track("booklet_rating_dismissed", { booklet_id: bookletId }); onDone(); }}
           className="px-4 py-2.5 text-sm text-ink/40 hover:text-ink/60 border border-ink/10 rounded-xl transition-colors"
         >
           דלג

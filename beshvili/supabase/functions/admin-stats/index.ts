@@ -195,23 +195,96 @@ Deno.serve(async (req) => {
       lastBookletAt: lastBookletByUser[u.id] ?? null,
     }));
 
-  // Funnel stats from events (last 7 days)
+  // Funnel + full analytics from events (last 7 days)
   let funnelStats = { sessions: 0, started: 0, completed: 0, upgradeOpened: 0, ctaClicked: 0, leads: 0 };
+  let analytics = {
+    visitors: 0, signups: 0, logins: 0, activated: 0,           // acquisition → activation
+    emailSubmitted: 0, verifyView: 0, googleClicks: 0,          // auth funnel
+    shares: 0, publicViews: 0, prints: 0,                       // virality / value
+    pwaInstalls: 0, ratings: 0, feedbacks: 0,                   // engagement
+    sources: [] as { source: string; visitors: number }[],     // traffic attribution
+    errors: [] as { type: string; count: number }[],            // generation failures
+    paywallHits: 0,                                              // saw a paywall (any path)
+    totalEvents: 0,
+  };
   try {
-    const { data: eventsData } = await admin
+    // Explicit high limit so PostgREST's default ~1000-row cap doesn't silently
+    // truncate (and undercount) once anonymous tracking ramps event volume.
+    const { data: ev } = await admin
       .from("events")
-      .select("event, user_id")
-      .gte("created_at", weekAgo);
-    if (eventsData) {
-      const uniq = (name: string) =>
-        [...new Set(eventsData.filter(e => e.event === name).map(e => e.user_id))].length;
+      .select("event, user_id, anonymous_id, metadata")
+      .gte("created_at", weekAgo)
+      .order("created_at", { ascending: false })
+      .limit(100000);
+    if (ev) {
+      const uniqUser = (name: string) =>
+        new Set(ev.filter(e => e.event === name).map(e => e.user_id).filter(Boolean)).size;
+      const uniqAnon = (name: string, pred?: (m: Record<string, unknown>) => boolean) =>
+        new Set(ev.filter(e => e.event === name && (!pred || pred(e.metadata ?? {})))
+          .map(e => e.anonymous_id).filter(Boolean)).size;
+      const countEv = (...names: string[]) => ev.filter(e => names.includes(e.event)).length;
+
       funnelStats = {
-        sessions:      uniq("session_start"),
-        started:       uniq("booklet_started"),
-        completed:     uniq("booklet_completed"),
-        upgradeOpened: uniq("upgrade_modal_opened"),
-        ctaClicked:    uniq("upgrade_cta_clicked"),
+        sessions:      uniqUser("session_start"),
+        started:       uniqUser("booklet_started"),
+        completed:     uniqUser("booklet_completed"),
+        upgradeOpened: uniqUser("upgrade_modal_opened"),
+        ctaClicked:    uniqUser("upgrade_cta_clicked"),
         leads:         0, // filled from the leads table below (more reliable than events)
+      };
+
+      // Traffic sources from first-touch attribution on landing page-views.
+      const landing = ev.filter(e => e.event === "page_view" && (e.metadata as Record<string, unknown>)?.route === "landing");
+      const classify = (m: Record<string, unknown>): string => {
+        const utm = m.utm_source as string | undefined;
+        if (utm) return utm;
+        const ref = (m.referrer as string | undefined) ?? "";
+        if (!ref) return "direct";
+        try {
+          const host = new URL(ref).hostname.replace(/^www\./, "");
+          if (/wa\.me|whatsapp/.test(host)) return "whatsapp";
+          if (/google\./.test(host)) return "google";
+          if (/facebook|fb\.com/.test(host)) return "facebook";
+          if (/instagram/.test(host)) return "instagram";
+          if (/beshvili/.test(host)) return "internal";
+          return host;
+        } catch { return "direct"; }
+      };
+      const sourceMap: Record<string, Set<string>> = {};
+      for (const e of landing) {
+        const src = classify((e.metadata ?? {}) as Record<string, unknown>);
+        (sourceMap[src] ??= new Set()).add(e.anonymous_id ?? "");
+      }
+
+      // Generation errors grouped by type.
+      const errMap: Record<string, number> = {};
+      for (const e of ev.filter(e => e.event === "booklet_error")) {
+        const t = ((e.metadata as Record<string, unknown>)?.type as string) ?? "unknown";
+        errMap[t] = (errMap[t] ?? 0) + 1;
+      }
+
+      analytics = {
+        visitors:       uniqAnon("page_view", m => m.route === "landing"),
+        signups:        uniqUser("signup_completed"),
+        logins:         uniqUser("login_completed"),
+        activated:      uniqUser("booklet_completed"),
+        emailSubmitted: uniqAnon("auth_email_submitted"),
+        verifyView:     uniqAnon("auth_verify_screen_view"),
+        googleClicks:   countEv("auth_google_click"),
+        shares:         countEv("booklet_shared_whatsapp", "share_link_copied", "public_booklet_cta_click"),
+        publicViews:    uniqAnon("public_booklet_view"),
+        prints:         countEv("booklet_printed", "public_booklet_print"),
+        pwaInstalls:    countEv("pwa_installed", "pwa_install_accepted"),
+        ratings:        countEv("booklet_rating_submitted"),
+        feedbacks:      countEv("feedback_submitted"),
+        paywallHits:    countEv("quota_screen_shown", "page_count_locked_clicked", "upgrade_modal_opened"),
+        sources: Object.entries(sourceMap)
+          .map(([source, set]) => ({ source, visitors: set.size }))
+          .sort((a, b) => b.visitors - a.visitors).slice(0, 8),
+        errors: Object.entries(errMap)
+          .map(([type, count]) => ({ type, count }))
+          .sort((a, b) => b.count - a.count),
+        totalEvents: ev.length,
       };
     }
   } catch { /* events table may not exist yet */ }

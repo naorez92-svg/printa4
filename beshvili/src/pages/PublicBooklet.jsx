@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { sanitizeBookletHtml } from "../lib/sanitize";
+import { track } from "../hooks/useEvents";
 
 const A4_PX = 794;
 const A4_H  = 1123; // A4 at 96dpi: 297mm × (96/25.4) ≈ 1123px
@@ -28,6 +29,16 @@ export default function PublicBooklet({ token }) {
       .catch(e => setError(e.message));
   }, [token]);
 
+  // Fire public_booklet_view once on successful load.
+  useEffect(() => {
+    if (booklet) track("public_booklet_view", { token, title: booklet.title });
+  }, [booklet, token]);
+
+  // Fire public_booklet_not_found when the error/not-found path is reached.
+  useEffect(() => {
+    if (error) track("public_booklet_not_found", { token });
+  }, [error, token]);
+
   useEffect(() => {
     const update = () => {
       if (!containerRef.current) return;
@@ -53,7 +64,8 @@ export default function PublicBooklet({ token }) {
     return () => window.removeEventListener("message", handler);
   }, []);
 
-  const openAndPrint = () => {
+  const openAndPrint = (location) => {
+    track("public_booklet_print", { token, location });
     if (!booklet?.html) return;
     const blob = new Blob([booklet.html], { type: "text/html;charset=utf-8" });
     const url = URL.createObjectURL(blob);
@@ -71,7 +83,7 @@ export default function PublicBooklet({ token }) {
         <div className="text-5xl">😕</div>
         <p className="text-ink font-semibold">החוברת לא נמצאה</p>
         <p className="text-ink/40 text-sm">ייתכן שהקישור שגוי או שהחוברת הוסרה</p>
-        <a href="https://www.beshvili.com" className="text-magic text-sm underline">לבשבילי ←</a>
+        <a href="https://www.beshvili.com" onClick={() => track("public_booklet_cta_click", { token, location: "error" })} className="text-magic text-sm underline">לבשבילי ←</a>
       </div>
     </div>
   );
@@ -101,13 +113,14 @@ export default function PublicBooklet({ token }) {
         </div>
         <div className="flex items-center gap-2">
           <button
-            onClick={openAndPrint}
+            onClick={() => openAndPrint("header")}
             className="bg-gradient-to-l from-grow to-grow/80 text-white rounded-xl px-4 py-2 text-sm font-semibold hover:opacity-90 transition-opacity"
           >
             🖨️ הדפס
           </button>
           <a
             href="https://www.beshvili.com"
+            onClick={() => track("public_booklet_cta_click", { token, location: "header" })}
             className="border border-ink/15 text-ink/50 rounded-xl px-3 py-2 text-xs hover:text-ink transition-colors"
           >
             צרי גם ✨
@@ -146,7 +159,7 @@ export default function PublicBooklet({ token }) {
 
 
         <button
-          onClick={openAndPrint}
+          onClick={() => openAndPrint("footer")}
           className="w-full flex items-center justify-center gap-2 bg-gradient-to-l from-grow to-grow/80 text-white rounded-2xl p-4 font-display font-semibold text-base hover:opacity-90 transition-opacity shadow-md"
         >
           <span className="text-xl">🖨️</span>
@@ -159,6 +172,7 @@ export default function PublicBooklet({ token }) {
           <p className="text-xs text-ink/50">בשבילי יוצרת חוברות AI בעברית בתוך דקה — חינם!</p>
           <a
             href="https://www.beshvili.com"
+            onClick={() => track("public_booklet_cta_click", { token, location: "promo_footer" })}
             className="inline-block bg-gradient-to-l from-brand to-magic text-white rounded-xl px-6 py-2.5 text-sm font-semibold hover:opacity-90 transition-opacity"
           >
             נסי חינם ← בשבילי

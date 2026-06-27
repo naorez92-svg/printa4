@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { supabase } from "../lib/supabase";
+import { track } from "../hooks/useEvents";
 
 const QUICK = [
   "🤩 מדהים! עוזר לי הרבה",
@@ -17,7 +18,7 @@ export default function FeedbackWidget() {
   const [done, setDone]         = useState(false);
   const [submitError, setSubmitError] = useState(false);
 
-  const close = () => { setOpen(false); };
+  const close = () => { track("feedback_closed", { submitted: done }); setOpen(false); };
 
   const submit = async () => {
     const text = [selected, message.trim()].filter(Boolean).join("\n");
@@ -27,15 +28,15 @@ export default function FeedbackWidget() {
     const { data: { user } } = await supabase.auth.getUser();
     const { error } = await supabase.from("feedback").insert({ user_id: user?.id ?? null, message: text });
     setSending(false);
-    if (error) { setSubmitError(true); } else { setDone(true); }
+    if (error) { setSubmitError(true); } else { setDone(true); track("feedback_submitted", { category: selected || null, has_message: !!message.trim() }); }
   };
 
-  const reset = () => { setOpen(false); setDone(false); setSelected(""); setMessage(""); setSubmitError(false); };
+  const reset = () => { track("feedback_closed", { submitted: true }); setOpen(false); setDone(false); setSelected(""); setMessage(""); setSubmitError(false); };
 
   if (!open) {
     return (
       <button
-        onClick={() => setOpen(true)}
+        onClick={() => { track("feedback_opened", {}); setOpen(true); }}
         className="fixed bottom-6 left-4 z-40 bg-white border border-ink/10 shadow-lg rounded-full px-4 py-2.5 text-sm font-medium text-ink/50 hover:text-ink hover:shadow-xl transition-all flex items-center gap-2"
       >
         <span>💬</span> פידבק

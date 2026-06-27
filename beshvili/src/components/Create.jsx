@@ -112,6 +112,11 @@ export default function Create({ onSaved, remaining, isPro, active = true, bookl
   // Abort any in-flight SSE stream on unmount
   useEffect(() => () => streamAbortRef.current?.abort(), []);
 
+  // Fire once when the free-quota paywall screen renders
+  useEffect(() => {
+    if (error === "quota") track("quota_screen_shown", { bookletCount });
+  }, [error, bookletCount]);
+
   // Start countdown when rate-limited
   useEffect(() => {
     const match = error?.match(/^rate:(\d+)$/);
@@ -142,7 +147,8 @@ export default function Create({ onSaved, remaining, isPro, active = true, bookl
     setHtml(null);
     setError(null);
     const effectiveWorld = f.world === "אחר" ? customWorld.trim() || "נושא חופשי" : f.world;
-    track("booklet_started", { mode, goal: mode === "exam" ? examTopic : f.goal, grade: mode === "exam" ? examGrade : f.grade, world: mode === "exam" ? null : effectiveWorld });
+    const trackError = (type, extra = {}) => track("booklet_error", { type, mode, pageCount, ...extra });
+    track("booklet_started", { mode, goal: mode === "exam" ? examTopic : f.goal, grade: mode === "exam" ? examGrade : f.grade, world: mode === "exam" ? null : effectiveWorld, pageCount, withAnswerKey, photo: !!photoUrl });
 
     // Ask for notification permission so we can alert when done (non-blocking)
     if ("Notification" in window && Notification.permission === "default") {
@@ -163,6 +169,7 @@ export default function Create({ onSaved, remaining, isPro, active = true, bookl
     if (!session) {
       setLoading(false);
       creatingRef.current = false;
+      trackError("no_session");
       setError("generic:אתה לא מחובר — נסה להתחבר מחדש");
       return;
     }
@@ -187,6 +194,7 @@ export default function Create({ onSaved, remaining, isPro, active = true, bookl
       setLoading(false);
       creatingRef.current = false;
       if (ctrl.signal.aborted) return; // unmounted — don't show error
+      trackError("network");
       setError(`generic:שגיאת רשת — ${String(e)}`);
       return;
     }
@@ -200,13 +208,16 @@ export default function Create({ onSaved, remaining, isPro, active = true, bookl
       setLoading(false);
       creatingRef.current = false;
       if (code === "quota_exceeded") {
-        setError(errData?.period === "monthly" ? "quota_monthly" : "quota");
+        const monthly = errData?.period === "monthly";
+        trackError(monthly ? "quota_monthly" : "quota");
+        setError(monthly ? "quota_monthly" : "quota");
         return;
       }
-      if (code === "rate_limited") { setError(`rate:${errData?.wait ?? 60}`); return; }
-      if (code === "ai_overloaded") { setError("generic:השרת עמוס כרגע — נסי שוב בעוד דקה 🙏"); return; }
-      if (code === "ai_timeout")    { setError("generic:הייצור לקח יותר מדי זמן — נסי עם פחות עמודים"); return; }
-      if (resp.status === 401)      { setError("generic:הסשן פג תוקף — רענן את הדף וכנסי מחדש"); return; }
+      if (code === "rate_limited") { const wait = errData?.wait ?? 60; trackError("rate_limited", { wait }); setError(`rate:${wait}`); return; }
+      if (code === "ai_overloaded") { trackError("ai_overloaded"); setError("generic:השרת עמוס כרגע — נסי שוב בעוד דקה 🙏"); return; }
+      if (code === "ai_timeout")    { trackError("ai_timeout"); setError("generic:הייצור לקח יותר מדי זמן — נסי עם פחות עמודים"); return; }
+      if (resp.status === 401)      { trackError("session_expired"); setError("generic:הסשן פג תוקף — רענן את הדף וכנסי מחדש"); return; }
+      trackError("server_error", { status: resp.status });
       const detail = code || (rawBody.length < 80 ? rawBody : rawBody.substring(0, 60) + "…");
       setError(`generic:שגיאת שרת ${resp.status}${detail ? ` — ${detail}` : ""}`);
       return;
@@ -227,6 +238,7 @@ export default function Create({ onSaved, remaining, isPro, active = true, bookl
     let streamAborted = false;
     let streamHadError = false;
     let streamErrorMsg = null;
+    let streamErrType = null;
 
     try {
       while (true) {
@@ -252,6 +264,7 @@ export default function Create({ onSaved, remaining, isPro, active = true, bookl
             } else if (ev.type === "error") {
               streamHadError = true;
               const errType = ev.error?.type ?? "unknown";
+              streamErrType = errType;
               streamErrorMsg = errType === "overloaded_error"
                 ? "generic:השרת עמוס כרגע — נסי שוב בעוד דקה 🙏"
                 : `generic:שגיאת AI — ${errType}`;
@@ -272,6 +285,7 @@ export default function Create({ onSaved, remaining, isPro, active = true, bookl
       } else {
         setLoading(false);
         creatingRef.current = false;
+        trackError("stream_dropped");
         setError("generic:החיבור נקטע — נסה שנית, רצוי עם פחות עמודים");
         return;
       }
@@ -281,12 +295,12 @@ export default function Create({ onSaved, remaining, isPro, active = true, bookl
     setLoading(false);
     creatingRef.current = false;
 
-    if (streamHadError) { setError(streamErrorMsg); return; }
+    if (streamHadError) { trackError("stream_error", { errType: streamErrType }); setError(streamErrorMsg); return; }
 
     // Strip all scripts + event-handler attributes from AI-generated HTML,
     // then restore the Tailwind CDN script (see src/lib/sanitize.js).
     const generatedHtml = sanitizeBookletHtml(htmlAccumulated.trim());
-    if (!generatedHtml || !generatedHtml.includes("<")) { setError("generic:לא התקבל HTML תקין מהשרת"); return; }
+    if (!generatedHtml || !generatedHtml.includes("<")) { trackError("empty_html"); setError("generic:לא התקבל HTML תקין מהשרת"); return; }
 
     const baseTitle = mode === "free"
       ? freeText.trim().substring(0, 60) + (freeText.length > 60 ? "…" : "")
@@ -304,14 +318,14 @@ export default function Create({ onSaved, remaining, isPro, active = true, bookl
       goal: mode === "free" ? freeText.trim().substring(0, 200) : mode === "exam" ? examTopic : f.goal,
       level: f.level, html: generatedHtml,
     }).select("id, share_token").single();
-    if (insertErr) { setError(`generic:שמירה נכשלה — ${insertErr.message}`); return; }
+    if (insertErr) { trackError("db_insert_failed"); setError(`generic:שמירה נכשלה — ${insertErr.message}`); return; }
 
     setBookletId(inserted?.id ?? null);
     setShareToken(inserted?.share_token ?? null);
     setBookletTitle(title);
     setShowRating(true);
     setHtml(generatedHtml);
-    track("booklet_completed", { booklet_id: inserted?.id, pages: pageCount, mode });
+    track("booklet_completed", { booklet_id: inserted?.id, pages: pageCount, mode, durationSec: loadingElapsed, chars: htmlAccumulated.length, partial: streamAborted, withAnswerKey });
     onSaved?.();
 
     // Notify user if they switched away during generation
@@ -324,7 +338,7 @@ export default function Create({ onSaved, remaining, isPro, active = true, bookl
         });
       } catch {}
     }
-  }, [canSubmit, mode, freeText, f, pageCount, withAnswerKey, onSaved, photoUrl, examGrade, examSubject, examTopic, noEmojis, customWorld]);
+  }, [canSubmit, mode, freeText, f, pageCount, withAnswerKey, onSaved, photoUrl, examGrade, examSubject, examTopic, noEmojis, customWorld, loadingElapsed]);
 
   useEffect(() => {
     if (!active) return;
@@ -336,7 +350,8 @@ export default function Create({ onSaved, remaining, isPro, active = true, bookl
   const handlePhotoUpload = useCallback(async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 5 * 1024 * 1024) { alert("תמונה גדולה מדי — מקסימום 5MB"); return; }
+    track("photo_upload_started", { size_bytes: file.size });
+    if (file.size > 5 * 1024 * 1024) { track("photo_upload_failed", { reason: "too_large" }); alert("תמונה גדולה מדי — מקסימום 5MB"); return; }
     setPhotoUploading(true);
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) { setPhotoUploading(false); return; }
@@ -345,10 +360,12 @@ export default function Create({ onSaved, remaining, isPro, active = true, bookl
     const { error: upErr } = await supabase.storage.from("child-photos").upload(path, file, { upsert: true });
     if (upErr) {
       setPhotoUploading(false);
+      track("photo_upload_failed", { reason: "upload_error" });
       alert("העלאת התמונה נכשלה — ודאי שהקובץ הוא תמונה תקינה (JPG/PNG) עד 5MB");
       return;
     }
     const { data: { publicUrl } } = supabase.storage.from("child-photos").getPublicUrl(path);
+    track("photo_upload_succeeded", {});
     setPhotoUrl(publicUrl);
     setPhotoUploading(false);
     e.target.value = "";
@@ -357,6 +374,7 @@ export default function Create({ onSaved, remaining, isPro, active = true, bookl
   const reset = () => { setHtml(null); setF(EMPTY); setFreeText(""); setError(null); setBookletId(null); setShareToken(null); setBookletTitle(null); setShowRating(false); setChildSaved(false); setPhotoUrl(null); };
   const set   = (k) => (e) => setF((p) => ({ ...p, [k]: e.target.value }));
   const applyTmpl = (tmpl) => {
+    track("template_chip_clicked", { label: tmpl.label, grade: tmpl.f.grade, world: tmpl.f.world, level: tmpl.f.level });
     setF((p) => ({ ...p, ...tmpl.f }));
     setMode("form");
     setRecentTmpl(tmpl.label);
@@ -377,6 +395,7 @@ export default function Create({ onSaved, remaining, isPro, active = true, bookl
         <a
           href={`https://wa.me/972509139137?text=${encodeURIComponent("שלום! הגעתי ל-20 חוברות החודש — אפשר להרחיב?")}`}
           target="_blank" rel="noopener noreferrer"
+          onClick={() => track("quota_monthly_whatsapp_clicked", {})}
           className="block w-full bg-[#25D366] text-white rounded-xl p-3.5 font-display font-semibold hover:opacity-90 transition-opacity shadow-sm"
         >
           💬 שלחי הודעה
@@ -421,7 +440,7 @@ export default function Create({ onSaved, remaining, isPro, active = true, bookl
           </div>
 
           <button
-            onClick={() => openUpgrade()}
+            onClick={() => { track("upgrade_intent_clicked", { source: "create_quota_screen" }); openUpgrade(); }}
             className="block w-full bg-gradient-to-l from-brand to-magic text-white rounded-xl p-3.5 font-display font-semibold hover:opacity-90 transition-opacity shadow-sm"
           >
             🚀 שדרגי עכשיו
@@ -482,7 +501,7 @@ export default function Create({ onSaved, remaining, isPro, active = true, bookl
                   בתוכנית מורה: 20 חוברות = <strong className="text-magic">15 שעות הכנה חסכות בחודש</strong>
                 </p>
               </div>
-              <button onClick={() => openUpgrade()} className="flex-shrink-0 bg-gradient-to-l from-brand to-magic text-white text-xs rounded-xl px-3 py-2 font-semibold hover:opacity-90 transition-opacity">
+              <button onClick={() => { track("upgrade_intent_clicked", { source: "post_success_nudge", remaining }); openUpgrade(); }} className="flex-shrink-0 bg-gradient-to-l from-brand to-magic text-white text-xs rounded-xl px-3 py-2 font-semibold hover:opacity-90 transition-opacity">
                 שדרגי
               </button>
             </div>
@@ -491,7 +510,7 @@ export default function Create({ onSaved, remaining, isPro, active = true, bookl
         )}
 
         {/* Booklet preview — shown immediately, always first */}
-        <Preview html={html} onReset={reset} shareToken={shareToken} title={bookletTitle} active={active} />
+        <Preview html={html} onReset={reset} shareToken={shareToken} title={bookletTitle} active={active} context="create" />
 
         {/* Rating widget — shown below the booklet, optional */}
         {showRating && bookletId && (
@@ -507,7 +526,7 @@ export default function Create({ onSaved, remaining, isPro, active = true, bookl
           <button
             onClick={async () => {
               const saved = await saveChild({ name: f.childName, grade: f.grade, world: f.world, level: f.level, photo_url: photoUrl });
-              if (saved) setChildSaved(true);
+              if (saved) { track("child_profile_saved", { grade: f.grade, world: f.world, level: f.level, has_photo: !!photoUrl }); setChildSaved(true); }
             }}
             className="w-full flex items-center justify-center gap-2 border border-grow/40 text-grow rounded-xl p-3 text-sm font-semibold hover:bg-grow/5 transition-colors"
           >
@@ -536,7 +555,7 @@ export default function Create({ onSaved, remaining, isPro, active = true, bookl
         </div>
         <div className="flex gap-1 bg-white/70 rounded-xl p-1 w-fit flex-wrap">
           {[["form", "📋 טופס"], ["quick", "⚡ דף מהיר"], ["free", "✍️ חופשי"], ["exam", "📝 מבחן"]].map(([m, label]) => (
-            <button key={m} onClick={() => { setMode(m); try { localStorage.setItem("beshvili_mode", m); } catch {} }}
+            <button key={m} onClick={() => { if (m !== mode) track("create_mode_switched", { from: mode, to: m }); setMode(m); try { localStorage.setItem("beshvili_mode", m); } catch {} }}
               className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${mode === m ? "bg-white shadow text-ink" : "text-ink/50 hover:text-ink"}`}>
               {label}
             </button>
@@ -824,7 +843,7 @@ export default function Create({ onSaved, remaining, isPro, active = true, bookl
               return (
                 <button
                   key={n}
-                  onClick={() => { if (isLocked) { openUpgrade(); return; } setPageCount(n); }}
+                  onClick={() => { if (isLocked) { track("page_count_locked_clicked", { pages: n, mode, bookletCount }); openUpgrade(); return; } track("page_count_selected", { pages: n, mode }); setPageCount(n); }}
                   disabled={loading}
                   className={`flex-1 rounded-xl p-2 text-sm font-medium border transition-colors relative ${
                     isLocked

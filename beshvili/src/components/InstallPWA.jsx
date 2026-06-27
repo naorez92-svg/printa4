@@ -1,5 +1,9 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useInstallPrompt } from "../hooks/useInstallPrompt";
+import { track } from "../hooks/useEvents";
+
+// Dedupe "prompt shown" per variant across re-renders/remounts within a page load.
+const promptShownVariants = new Set();
 
 export default function InstallPWA({ variant = "banner" }) {
   const { canInstall, isIOS, install } = useInstallPrompt();
@@ -8,12 +12,23 @@ export default function InstallPWA({ variant = "banner" }) {
     try { return localStorage.getItem("beshvili_pwa_dismissed") === "1"; } catch { return false; }
   });
 
-  if (!canInstall || dismissed) return null;
+  const visible = canInstall && !dismissed;
+
+  useEffect(() => {
+    if (visible && !promptShownVariants.has(variant)) {
+      promptShownVariants.add(variant);
+      track("pwa_prompt_shown", { variant, isIOS });
+    }
+  }, [visible, variant, isIOS]);
+
+  if (!visible) return null;
 
   const handleInstall = async () => {
-    if (isIOS) { setShowIOSModal(true); return; }
+    track("pwa_install_clicked", { variant, isIOS });
+    if (isIOS) { setShowIOSModal(true); track("pwa_ios_instructions_shown", { variant }); return; }
     const accepted = await install();
-    if (accepted) setDismissed(true);
+    if (accepted) { track("pwa_install_accepted", { variant }); setDismissed(true); }
+    else { track("pwa_install_dismissed", { variant, via: "decline" }); }
   };
 
   if (variant === "sidebar") {
@@ -44,7 +59,7 @@ export default function InstallPWA({ variant = "banner" }) {
           {isIOS ? "איך?" : "התקן"}
         </button>
         <button
-          onClick={() => { try { localStorage.setItem("beshvili_pwa_dismissed", "1"); } catch {} setDismissed(true); }}
+          onClick={() => { track("pwa_install_dismissed", { variant, via: "close-x" }); try { localStorage.setItem("beshvili_pwa_dismissed", "1"); } catch {} setDismissed(true); }}
           className="flex-shrink-0 text-white/30 hover:text-white/60 text-lg leading-none px-1"
           aria-label="סגור"
         >
@@ -89,7 +104,7 @@ export default function InstallPWA({ variant = "banner" }) {
             </ol>
 
             <button
-              onClick={() => { setShowIOSModal(false); try { localStorage.setItem("beshvili_pwa_dismissed", "1"); } catch {} setDismissed(true); }}
+              onClick={() => { track("pwa_install_dismissed", { variant, via: "ios-modal-done" }); setShowIOSModal(false); try { localStorage.setItem("beshvili_pwa_dismissed", "1"); } catch {} setDismissed(true); }}
               className="w-full bg-ink text-white py-3 rounded-2xl font-bold text-sm"
             >
               הבנתי, תודה!

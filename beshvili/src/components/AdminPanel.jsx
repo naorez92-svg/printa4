@@ -143,6 +143,17 @@ export default function AdminPanel() {
   const convCta  = fs.upgradeOpened > 0 ? Math.min(100, Math.round(((fs.ctaClicked ?? 0) / fs.upgradeOpened) * 100)) : 0;
   const convLead = fs.completed     > 0 ? Math.min(100, Math.round(((fs.upgradeOpened ?? 0) / fs.completed) * 100)) : 0;
 
+  // Full-funnel analytics (anonymous → signup → activation + virality + reliability)
+  const an = data.analytics ?? {
+    visitors: 0, signups: 0, logins: 0, activated: 0, emailSubmitted: 0, verifyView: 0,
+    googleClicks: 0, shares: 0, publicViews: 0, prints: 0, pwaInstalls: 0, ratings: 0,
+    feedbacks: 0, sources: [], errors: [], paywallHits: 0, totalEvents: 0,
+  };
+  const pct = (num, den) => (den > 0 ? Math.min(100, Math.round((num / den) * 100)) : 0);
+  const convVisitSignup  = pct(an.signups, an.visitors);
+  const convSignupActive = pct(an.activated, an.signups + an.logins);
+  const errorTotal = (an.errors ?? []).reduce((s, e) => s + e.count, 0);
+
   return (
     <div className="space-y-6">
 
@@ -237,6 +248,94 @@ export default function AdminPanel() {
           </div>
         )}
       </div>
+
+      {/* ── FULL FUNNEL ANALYTICS (last 7 days) ─────────────────────────── */}
+      {an.totalEvents > 0 ? (
+        <div className="space-y-4">
+          {/* Acquisition → activation */}
+          <div className="bg-white rounded-2xl p-4 border border-ink/5 shadow-sm">
+            <h3 className="font-bold text-ink mb-3 text-sm">🚀 משפך רכישה מלא — 7 ימים</h3>
+            <div className="flex items-center gap-2">
+              {[
+                { label: "מבקרים", value: an.visitors, color: "text-ink" },
+                { label: "הרשמות", value: an.signups, pct: convVisitSignup, color: "text-magic" },
+                { label: "התחברו", value: an.logins, color: "text-ink" },
+                { label: "יצרו חוברת", value: an.activated, pct: convSignupActive, color: "text-grow" },
+              ].map((s, i) => (
+                <div key={s.label} className="flex items-center gap-2 flex-1">
+                  {i > 0 && <div className="text-ink/20">→</div>}
+                  <div className="flex-1 text-center bg-canvas rounded-xl p-3">
+                    <div className={`text-xl font-bold font-display ${s.color}`}>{s.value}</div>
+                    <div className="text-[11px] text-ink/40 mt-0.5">{s.label}</div>
+                    {s.pct > 0 && <div className="text-[11px] text-magic font-bold mt-0.5">{s.pct}%</div>}
+                  </div>
+                </div>
+              ))}
+            </div>
+            <p className="text-[10px] text-ink/30 mt-2 text-center">{an.totalEvents.toLocaleString("he-IL")} אירועים נמדדו · מבקר→הרשמה {convVisitSignup}% · הרשמה→חוברת {convSignupActive}%</p>
+          </div>
+
+          {/* Traffic sources + virality/engagement side by side */}
+          <div className="grid sm:grid-cols-2 gap-4">
+            {/* Traffic sources */}
+            <div className="bg-white rounded-2xl p-4 border border-ink/5 shadow-sm">
+              <h3 className="font-bold text-ink mb-3 text-sm">🌐 מקורות תנועה</h3>
+              {(an.sources ?? []).length === 0 ? (
+                <p className="text-xs text-ink/30">אין נתוני מקור עדיין</p>
+              ) : (
+                <div className="space-y-1.5">
+                  {an.sources.map(s => (
+                    <div key={s.source} className="flex items-center justify-between text-sm">
+                      <span className="text-ink/70">{s.source}</span>
+                      <span className="font-bold text-ink">{s.visitors}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Virality + engagement */}
+            <div className="bg-white rounded-2xl p-4 border border-ink/5 shadow-sm">
+              <h3 className="font-bold text-ink mb-3 text-sm">📣 הפצה ומעורבות</h3>
+              <div className="grid grid-cols-2 gap-2 text-center">
+                {[
+                  { label: "שיתופים", value: an.shares, icon: "🔗" },
+                  { label: "צפיות בשיתוף", value: an.publicViews, icon: "👀" },
+                  { label: "הדפסות", value: an.prints, icon: "🖨️" },
+                  { label: "התקנות PWA", value: an.pwaInstalls, icon: "📱" },
+                  { label: "דירוגים", value: an.ratings, icon: "⭐" },
+                  { label: "פידבקים", value: an.feedbacks, icon: "💬" },
+                ].map(m => (
+                  <div key={m.label} className="bg-canvas rounded-lg p-2">
+                    <div className="text-base font-bold text-ink font-display">{m.icon} {m.value}</div>
+                    <div className="text-[10px] text-ink/40">{m.label}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Generation reliability — errors by type */}
+          {errorTotal > 0 && (
+            <div className="bg-white rounded-2xl p-4 border border-ink/5 shadow-sm">
+              <h3 className="font-bold text-ink mb-3 text-sm">⚠️ תקלות ייצור — {errorTotal} ב-7 ימים</h3>
+              <div className="flex flex-wrap gap-2">
+                {an.errors.map(e => (
+                  <span key={e.type} className="text-xs bg-red-50 border border-red-200 text-red-600 rounded-full px-2.5 py-1">
+                    {e.type}: <strong>{e.count}</strong>
+                  </span>
+                ))}
+              </div>
+              <p className="text-[10px] text-ink/30 mt-2">quota = פגיעה ב-paywall (טוב) · ai_overloaded/timeout/network/stream = תקלות אמיתיות לתיקון</p>
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className="bg-canvas rounded-2xl p-4 border border-ink/5">
+          <p className="text-sm font-medium text-ink/50">📊 משפך מלא — ייאסף החל מהפריסה</p>
+          <p className="text-xs text-ink/30 mt-0.5">מבקרים אנונימיים, מקורות תנועה, הפצה, ותקלות ייצור יופיעו כאן תוך יום</p>
+        </div>
+      )}
 
       {/* Quality signals */}
       {(data.ratedBooklets > 0 || data.churnRiskCount > 0) && (

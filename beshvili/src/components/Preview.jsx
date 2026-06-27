@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from "react";
+import { track } from "../hooks/useEvents";
 
 const A4_PX = 794;
 const A4_H  = 1123; // A4 at 96dpi: 297mm × (96/25.4) ≈ 1123px
@@ -18,7 +19,7 @@ function extractText(html) {
   return (doc.body.textContent || "").replace(/\s+/g, " ").trim();
 }
 
-export default function Preview({ html, onReset, shareToken, title, active = true }) {
+export default function Preview({ html, onReset, shareToken, title, active = true, context = "unknown" }) {
   const containerRef = useRef(null); // outer div — measures available width
   const iframeRef = useRef(null);
   const [scale, setScale]   = useState(1);
@@ -68,20 +69,22 @@ export default function Preview({ html, onReset, shareToken, title, active = tru
         );
 
   const openInNewTab = () => {
+    track("booklet_opened_newtab", { context });
     const printHtml = getPrintHtml();
     const blob = new Blob([printHtml], { type: "text/html;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const w = window.open(url, "_blank");
-    if (!w) { alert("אפשרי חלונות קופצים בדפדפן"); URL.revokeObjectURL(url); return; }
+    if (!w) { track("popup_blocked", { action: "newtab" }); alert("אפשרי חלונות קופצים בדפדפן"); URL.revokeObjectURL(url); return; }
     setTimeout(() => URL.revokeObjectURL(url), 120000);
   };
 
   const handlePrint = useCallback(() => {
+    track("booklet_printed", { context, isMobile });
     const printHtml = getPrintHtml();
     const blob = new Blob([printHtml], { type: "text/html;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const w = window.open(url, "_blank");
-    if (!w) { alert("אפשרי חלונות קופצים בדפדפן"); URL.revokeObjectURL(url); return; }
+    if (!w) { track("popup_blocked", { action: "print" }); alert("אפשרי חלונות קופצים בדפדפן"); URL.revokeObjectURL(url); return; }
     setTimeout(() => {
       try { w.focus(); w.print(); } catch {}
       setTimeout(() => URL.revokeObjectURL(url), 120000);
@@ -95,20 +98,28 @@ export default function Preview({ html, onReset, shareToken, title, active = tru
     return () => window.removeEventListener("keydown", h);
   }, [html, active, handlePrint]);
 
+  const utterRef = useRef(null);
+
   const toggleRead = useCallback(() => {
     const synth = window.speechSynthesis;
     if (!synth) return;
 
     if (synth.speaking) {
+      // Detach onend so the manual-stop event isn't also counted as a natural end.
+      if (utterRef.current) utterRef.current.onend = null;
       synth.cancel();
       setReading(false);
+      track("read_aloud_stopped", { context });
       return;
     }
 
     const text = extractText(html);
     if (!text) return;
 
+    track("read_aloud_started", { context });
+
     const utter = new SpeechSynthesisUtterance(text);
+    utterRef.current = utter;
     utter.lang = "he-IL";
     utter.rate = 0.88;
     utter.pitch = 1.05;
@@ -119,7 +130,7 @@ export default function Preview({ html, onReset, shareToken, title, active = tru
     if (heVoice) utter.voice = heVoice;
 
     utter.onstart  = () => setReading(true);
-    utter.onend    = () => setReading(false);
+    utter.onend    = () => { setReading(false); track("read_aloud_stopped", { context }); };
     utter.onerror  = () => setReading(false);
     utter.onpause  = () => setReading(false);
 
@@ -127,6 +138,7 @@ export default function Preview({ html, onReset, shareToken, title, active = tru
   }, [html]);
 
   const shareWhatsApp = () => {
+    track("booklet_shared_whatsapp", { context, has_share_token: !!shareToken });
     const link = shareToken
       ? `${window.location.origin}/b/${shareToken}`
       : window.location.origin;
@@ -137,6 +149,7 @@ export default function Preview({ html, onReset, shareToken, title, active = tru
 
   const copyShareLink = useCallback(async () => {
     if (!shareToken) return;
+    track("share_link_copied", { context });
     const link = `${window.location.origin}/b/${shareToken}`;
     try {
       await navigator.clipboard.writeText(link);
@@ -153,6 +166,7 @@ export default function Preview({ html, onReset, shareToken, title, active = tru
   }, [shareToken]);
 
   const downloadHtml = () => {
+    track("booklet_html_downloaded", { context });
     const url = URL.createObjectURL(new Blob([html], { type: "text/html;charset=utf-8" }));
     const a = document.createElement("a");
     a.href = url;
@@ -275,7 +289,7 @@ export default function Preview({ html, onReset, shareToken, title, active = tru
         </button>
         {onReset && (
           <button
-            onClick={onReset}
+            onClick={() => { track("booklet_reset", { context }); onReset(); }}
             className="flex items-center justify-center gap-2 border border-ink/15 rounded-xl p-3 text-sm text-ink/50 hover:text-ink hover:border-ink/30 transition-colors"
           >
             ✨ חוברת חדשה

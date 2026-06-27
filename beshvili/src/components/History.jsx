@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabase";
 import Preview from "./Preview";
+import { track } from "../hooks/useEvents";
 
 const WORLD_COLORS = {
   "כדורגל": "bg-green-100 text-green-700",
@@ -55,7 +56,7 @@ export default function History() {
       .select("id, title, world, child_name, grade, created_at")
       .order("created_at", { ascending: false })
       .then(({ data, error }) => {
-        if (error) setLoadError(true);
+        if (error) { setLoadError(true); track("history_load_failed", {}); }
         setItems(data ?? []);
         setLoading(false);
       });
@@ -86,7 +87,10 @@ export default function History() {
               type="text"
               placeholder="🔍 חיפוש..."
               value={search}
-              onChange={e => setSearch(e.target.value)}
+              onChange={e => {
+                if (!search && e.target.value) track("history_search_used", {});
+                setSearch(e.target.value);
+              }}
               className="w-full border border-ink/15 rounded-xl p-2 pr-3 text-right bg-white text-sm outline-none focus:border-magic text-ink"
             />
             {search && (
@@ -140,6 +144,7 @@ function BookletRow({ booklet: b, onDelete, index = 0 }) {
   const toggle = async () => {
     if (html) { setHtml(null); setShareToken(null); return; }
     if (loadingHtml) return;
+    track("history_booklet_opened", { booklet_id: b.id, world: b.world });
     setLoadingHtml(true);
     const { data } = await supabase.from("booklets").select("html, share_token").eq("id", b.id).single();
     setHtml(data?.html ?? null);
@@ -153,7 +158,8 @@ function BookletRow({ booklet: b, onDelete, index = 0 }) {
     setDelError(false);
     const { error } = await supabase.from("booklets").delete().eq("id", b.id);
     setDeleting(false);
-    if (error) { setDelError(true); return; }
+    if (error) { setDelError(true); track("history_delete_failed", { booklet_id: b.id }); return; }
+    track("history_booklet_deleted", { booklet_id: b.id, world: b.world });
     onDelete(b.id);
   };
 
@@ -212,7 +218,7 @@ function BookletRow({ booklet: b, onDelete, index = 0 }) {
       </div>
       {html && (
         <div className="border-t border-ink/5 p-4">
-          <Preview html={html} shareToken={shareToken} title={b.title} />
+          <Preview html={html} shareToken={shareToken} title={b.title} context="history" />
         </div>
       )}
     </div>
