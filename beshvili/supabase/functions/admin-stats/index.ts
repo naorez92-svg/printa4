@@ -6,7 +6,8 @@ function getCors(req: Request) {
     origin === "https://www.beshvili.com" ||
     origin === "https://beshvili.com" ||
     origin === "http://localhost:5173" ||
-    /^https:\/\/printa4-git-[^.]+\.vercel\.app$/.test(origin);
+    origin === "http://localhost:4173" ||
+    /^https:\/\/printa4-git-[a-z0-9-]+-naor-s-projects\.vercel\.app$/.test(origin);
   return {
     "Access-Control-Allow-Origin": allowed ? origin : "https://www.beshvili.com",
     "Vary": "Origin",

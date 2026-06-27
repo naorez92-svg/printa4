@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { track } from "../hooks/useEvents";
+import { supabase } from "../lib/supabase";
 
 const A4_PX = 794;
 const A4_H  = 1123; // A4 at 96dpi: 297mm × (96/25.4) ≈ 1123px
@@ -19,7 +20,7 @@ function extractText(html) {
   return (doc.body.textContent || "").replace(/\s+/g, " ").trim();
 }
 
-export default function Preview({ html, onReset, shareToken, title, active = true, context = "unknown" }) {
+export default function Preview({ html, onReset, shareToken, title, active = true, context = "unknown", bookletId = null }) {
   const containerRef = useRef(null); // outer div — measures available width
   const iframeRef = useRef(null);
   const [scale, setScale]   = useState(1);
@@ -137,8 +138,17 @@ export default function Preview({ html, onReset, shareToken, title, active = tru
     synth.speak(utter);
   }, [html]);
 
+  // Flip the booklet to public the first time it's actually shared (fire-and-forget
+  // so the share window opens inside the click gesture and isn't popup-blocked).
+  const markPublic = () => {
+    if (!bookletId) return;
+    supabase.from("booklets").update({ is_public: true }).eq("id", bookletId)
+      .then(({ error }) => { if (error) console.error("markPublic error:", error); });
+  };
+
   const shareWhatsApp = () => {
     track("booklet_shared_whatsapp", { context, has_share_token: !!shareToken });
+    markPublic();
     const link = shareToken
       ? `${window.location.origin}/b/${shareToken}`
       : window.location.origin;
@@ -150,6 +160,7 @@ export default function Preview({ html, onReset, shareToken, title, active = tru
   const copyShareLink = useCallback(async () => {
     if (!shareToken) return;
     track("share_link_copied", { context });
+    markPublic();
     const link = `${window.location.origin}/b/${shareToken}`;
     try {
       await navigator.clipboard.writeText(link);

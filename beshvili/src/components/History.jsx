@@ -218,7 +218,7 @@ function BookletRow({ booklet: b, onDelete, index = 0 }) {
       </div>
       {html && (
         <div className="border-t border-ink/5 p-4">
-          <Preview html={html} shareToken={shareToken} title={b.title} context="history" />
+          <Preview html={html} shareToken={shareToken} title={b.title} context="history" bookletId={b.id} />
         </div>
       )}
     </div>

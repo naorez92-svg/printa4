@@ -498,7 +498,11 @@ Deno.serve(async (req) => {
     const teacherName    = isTeacher ? stripNewlines(profile?.teacher_display_name ?? "") : "";
     const teacherTagline = isTeacher ? stripNewlines(profile?.teacher_tagline ?? "") : "";
     const teacherPhone   = isTeacher ? stripNewlines(profile?.teacher_phone ?? "") : "";
-    const teacherColor   = isTeacher ? (profile?.teacher_color ?? "purple") : "";
+    // Allow-list (not esc): teacher_color is appended outside the <user_input>
+    // delimiters, so an arbitrary value would be a prompt-injection vector.
+    const teacherColor   = isTeacher
+      ? (["purple", "blue", "green", "orange", "pink"].includes(profile?.teacher_color) ? profile.teacher_color : "purple")
+      : "";
     const brandingBlock  = teacherName
       ? `\n\nמיתוג מורה:\nteacher_name: ${esc(teacherName)}\nteacher_tagline: ${esc(teacherTagline)}\nteacher_phone: ${esc(teacherPhone)}\nteacher_logo: ${safeTeacherLogo}\nteacher_color: ${teacherColor}`
       : "";

@@ -16,6 +16,7 @@ export default function PublicBooklet({ token }) {
   const [scale, setScale]     = useState(1);
   const [iframeHeight, setIframeHeight] = useState(A4_H);
   const containerRef = useRef(null); // outer div — measures available width
+  const iframeRef = useRef(null);
 
   useEffect(() => {
     const url = `${import.meta.env.VITE_SUPABASE_URL || "https://gywpdzkvkdisonuzhsib.supabase.co"}/functions/v1/view-booklet?token=${token}`;
@@ -55,6 +56,7 @@ export default function PublicBooklet({ token }) {
   useEffect(() => {
     const handler = (e) => {
       if (e.origin !== "null" && e.origin !== window.location.origin) return;
+      if (iframeRef.current && e.source !== iframeRef.current.contentWindow) return;
       const h = e.data?.height;
       if (e.data?.type === "beshvili_height" && typeof h === "number" && h > A4_H && h < 60000) {
         setIframeHeight(h);
@@ -138,6 +140,7 @@ export default function PublicBooklet({ token }) {
             style={{ width: `${scaledW}px`, height: `${scaledH}px` }}
           >
             <iframe
+              ref={iframeRef}
               title={booklet.title || "חוברת"}
               srcDoc={injectHeightProbe(booklet.html)}
               sandbox="allow-scripts"

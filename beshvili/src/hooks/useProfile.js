@@ -10,6 +10,7 @@ export function useProfile() {
   const [bookletCount, setBookletCount] = useState(0);
   const [monthlyBookletCount, setMonthlyBookletCount] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   const refresh = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser();
@@ -20,11 +21,19 @@ export function useProfile() {
 
     // bookletCount = total_booklets_created (lifetime, never decremented) so deleting
     // a booklet cannot reset the free-tier quota
-    const [{ data: p }, { count: monthly }] = await Promise.all([
+    const [{ data: p, error: pErr }, { count: monthly }] = await Promise.all([
       supabase.from("profiles").select("plan, full_name, total_booklets_created, teacher_display_name, teacher_tagline, teacher_phone, teacher_logo_url, teacher_color").eq("id", user.id).single(),
       supabase.from("booklets").select("*", { count: "exact", head: true }).eq("user_id", user.id).gte("created_at", monthStart),
     ]);
 
+    // On a fetch error, keep the previously-loaded profile rather than silently
+    // downgrading a paying user to the free tier (locked pages, wrong quota).
+    if (pErr) {
+      setError(pErr);
+      setLoading(false);
+      return;
+    }
+    setError(null);
     setProfile(p);
     setBookletCount(p?.total_booklets_created ?? 0);
     setMonthlyBookletCount(monthly ?? 0);
@@ -47,5 +56,5 @@ export function useProfile() {
     ? Math.max(0, monthlyLimit - monthlyBookletCount)
     : null;
 
-  return { profile, plan, bookletCount, monthlyBookletCount, monthlyLimit, monthlyRemaining, remaining, isPro, isAdmin, loading, refresh };
+  return { profile, plan, bookletCount, monthlyBookletCount, monthlyLimit, monthlyRemaining, remaining, isPro, isAdmin, loading, error, refresh };
 }

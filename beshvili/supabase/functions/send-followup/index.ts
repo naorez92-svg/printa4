@@ -5,6 +5,11 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
 
 const FREE_LIMIT = 3; // must match useProfile.js + DB trigger
 
+// HTML-escape user-controlled values (full_name) before interpolation.
+const esc = (s: string) => String(s ?? "")
+  .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+  .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+
 function buildEmailHtml(greeting: string, bodyHtml: string, ctaText: string, ctaUrl: string): string {
   return `<!DOCTYPE html>
 <html dir="rtl" lang="he">
@@ -117,7 +122,7 @@ Deno.serve(async (req) => {
   );
 
   for (const p of wave1) {
-    const name    = p.full_name ? p.full_name.split(" ")[0] : null;
+    const name    = p.full_name ? esc(p.full_name.split(" ")[0]) : null;
     const greeting = name ? `שלום ${name}!` : "שלום!";
     const count   = bookletsByUser[p.id] ?? 0;
     const remaining = FREE_LIMIT - count;
@@ -192,7 +197,7 @@ Deno.serve(async (req) => {
   });
 
   for (const p of wave2) {
-    const name      = p.full_name ? p.full_name.split(" ")[0] : null;
+    const name      = p.full_name ? esc(p.full_name.split(" ")[0]) : null;
     const greeting  = name ? `שלום ${name}!` : "שלום!";
     const count     = bookletsByUser[p.id] ?? 0;
     const remaining = FREE_LIMIT - count;

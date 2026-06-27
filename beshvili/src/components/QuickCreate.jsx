@@ -45,6 +45,7 @@ export default function QuickCreate({ student, onClose, onSaved, remaining, isPr
   const [shareToken, setShareToken] = useState(null);
   const [rateCountdown, setRateCountdown] = useState(null);
   const streamAbortRef = useRef(null);
+  const creatingRef = useRef(false);   // prevent double-submit (fast double-tap)
 
   useEffect(() => {
     if (!loading) { setLoadingMsgIdx(0); setStreamChars(0); return; }
@@ -72,7 +73,8 @@ export default function QuickCreate({ student, onClose, onSaved, remaining, isPr
   const canSubmit = !loading && subject.length > 0;
 
   const create = useCallback(async () => {
-    if (!canSubmit) return;
+    if (!canSubmit || creatingRef.current) return;
+    creatingRef.current = true;
     setLoading(true);
     setHtml(null);
     setError(null);
@@ -97,6 +99,7 @@ export default function QuickCreate({ student, onClose, onSaved, remaining, isPr
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) {
       setLoading(false);
+      creatingRef.current = false;
       trackError("no_session");
       setError("אתה לא מחובר — נסה להתחבר מחדש");
       return;
@@ -119,6 +122,7 @@ export default function QuickCreate({ student, onClose, onSaved, remaining, isPr
       });
     } catch (e) {
       setLoading(false);
+      creatingRef.current = false;
       if (ctrl.signal.aborted) return;
       trackError("network");
       setError(`שגיאת רשת — ${String(e)}`);
@@ -128,9 +132,11 @@ export default function QuickCreate({ student, onClose, onSaved, remaining, isPr
     if (!resp.ok) {
       const errData = await resp.json().catch(() => ({}));
       setLoading(false);
+      creatingRef.current = false;
       if (errData?.error === "quota_exceeded") {
-        trackError(errData?.period === "monthly" ? "quota_monthly" : "quota");
-        setError("quota");
+        const monthly = errData?.period === "monthly";
+        trackError(monthly ? "quota_monthly" : "quota");
+        setError(monthly ? "quota_monthly" : "quota");
         return;
       }
       if (errData?.error === "rate_limited") {
@@ -172,12 +178,14 @@ export default function QuickCreate({ student, onClose, onSaved, remaining, isPr
         }
       }
     } catch {
+      if (ctrl.signal.aborted) { creatingRef.current = false; return; } // unmounted/closed mid-stream
       const partial = htmlAccumulated.trim();
       if (partial.length > 8000 && (partial.includes("<!DOCTYPE") || partial.includes("<html"))) {
         if (!partial.includes("</html>")) htmlAccumulated = partial + "\n</body></html>";
         // Fall through to save the partial booklet
       } else {
         setLoading(false);
+        creatingRef.current = false;
         trackError("stream_dropped");
         setError("החיבור נקטע — נסה שנית, רצוי עם פחות עמודים");
         return;
@@ -185,6 +193,7 @@ export default function QuickCreate({ student, onClose, onSaved, remaining, isPr
     }
 
     setLoading(false);
+    creatingRef.current = false;
     const rawHtml = htmlAccumulated.trim();
     if (!rawHtml || !rawHtml.includes("<")) { trackError("empty_html"); setError("לא התקבל HTML תקין מהשרת"); return; }
     const finalHtml = sanitizeBookletHtml(rawHtml);
@@ -235,7 +244,7 @@ export default function QuickCreate({ student, onClose, onSaved, remaining, isPr
               <span className="text-xl">✅</span>
               <span>החוברת נוצרה עבור {student.name}!</span>
             </div>
-            <Preview html={html} onReset={onClose} shareToken={shareToken} context="quick" />
+            <Preview html={html} onReset={onClose} shareToken={shareToken} context="quick" bookletId={bookletId} />
           </div>
         )}
       </section>
@@ -356,6 +365,19 @@ export default function QuickCreate({ student, onClose, onSaved, remaining, isPr
             >
               🚀 שדרגי — מ-₪19/חודש
             </button>
+          </div>
+        )}
+        {error === "quota_monthly" && (
+          <div className="space-y-3 text-center">
+            <p className="text-ink/70 text-sm font-semibold">📅 הגעת למכסה החודשית</p>
+            <p className="text-ink/50 text-xs">המכסה מתחדשת בתחילת החודש. צריך יותר? שלחי הודעה ונרחיב.</p>
+            <a
+              href={`https://wa.me/972509139137?text=${encodeURIComponent("שלום! הגעתי למכסה החודשית — אפשר להרחיב?")}`}
+              target="_blank" rel="noopener noreferrer"
+              className="block w-full bg-[#25D366] text-white rounded-xl p-3 font-semibold text-center hover:opacity-90 transition-opacity"
+            >
+              💬 שלחי הודעה
+            </a>
           </div>
         )}
 

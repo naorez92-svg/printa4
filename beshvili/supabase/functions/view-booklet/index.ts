@@ -23,10 +23,13 @@ Deno.serve(async (req) => {
     { auth: { persistSession: false } }
   );
 
+  // Only booklets the owner has explicitly shared (is_public) are served — a
+  // freshly-created booklet is private until the user shares it.
   const { data: booklet, error } = await admin
     .from("booklets")
     .select("title, html, created_at")
     .eq("share_token", token)
+    .eq("is_public", true)
     .single();
 
   if (error || !booklet) {

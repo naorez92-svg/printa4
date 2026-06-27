@@ -1,50 +1,66 @@
 const TAILWIND_CDN = "https://cdn.tailwindcss.com";
+const FONTS_RE = /^https:\/\/fonts\.(googleapis|gstatic)\.com\//;
 
-// Strip unsafe content from AI-generated HTML before storing or rendering.
+// Strip unsafe content from AI-generated HTML before storing, rendering, or
+// printing. This runs DOM-based (DOMParser) rather than regex: the browser's
+// real HTML tokenizer correctly handles the bypasses a regex misses —
+// `<img/src=x/onerror=...>` (slash separators), unclosed/malformed `<script`,
+// `<iframe srcdoc=...>`, etc. It removes dangerous nodes/attributes but leaves
+// all CSS (style blocks + inline styles) untouched, so booklet print layout is
+// preserved exactly. The ONLY script allowed in the output is the trusted
+// Tailwind CDN, re-injected at the end.
 export function sanitizeBookletHtml(h) {
   if (!h) return h;
+  if (typeof DOMParser === "undefined") return h; // non-browser — caller renders sandboxed anyway
   const hasTailwind = h.includes(TAILWIND_CDN);
 
-  // 1. Remove all <script> blocks (inline and external)
-  let out = h.replace(/<script\b[\s\S]*?<\/script>/gi, "");
+  const doc = new DOMParser().parseFromString(h, "text/html");
 
-  // 2. Remove tags that can redirect, load plugins, or rebase relative URLs
-  out = out.replace(/<(base|frame|frameset)\b[^>]*\/?>/gi, "");
-  out = out.replace(/<meta\b[^>]*\bhttp-equiv\b[^>]*\/?>/gi, "");
-  out = out.replace(/<(object|applet)\b[\s\S]*?<\/\1>/gi, "");
-  out = out.replace(/<(object|applet|embed)\b[^>]*\/?>/gi, "");
+  // 1. Remove executable / navigation / plugin / rebasing elements entirely.
+  doc.querySelectorAll(
+    "script, iframe, object, embed, applet, base, frame, frameset, noscript, template"
+  ).forEach((el) => el.remove());
 
-  // 3. Strip <link> tags that load external resources; Google Fonts are safe and
-  //    required for booklet typography (Fredoka, Varela Round, Assistant, Rubik)
-  out = out.replace(/<link\b[^>]*>/gi, (m) =>
-    /https:\/\/fonts\.(googleapis|gstatic)\.com\//.test(m) ? m : ""
-  );
+  // 2. Remove <meta http-equiv> (refresh redirects / CSP overrides).
+  doc.querySelectorAll("meta[http-equiv]").forEach((el) => el.remove());
 
-  // 4. Remove inline event-handler attributes (onclick, onerror, onload, …)
-  out = out.replace(/\s+on[a-z]+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]*)/gi, "");
+  // 3. Keep only Google-Fonts <link>; drop every other external stylesheet/resource.
+  doc.querySelectorAll("link").forEach((el) => {
+    if (!FONTS_RE.test(el.getAttribute("href") || "")) el.remove();
+  });
 
-  // 5. Strip javascript:/vbscript: from href, src, action, formaction attributes
-  out = out.replace(
-    /((?:href|src|action|formaction)\s*=\s*["'])\s*(?:javascript|vbscript):[^"']*/gi,
-    "$1#"
-  );
+  // 4. Scrub every element's attributes: event handlers + dangerous URL schemes.
+  const URL_ATTRS = new Set(["href", "src", "action", "formaction", "xlink:href", "background", "poster"]);
+  doc.querySelectorAll("*").forEach((el) => {
+    for (const attr of [...el.attributes]) {
+      const name = attr.name.toLowerCase();
+      const val = (attr.value || "").trim();
+      if (name.startsWith("on")) {
+        el.removeAttribute(attr.name);                       // onclick/onerror/onload/…
+      } else if (URL_ATTRS.has(name)) {
+        const scheme = val.toLowerCase();
+        const bad =
+          /^(javascript|vbscript):/.test(scheme) ||
+          // data:/blob: are script/navigation sinks here — but allow inline images.
+          (/^(data|blob):/.test(scheme) && !/^data:image\//.test(scheme));
+        if (bad) el.removeAttribute(attr.name);
+      } else if (name === "srcdoc") {
+        el.removeAttribute(attr.name);
+      } else if (name === "style" && /(javascript|vbscript):|expression\s*\(/i.test(val)) {
+        el.setAttribute(
+          "style",
+          val.replace(/(?:javascript|vbscript):/gi, "").replace(/expression\s*\(/gi, "(")
+        );
+      }
+    }
+  });
 
-  // 6. Strip javascript:/vbscript: from inline style attribute values
-  //    Covers: background:url(javascript:...), content:url(javascript:...), etc.
-  out = out.replace(/\bstyle\s*=\s*"([^"]*)"/gi, (_, v) =>
-    `style="${v.replace(/(?:javascript|vbscript):/gi, "")}"`
-  );
-  out = out.replace(/\bstyle\s*=\s*'([^']*)'/gi, (_, v) =>
-    `style='${v.replace(/(?:javascript|vbscript):/gi, "")}'`
-  );
-
-  // 7. Re-inject Tailwind CDN (was removed in step 1 along with all scripts)
-  if (hasTailwind) {
-    const tag = `<script src="${TAILWIND_CDN}"></script>`;
-    out = out.includes("</head>")
-      ? out.replace("</head>", `${tag}\n</head>`)
-      : tag + out;
+  // 5. Re-inject the single trusted script (Tailwind CDN) removed in step 1.
+  if (hasTailwind && doc.head) {
+    const s = doc.createElement("script");
+    s.src = TAILWIND_CDN;
+    doc.head.appendChild(s);
   }
 
-  return out;
+  return "<!DOCTYPE html>\n" + doc.documentElement.outerHTML;
 }

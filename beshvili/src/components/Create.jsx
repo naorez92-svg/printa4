@@ -147,6 +147,7 @@ export default function Create({ onSaved, remaining, isPro, active = true, bookl
   const create = useCallback(async () => {
     if (!canSubmit || creatingRef.current) return;
     creatingRef.current = true;
+    const startedAt = Date.now();   // true generation duration (not the stale loadingElapsed closure)
     setLoading(true);
     setHtml(null);
     setError(null);
@@ -280,6 +281,9 @@ export default function Create({ onSaved, remaining, isPro, active = true, bookl
       }
     } catch (streamErr) {
       wakeLock?.release().catch(() => {});
+      // Unmounted / navigated away mid-stream: don't setState or save a booklet
+      // the user abandoned.
+      if (ctrl.signal.aborted) { creatingRef.current = false; return; }
       // Save partial booklet if we got substantial HTML (e.g. connection dropped mid-stream)
       const partial = htmlAccumulated.trim();
       if (partial.length > 8000 && (partial.includes("<!DOCTYPE") || partial.includes("<html"))) {
@@ -329,7 +333,7 @@ export default function Create({ onSaved, remaining, isPro, active = true, bookl
     setBookletTitle(title);
     setShowRating(true);
     setHtml(generatedHtml);
-    track("booklet_completed", { booklet_id: inserted?.id, pages: pageCount, mode, durationSec: loadingElapsed, chars: htmlAccumulated.length, partial: streamAborted, withAnswerKey });
+    track("booklet_completed", { booklet_id: inserted?.id, pages: pageCount, mode, durationSec: Math.round((Date.now() - startedAt) / 1000), chars: htmlAccumulated.length, partial: streamAborted, withAnswerKey });
     onSaved?.();
 
     // Notify user if they switched away during generation
@@ -514,7 +518,7 @@ export default function Create({ onSaved, remaining, isPro, active = true, bookl
         )}
 
         {/* Booklet preview — shown immediately, always first */}
-        <Preview html={html} onReset={reset} shareToken={shareToken} title={bookletTitle} active={active} context="create" />
+        <Preview html={html} onReset={reset} shareToken={shareToken} title={bookletTitle} active={active} context="create" bookletId={bookletId} />
 
         {/* Rating widget — shown below the booklet, optional */}
         {showRating && bookletId && (
