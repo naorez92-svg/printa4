@@ -126,34 +126,7 @@ Deno.serve(async (req) => {
       if (!res.ok) console.error("notify-lead resend error:", await res.text());
     }
 
-    // 3. Instant WhatsApp ping to the owner (optional — only if configured via
-    //    CallMeBot: set secrets OWNER_WHATSAPP_PHONE + CALLMEBOT_APIKEY). This is
-    //    the fastest channel: a hot lead reaches the phone in seconds.
-    let whatsapped = false;
-    if ((recentLeadCount ?? 0) === 0) {
-      const waPhone = Deno.env.get("OWNER_WHATSAPP_PHONE");   // e.g. 972509139137
-      const waKey   = Deno.env.get("CALLMEBOT_APIKEY");
-      if (waPhone && waKey) {
-        try {
-          const planLabel = PLAN_LABELS[planId] ?? planId;
-          const lines = [
-            "🔥 ליד חם בבשבילי!",
-            `שם: ${displayName}`,
-            `תוכנית: ${planLabel}`,
-            userEmail !== "—" ? `מייל: ${userEmail}` : "",
-            phone ? `טלפון: ${phone}` : "",
-          ].filter(Boolean).join("\n");
-          const waUrl = `https://api.callmebot.com/whatsapp.php?phone=${encodeURIComponent(waPhone)}&text=${encodeURIComponent(lines)}&apikey=${encodeURIComponent(waKey)}`;
-          const waRes = await fetch(waUrl, { signal: AbortSignal.timeout(10_000) });
-          whatsapped = waRes.ok;
-          if (!waRes.ok) console.error("notify-lead whatsapp error:", waRes.status);
-        } catch (e) {
-          console.error("notify-lead whatsapp failed:", e);
-        }
-      }
-    }
-
-    return new Response(JSON.stringify({ ok: true, emailed, whatsapped }), { status: 200, headers: cors });
+    return new Response(JSON.stringify({ ok: true, emailed }), { status: 200, headers: cors });
   } catch (e) {
     console.error("notify-lead error:", e);
     return new Response(JSON.stringify({ error: "internal_error" }), { status: 500, headers: cors });
