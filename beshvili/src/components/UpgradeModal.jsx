@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { supabase } from "../lib/supabase";
+import { track } from "../hooks/useEvents";
 
 const WA = "972509139137";
 const BIT_PHONE = "0509139137";
@@ -28,42 +29,55 @@ const PLANS = [
   },
 ];
 
-export default function UpgradeModal({ onClose, bookletCount = 0 }) {
+export default function UpgradeModal({ onClose, bookletCount = 0, source = "unknown" }) {
   const [selectedPlan, setSelectedPlan] = useState("teacher");
   const [name, setName]   = useState("");
+  const [phone, setPhone] = useState("");
   const [sent, setSent]   = useState(false);
 
   const plan = PLANS.find(p => p.id === selectedPlan);
 
-  const saveLead = async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      await supabase.from("leads").insert({
-        user_id: user?.id ?? null,
-        name:    name.trim() || null,
-        phone:   null,
-      });
-    } catch (e) {
-      console.error("leads insert error:", e);
-    }
+  // Track that the paywall was actually seen — the first funnel step that was
+  // previously invisible (we only knew about booklet_completed before this).
+  // Fire once per mount; the modal unmounts on close so this is one view = one event.
+  useEffect(() => { track("upgrade_modal_opened", { source, bookletCount }); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Persist the lead + alert the owner via the notify-lead edge function.
+  // Fire-and-forget — NEVER await this before window.open, or the popup blocker
+  // kills the WhatsApp/Bit redirect (window.open must stay in the click gesture).
+  const saveLead = (method) => {
+    track("upgrade_cta_clicked", { method, plan: plan.id, source, bookletCount });
+    supabase.functions
+      .invoke("notify-lead", {
+        body: {
+          name: name.trim() || null,
+          phone: phone.trim() || null,
+          plan: plan.id,
+          method,
+          bookletCount,
+        },
+      })
+      .then(({ error }) => { if (error) console.error("notify-lead error:", error); })
+      .catch((e) => console.error("notify-lead invoke failed:", e));
   };
 
-  const payWithBit = async () => {
-    await saveLead();
+  const payWithBit = () => {
     const planLabel = plan.id === "teacher" ? "מורה" : "הורה";
     const msg = encodeURIComponent(
       `שלום! אני רוצה לשדרג לתוכנית ${planLabel} בבשבילי ${plan.icon}\nשלחתי ${plan.price} ₪ בביט${name.trim() ? `\nשם: ${name.trim()}` : ""}`
     );
+    // Open synchronously (still inside the click gesture) BEFORE the network call.
     window.open(`https://wa.me/${WA}?text=${msg}`, "_blank");
+    saveLead("bit");
     setSent(true);
   };
 
-  const sendWhatsApp = async () => {
-    await saveLead();
+  const sendWhatsApp = () => {
     const planLabel = plan.id === "teacher" ? "מורה" : "הורה";
     const parts = [`שלום! אני רוצה לשדרג לתוכנית ${planLabel} בבשבילי ${plan.icon}`];
     if (name.trim()) parts.push(`שם: ${name.trim()}`);
     window.open(`https://wa.me/${WA}?text=${encodeURIComponent(parts.join("\n"))}`, "_blank");
+    saveLead("whatsapp");
     setSent(true);
   };
 
@@ -170,6 +184,14 @@ export default function UpgradeModal({ onClose, bookletCount = 0 }) {
               placeholder="שם (אופציונלי)"
               value={name}
               onChange={e => setName(e.target.value)}
+            />
+            <input
+              type="tel"
+              inputMode="tel"
+              className="w-full border border-ink/20 rounded-xl p-3 text-right bg-canvas/50 outline-none focus:border-magic text-sm"
+              placeholder="טלפון לחזרה (אופציונלי) — נחזור אלייך"
+              value={phone}
+              onChange={e => setPhone(e.target.value)}
             />
 
             <p className="text-xs text-ink/40 font-medium text-center">בחרי אמצעי תשלום:</p>

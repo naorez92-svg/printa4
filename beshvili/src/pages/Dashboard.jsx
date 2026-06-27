@@ -227,7 +227,7 @@ export default function Dashboard() {
         </footer>
       </div>
 
-      {showUpgrade && <UpgradeModal onClose={() => setShowUpgrade(false)} bookletCount={bookletCount} />}
+      {showUpgrade && <UpgradeModal onClose={() => setShowUpgrade(false)} bookletCount={bookletCount} source="dashboard" />}
       <FeedbackWidget />
       <InstallPWA variant="banner" />
     </div>

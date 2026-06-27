@@ -134,9 +134,14 @@ export default function AdminPanel() {
     { label: "חוברות היום",   value: data.bookletsToday,      icon: "🔥" },
   ];
 
-  const fs = data.funnelStats ?? { sessions: 0, started: 0, completed: 0 };
+  const fs = data.funnelStats ?? { sessions: 0, started: 0, completed: 0, upgradeOpened: 0, ctaClicked: 0, leads: 0 };
   const convStart = fs.sessions > 0 ? Math.round((fs.started / fs.sessions) * 100) : 0;
   const convDone  = fs.started  > 0 ? Math.round((fs.completed / fs.started) * 100) : 0;
+  // Upgrade funnel: saw paywall → clicked pay → became a lead.
+  // Clamp to 100%: the modal also opens from non-completion paths (dashboard/quota),
+  // so upgradeOpened can exceed completed — a raw ratio would read >100%.
+  const convCta  = fs.upgradeOpened > 0 ? Math.min(100, Math.round(((fs.ctaClicked ?? 0) / fs.upgradeOpened) * 100)) : 0;
+  const convLead = fs.completed     > 0 ? Math.min(100, Math.round(((fs.upgradeOpened ?? 0) / fs.completed) * 100)) : 0;
 
   return (
     <div className="space-y-6">
@@ -196,6 +201,38 @@ export default function AdminPanel() {
               <div className="text-2xl font-bold text-ink font-display">{fs.completed}</div>
               <div className="text-xs text-ink/40 mt-0.5">סיימו</div>
               {convDone > 0 && <div className="text-xs text-grow font-bold mt-0.5">{convDone}%</div>}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Upgrade funnel (last 7 days) — the conversion step that was previously invisible */}
+      <div className="bg-white rounded-2xl p-4 border border-ink/5 shadow-sm">
+        <h3 className="font-bold text-ink mb-3 text-sm">💰 משפך שדרוג — 7 ימים</h3>
+        {(fs.upgradeOpened ?? 0) === 0 && (fs.ctaClicked ?? 0) === 0 && (fs.leads ?? 0) === 0 ? (
+          <p className="text-xs text-ink/30">עדיין אין נתוני שדרוג — ייאסף החל מהיום (מי ראה מסך תשלום, מי לחץ, מי השאיר ליד)</p>
+        ) : (
+          <div className="flex items-center gap-3">
+            <div className="flex-1 text-center bg-canvas rounded-xl p-3">
+              <div className="text-2xl font-bold text-ink font-display">{fs.completed}</div>
+              <div className="text-xs text-ink/40 mt-0.5">סיימו חוברת</div>
+            </div>
+            <div className="text-ink/20">→</div>
+            <div className="flex-1 text-center bg-canvas rounded-xl p-3">
+              <div className="text-2xl font-bold text-ink font-display">{fs.upgradeOpened ?? 0}</div>
+              <div className="text-xs text-ink/40 mt-0.5">ראו תשלום</div>
+              {convLead > 0 && <div className="text-xs text-magic font-bold mt-0.5">{convLead}%</div>}
+            </div>
+            <div className="text-ink/20">→</div>
+            <div className="flex-1 text-center bg-canvas rounded-xl p-3">
+              <div className="text-2xl font-bold text-ink font-display">{fs.ctaClicked ?? 0}</div>
+              <div className="text-xs text-ink/40 mt-0.5">לחצו תשלום</div>
+              {convCta > 0 && <div className="text-xs text-magic font-bold mt-0.5">{convCta}%</div>}
+            </div>
+            <div className="text-ink/20">→</div>
+            <div className="flex-1 text-center bg-grow/8 rounded-xl p-3 border border-grow/20">
+              <div className="text-2xl font-bold text-grow font-display">{fs.leads ?? 0}</div>
+              <div className="text-xs text-ink/40 mt-0.5">לידים 🔥</div>
             </div>
           </div>
         )}

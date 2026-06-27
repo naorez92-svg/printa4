@@ -392,7 +392,7 @@ export default function Create({ onSaved, remaining, isPro, active = true, bookl
   if (error === "quota") {
     return (
       <>
-        {showUpgrade && <UpgradeModal onClose={() => setShowUpgrade(false)} />}
+        {showUpgrade && <UpgradeModal onClose={() => setShowUpgrade(false)} bookletCount={bookletCount} source="create_quota" />}
         <section className="bg-white rounded-2xl p-6 shadow-sm border border-ink/5 text-center space-y-5">
           <div className="text-5xl">🔒</div>
           <div>
@@ -524,7 +524,7 @@ export default function Create({ onSaved, remaining, isPro, active = true, bookl
 
   return (
     <>
-    {showUpgrade && <UpgradeModal onClose={() => setShowUpgrade(false)} />}
+    {showUpgrade && <UpgradeModal onClose={() => setShowUpgrade(false)} bookletCount={bookletCount} source="create_form" />}
     <section className="bg-white rounded-2xl shadow-sm border border-ink/5 overflow-hidden">
       {/* Header */}
       <div className="bg-gradient-to-l from-magic/10 to-brand/10 px-5 pt-5 pb-4">

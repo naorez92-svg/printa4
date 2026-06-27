@@ -196,20 +196,32 @@ Deno.serve(async (req) => {
     }));
 
   // Funnel stats from events (last 7 days)
-  let funnelStats = { sessions: 0, started: 0, completed: 0 };
+  let funnelStats = { sessions: 0, started: 0, completed: 0, upgradeOpened: 0, ctaClicked: 0, leads: 0 };
   try {
     const { data: eventsData } = await admin
       .from("events")
       .select("event, user_id")
       .gte("created_at", weekAgo);
     if (eventsData) {
+      const uniq = (name: string) =>
+        [...new Set(eventsData.filter(e => e.event === name).map(e => e.user_id))].length;
       funnelStats = {
-        sessions:  [...new Set(eventsData.filter(e => e.event === "session_start").map(e => e.user_id))].length,
-        started:   [...new Set(eventsData.filter(e => e.event === "booklet_started").map(e => e.user_id))].length,
-        completed: [...new Set(eventsData.filter(e => e.event === "booklet_completed").map(e => e.user_id))].length,
+        sessions:      uniq("session_start"),
+        started:       uniq("booklet_started"),
+        completed:     uniq("booklet_completed"),
+        upgradeOpened: uniq("upgrade_modal_opened"),
+        ctaClicked:    uniq("upgrade_cta_clicked"),
+        leads:         0, // filled from the leads table below (more reliable than events)
       };
     }
   } catch { /* events table may not exist yet */ }
+
+  // Leads in the last 7 days (purchase-intent count, from the source of truth)
+  try {
+    const { count: leadCount } = await admin
+      .from("leads").select("*", { count: "exact", head: true }).gte("created_at", weekAgo);
+    funnelStats.leads = leadCount ?? 0;
+  } catch { /* leads table may not exist yet */ }
 
   // Load existing pending proposals
   let pendingProposals: any[] = [];

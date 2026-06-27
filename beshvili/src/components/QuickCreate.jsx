@@ -216,7 +216,7 @@ export default function QuickCreate({ student, onClose, onSaved, remaining, isPr
 
   return (
     <>
-    {showUpgrade && <UpgradeModal onClose={() => setShowUpgrade(false)} />}
+    {showUpgrade && <UpgradeModal onClose={() => setShowUpgrade(false)} source="quick_create" />}
     <div className="bg-white rounded-2xl shadow-sm border border-ink/5 overflow-hidden">
       {/* Header */}
       <div className="bg-gradient-to-l from-magic/10 to-brand/10 px-5 pt-5 pb-4">
