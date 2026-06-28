@@ -295,7 +295,7 @@ export default function Create({ onSaved, remaining, isPro, active = true, bookl
         setLoading(false);
         creatingRef.current = false;
         trackError("stream_dropped");
-        setError("generic:החיבור נקטע — נסה שנית, רצוי עם פחות עמודים");
+        setError(`generic:החיבור נקטע — לחצי שוב על "צור חוברת" כדי לנסות שוב${pageCount > 3 ? " (רצוי עם פחות עמודים)" : ""}`);
         return;
       }
     }
