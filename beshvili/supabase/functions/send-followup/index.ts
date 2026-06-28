@@ -45,7 +45,7 @@ Deno.serve(async (req) => {
     return new Response(JSON.stringify({ error: "RESEND_API_KEY not configured" }), { status: 500 });
   }
 
-  // Authorize: service role key (cron) or admin JWT
+  // Authorize: service role key (cron) or admin JWT — BEFORE reading body
   const token = req.headers.get("authorization")?.replace("Bearer ", "") ?? "";
   const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
   if (token !== serviceRoleKey) {
@@ -55,10 +55,16 @@ Deno.serve(async (req) => {
     if (profile?.plan !== "admin") return new Response(JSON.stringify({ error: "forbidden" }), { status: 403 });
   }
 
+  // Parse body after auth is confirmed
+  let body: { sameDay?: boolean } = {};
+  try { body = await req.json(); } catch { /* no body or not JSON */ }
+
   const now = new Date();
-  const twoDaysAgo  = new Date(now.getTime() - 2  * 24 * 60 * 60 * 1000).toISOString();
-  const fourDaysAgo = new Date(now.getTime() - 4  * 24 * 60 * 60 * 1000).toISOString();
-  const fiveDaysAgo = new Date(now.getTime() - 5  * 24 * 60 * 60 * 1000).toISOString();
+  const twoHoursAgo = new Date(now.getTime() -  2 * 60 * 60 * 1000).toISOString();
+  const oneDayAgo   = new Date(now.getTime() -  1 * 24 * 60 * 60 * 1000).toISOString();
+  const twoDaysAgo  = new Date(now.getTime() -  2 * 24 * 60 * 60 * 1000).toISOString();
+  const fourDaysAgo = new Date(now.getTime() -  4 * 24 * 60 * 60 * 1000).toISOString();
+  const fiveDaysAgo = new Date(now.getTime() -  5 * 24 * 60 * 60 * 1000).toISOString();
   const tenDaysAgo  = new Date(now.getTime() - 10 * 24 * 60 * 60 * 1000).toISOString();
 
   // Load all profiles (free + pro, non-admin) in one query
@@ -112,6 +118,41 @@ Deno.serve(async (req) => {
     }
   }
 
+  // ── Wave 0: Same-day follow-up (manual only — triggered from admin panel) ──
+  // Target: signed up today (>2h ago), never got any follow-up, 0 booklets created
+  let wave0: typeof (allProfiles ?? []) = [];
+  if (body.sameDay) {
+    wave0 = (allProfiles ?? []).filter(p =>
+      p.plan !== "admin" &&
+      p.followup_sent_at === null &&
+      p.created_at <= twoHoursAgo &&
+      p.created_at >= oneDayAgo &&
+      (bookletsByUser[p.id] ?? 0) === 0
+    );
+
+    for (const p of wave0) {
+      const name     = p.full_name ? esc(p.full_name.split(" ")[0]) : null;
+      const greeting = name ? `שלום ${name}!` : "שלום!";
+      const subject  = "עוד לא ניסית? 60 שניות → חוברת מותאמת אישית ✨";
+      const html = buildEmailHtml(greeting,
+        `<p style="color:#555;line-height:1.7;margin:0 0 16px;">
+          נרשמת היום לבשבילי — עדיין לא יצרת את החוברת הראשונה שלך 😊
+        </p>
+        <p style="color:#555;line-height:1.7;margin:0 0 16px;">
+          זה ממש פשוט: לחצי על אחד מהנושאים בדף הבית (כמו &quot;הבנת הנקרא ג-ד&quot;) — הטופס יתמלא אוטומטית,
+          ואחר כך רק לחצי &quot;צור חוברת&quot;. <strong>תוך 60 שניות יש לך חוברת עבודה מלאה מוכנה להדפסה.</strong>
+        </p>
+        <div style="background:#f0f0ff;border-radius:12px;padding:16px;margin:0 0 16px;text-align:right;">
+          <p style="margin:0 0 6px;color:#6C5CE7;font-weight:bold;font-size:14px;">✨ 3 חוברות ראשונות — חינם לגמרי</p>
+          <p style="margin:0;color:#555;font-size:13px;line-height:1.7;">מורות פרטיות חוסכות 3+ שעות הכנה בשבוע · כל חוברת מוכנה ב-60 שניות</p>
+        </div>`,
+        "צרי את החוברת הראשונה שלך ✨",
+        "https://beshvili.com"
+      );
+      await sendEmail(p.id, subject, html, "followup_sent_at");
+    }
+  }
+
   // ── Wave 1: D+2 onboarding follow-up ─────────────────────────────────────
   // Target: signed up 2-4 days ago, never received a follow-up
   const wave1 = (allProfiles ?? []).filter(p =>
@@ -130,7 +171,6 @@ Deno.serve(async (req) => {
     let subject: string, html: string;
 
     if (count >= FREE_LIMIT) {
-      // Used all 3 free — push to upgrade
       subject = "אהבת? שדרגי לפרו — חוברות ללא הגבלה 🚀";
       html = buildEmailHtml(greeting,
         `<p style="color:#555;line-height:1.7;margin:0 0 16px;">
@@ -148,7 +188,6 @@ Deno.serve(async (req) => {
         "https://beshvili.com"
       );
     } else if (count > 0) {
-      // Created 1-2 booklets — encourage to use remaining
       const savedMin = count * 45;
       const savedStr = savedMin >= 60
         ? `${(savedMin / 60).toFixed(1).replace(".0", "")} שעות`
@@ -166,7 +205,6 @@ Deno.serve(async (req) => {
         "https://beshvili.com"
       );
     } else {
-      // Never created — remove onboarding friction
       subject = "עדיין לא ניסית? 60 שניות → חוברת מותאמת אישית ✨";
       html = buildEmailHtml(greeting,
         `<p style="color:#555;line-height:1.7;margin:0 0 16px;">
@@ -185,12 +223,9 @@ Deno.serve(async (req) => {
   }
 
   // ── Wave 2: Dormant re-engagement ────────────────────────────────────────
-  // Target: free users who created 1+ booklets, last booklet 5-10 days ago,
-  //         never received a dormant followup
-  // Strategy: value-first — "הנה רעיון לחוברת הבאה" not "חזרי לאפליקציה"
   const wave2 = (allProfiles ?? []).filter(p => {
-    if (p.plan !== "free") return false; // pro users get renewal reminder instead
-    if (p.dormant_followup_sent_at !== null) return false; // already sent
+    if (p.plan !== "free") return false;
+    if (p.dormant_followup_sent_at !== null) return false;
     const lastBooklet = lastBookletByUser[p.id];
     if (!lastBooklet) return false;
     return lastBooklet <= fiveDaysAgo && lastBooklet >= tenDaysAgo;
@@ -238,9 +273,10 @@ Deno.serve(async (req) => {
 
   return new Response(JSON.stringify({
     sent,
+    wave0_candidates: wave0.length,
     wave1_candidates: wave1.length,
     wave2_candidates: wave2.length,
-    total: wave1.length + wave2.length,
+    total: wave0.length + wave1.length + wave2.length,
     errors,
   }), { status: 200 });
 });
