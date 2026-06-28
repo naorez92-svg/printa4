@@ -1,0 +1,120 @@
+name: Health Check (every 2h)
+
+on:
+  schedule:
+    # Every 2 hours 6am–midnight Israel time (UTC+3 = UTC 03:00–21:00)
+    - cron: '0 3,5,7,9,11,13,15,17,19,21 * * *'
+  workflow_dispatch:
+
+jobs:
+  health-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run health check
+        id: check
+        run: |
+          RESPONSE=$(curl -sS -w "\n%{http_code}" -X POST \
+            "https://gywpdzkvkdisonuzhsib.supabase.co/functions/v1/health-check" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
+            -H "Content-Type: application/json" \
+            -d '{}')
+          HTTP_CODE=$(echo "$RESPONSE" | tail -1)
+          BODY=$(echo "$RESPONSE" | head -n -1)
+          echo "http_code=$HTTP_CODE" >> $GITHUB_OUTPUT
+          echo "body<<HEALTHEOF" >> $GITHUB_OUTPUT
+          echo "$BODY" >> $GITHUB_OUTPUT
+          echo "HEALTHEOF" >> $GITHUB_OUTPUT
+          echo "=== Health Check Response ==="
+          echo "Status: $HTTP_CODE"
+          echo "$BODY"
+
+      - name: Create GitHub issue on failure
+        if: steps.check.outputs.http_code != '200'
+        uses: actions/github-script@v7
+        env:
+          HEALTH_BODY: ${{ steps.check.outputs.body }}
+          HTTP_CODE: ${{ steps.check.outputs.http_code }}
+        with:
+          script: |
+            const raw = process.env.HEALTH_BODY || '{}';
+            const httpCode = process.env.HTTP_CODE;
+            let result = {};
+            try { result = JSON.parse(raw); } catch {}
+
+            const failed = (result.checks || []).filter(c => !c.ok);
+            const passed = (result.checks || []).filter(c => c.ok);
+
+            const failLines = failed.map(c => `- ❌ **${c.name}**: ${c.msg || 'failed'}`).join('\n');
+            const passLines = passed.map(c => `- ✅ ${c.name}${c.msg ? ` (${c.msg})` : ''}`).join('\n');
+
+            const now = new Date();
+            const timeIL = now.toLocaleString('he-IL', {
+              timeZone: 'Asia/Jerusalem',
+              day: '2-digit', month: '2-digit',
+              hour: '2-digit', minute: '2-digit'
+            });
+
+            const actionLines = failed.map(c => {
+              if (c.name === 'RESEND_API_KEY' || c.name === 'ANTHROPIC_API_KEY') {
+                return `- [ ] הגדר ${c.name} ב-[Supabase Secrets](https://supabase.com/dashboard/project/gywpdzkvkdisonuzhsib/settings/functions)`;
+              }
+              if (c.name === 'profiles_schema') {
+                return `- [ ] הרץ מיגרציה — [Deploy Supabase workflow](https://github.com/naorez92-svg/printa4/actions/workflows/deploy-supabase.yml)`;
+              }
+              if (c.name === 'stream_error_rate') {
+                return `- [ ] בדוק [Edge Function לוגים](https://supabase.com/dashboard/project/gywpdzkvkdisonuzhsib/functions) ו-[Anthropic status](https://status.anthropic.com)`;
+              }
+              return `- [ ] בדוק ${c.name}`;
+            }).join('\n');
+
+            // Close any existing open health-check issues first
+            const { data: existing } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              labels: 'health-check-alert',
+              state: 'open',
+            });
+            for (const issue of existing) {
+              await github.rest.issues.update({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue.number,
+                state: 'closed',
+              });
+            }
+
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `🚨 בשבילי — תקלה זוהתה ${timeIL}`,
+              labels: ['health-check-alert'],
+              body: `## בדיקת תקינות אוטומטית — נכשלה
+
+### ❌ כשלים (${failed.length})
+${failLines || '(אין כשלים ספציפיים)'}
+
+### ✅ תקין (${passed.length})
+${passLines || '(אין)'}
+
+### פעולות נדרשות
+${actionLines || '- [ ] בדוק את הלוגים'}
+
+---
+
+<details>
+<summary>תגובה מלאה (JSON)</summary>
+
+\`\`\`json
+${JSON.stringify(result, null, 2)}
+\`\`\`
+
+</details>
+
+> HTTP Status: ${httpCode} · נזוהה ב-${timeIL}`,
+            });
+
+      - name: Fail workflow if health check failed
+        if: steps.check.outputs.http_code != '200'
+        run: |
+          echo "Health check failed (HTTP ${{ steps.check.outputs.http_code }})"
+          exit 1
