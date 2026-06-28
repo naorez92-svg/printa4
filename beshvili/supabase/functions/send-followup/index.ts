@@ -88,9 +88,18 @@ Deno.serve(async (req) => {
   const tenDaysAgo  = new Date(now.getTime() - 10 * 24 * 60 * 60 * 1000).toISOString();
 
   // Load all profiles (free + pro, non-admin) in one query
-  const { data: allProfiles } = await admin
+  const { data: allProfiles, error: profilesError } = await admin
     .from("profiles")
     .select("id, full_name, plan, followup_sent_at, dormant_followup_sent_at, created_at");
+
+  if (profilesError) {
+    console.error("[send-followup] profiles query failed:", profilesError.message);
+    return new Response(JSON.stringify({
+      error: "profiles_query_failed",
+      detail: profilesError.message,
+      hint: "Migration 0020_dormant_followup.sql may not have been applied — run Deploy Supabase workflow manually.",
+    }), { status: 500, headers: cors });
+  }
 
   const profileMap: Record<string, {
     full_name: string | null;
@@ -351,5 +360,10 @@ Deno.serve(async (req) => {
     wave2_candidates: wave2.length,
     total: wave0.length + wave0e.length + wave1.length + wave2.length,
     errors,
+    _debug: {
+      profiles_found: (allProfiles ?? []).length,
+      auth_users_found: (authData?.users ?? []).length,
+      booklets_found: (allBooklets ?? []).length,
+    },
   }), { status: 200, headers: cors });
 });
