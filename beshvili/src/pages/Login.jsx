@@ -112,6 +112,10 @@ export default function Login() {
   const [step, setStep]   = useState("email");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [heroEmail, setHeroEmail] = useState("");
+  const [heroSent, setHeroSent] = useState(false);
+  const [heroLoading, setHeroLoading] = useState(false);
+  const [heroError, setHeroError] = useState("");
   const [subjectIdx, setSubjectIdx]       = useState(0);
   const [subjectVisible, setSubjectVisible] = useState(true);
   const [openFaq, setOpenFaq] = useState(null);
@@ -166,6 +170,31 @@ export default function Login() {
       track("auth_google_error", { error: err.message });
       setError(err.message || "שגיאה בכניסה עם Google");
       setLoading(false);
+    }
+  };
+
+  const sendFromHero = async () => {
+    if (!heroEmail.trim()) return;
+    track("auth_email_submitted", { method: "magic_link", location: "hero" });
+    setHeroLoading(true);
+    setHeroError("");
+    const { error: err } = await supabase.auth.signInWithOtp({
+      email: heroEmail,
+      options: { emailRedirectTo: window.location.origin },
+    });
+    setHeroLoading(false);
+    if (err) {
+      const msg = err.message || "";
+      const alreadySent = /after \d+ second/i.test(msg) || /rate|security/i.test(msg);
+      if (alreadySent) {
+        setHeroSent(true);
+      } else {
+        track("auth_email_error", { error: msg, location: "hero" });
+        setHeroError(msg || "שגיאה בשליחה — נסי שנית");
+      }
+    } else {
+      track("auth_email_sent", { method: "magic_link", location: "hero" });
+      setHeroSent(true);
     }
   };
 
@@ -240,6 +269,54 @@ export default function Login() {
           >
             ✨ התחילי חינם — 3 חוברות מתנה
           </button>
+
+          {/* ── Compact hero login card ── */}
+          <div className="bg-white/10 backdrop-blur-sm border border-white/15 rounded-2xl px-5 py-4 max-w-xs mx-auto w-full">
+            {heroSent ? (
+              <div className="text-center space-y-1.5 py-1">
+                <p className="text-white font-semibold text-sm">✉️ בדוק את {heroEmail}</p>
+                <p className="text-white/50 text-xs">שלחנו קישור — לחץ עליו להיכנס</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <p className="text-white/40 text-xs text-center">── כניסה מהירה ──</p>
+                <button
+                  onClick={signInWithGoogle}
+                  disabled={heroLoading || loading}
+                  className="w-full flex items-center justify-center gap-2.5 bg-white/90 hover:bg-white rounded-xl px-4 py-2.5 text-sm font-semibold text-ink/80 transition-all disabled:opacity-50"
+                >
+                  <GoogleIcon />
+                  כניסה עם Google
+                </button>
+                <div className="relative flex items-center gap-2">
+                  <div className="flex-1 border-t border-white/15" />
+                  <span className="text-white/30 text-xs">או</span>
+                  <div className="flex-1 border-t border-white/15" />
+                </div>
+                <div className="flex gap-2">
+                  <input
+                    className="flex-1 min-w-0 bg-white/10 border border-white/20 rounded-xl px-3 py-2.5 text-sm text-white placeholder-white/35 outline-none focus:border-white/50 transition-colors text-right"
+                    placeholder="your@email.com"
+                    type="email"
+                    value={heroEmail}
+                    onChange={(e) => setHeroEmail(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && sendFromHero()}
+                    disabled={heroLoading}
+                    dir="ltr"
+                  />
+                  <button
+                    onClick={sendFromHero}
+                    disabled={heroLoading || !heroEmail.trim()}
+                    className="flex-shrink-0 bg-brand hover:opacity-90 text-white rounded-xl px-3.5 py-2.5 text-sm font-semibold transition-opacity disabled:opacity-40"
+                  >
+                    {heroLoading ? "…" : "שלחי →"}
+                  </button>
+                </div>
+                {heroError && <p className="text-red-300 text-xs text-center">{heroError}</p>}
+              </div>
+            )}
+          </div>
+
           <p className="text-xs text-white/30">ללא כרטיס אשראי · ללא סיסמה · כניסה קלה במייל</p>
           <div className="flex items-center justify-center gap-2 pt-1">
             <span className="w-1.5 h-1.5 bg-grow rounded-full animate-pulse flex-shrink-0" />
@@ -422,6 +499,59 @@ export default function Login() {
                 <div className="text-xs text-ink/50">{desc}</div>
               </div>
             ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── Jewish Studies section ── */}
+      <section className="py-14 px-5 bg-gradient-to-b from-canvas to-white">
+        <div className="max-w-3xl mx-auto">
+          <div className="text-center mb-8">
+            <div className="inline-flex items-center gap-2 bg-magic/10 border border-magic/20 rounded-full px-4 py-1.5 mb-4">
+              <span className="text-sm">✡️</span>
+              <span className="text-xs font-semibold text-magic">חדש — מקצועות יהדות</span>
+            </div>
+            <h2 className="text-2xl font-bold text-ink mb-2 font-display">חומרי יהדות לפי תכנית המפמ"ר</h2>
+            <p className="text-ink/55 text-sm max-w-lg mx-auto leading-relaxed">
+              מורות לחינוך דתי לאומי — עכשיו אפשר ליצור דפי עבודה, מבחנים וסיכומים בכל מקצועות היהדות,
+              מותאמים לתכנית הלימודים הרשמית של משרד החינוך.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-8">
+            {[
+              { icon: "⚖️", label: "הלכה",         desc: "ל\"ט מלאכות, ברכות, כשרות — לפי כיתה" },
+              { icon: "📜", label: "משנה",          desc: "תענית, ראש השנה, ברכות, אבות — שלמות" },
+              { icon: "📖", label: "תנ\"ך",          desc: "חמ\"ד — בראשית עד כתובים לפי שכבה" },
+              { icon: "🕍", label: "מקור חיים",     desc: "הרב חיים דוד הלוי — כיתות ז-ט" },
+              { icon: "✡️", label: "פרשת השבוע",   desc: "פרשה שוטפת + רש\"י + שאלות עיון" },
+              { icon: "🔯", label: "מחשבת ישראל",  desc: "אמונה, ציונות דתית, תורה שבע\"פ" },
+            ].map(({ icon, label, desc }) => (
+              <div key={label} className="bg-white rounded-2xl p-4 border border-magic/10 shadow-sm">
+                <div className="text-2xl mb-2">{icon}</div>
+                <div className="font-bold text-sm text-ink mb-1">{label}</div>
+                <div className="text-[11px] text-ink/50 leading-snug">{desc}</div>
+              </div>
+            ))}
+          </div>
+
+          <div className="bg-gradient-to-l from-magic/10 to-brand/10 border border-magic/20 rounded-2xl px-5 py-4">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+              {[
+                { icon: "📄", label: "דף עבודה" },
+                { icon: "📝", label: "מבחן 100 נק'" },
+                { icon: "📋", label: "סיכום שיעור" },
+                { icon: "🃏", label: "כרטיסיות חזרה" },
+              ].map(({ icon, label }) => (
+                <div key={label} className="bg-white/70 rounded-xl px-3 py-2.5 text-center border border-magic/10">
+                  <div className="text-xl mb-1">{icon}</div>
+                  <div className="text-[11px] font-semibold text-ink">{label}</div>
+                </div>
+              ))}
+            </div>
+            <p className="text-center text-xs text-ink/55">
+              כל החומרים מותאמים לתכנית הלימודים הרשמית · ציטוטי מקורות מדויקים · עברית תקנית · מוכן להדפסה A4
+            </p>
           </div>
         </div>
       </section>
