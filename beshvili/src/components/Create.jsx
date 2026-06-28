@@ -105,6 +105,9 @@ export default function Create({ onSaved, remaining, isPro, active = true, bookl
   const [showMoreModes, setShowMoreModes] = useState(false);        // first-timers: hide free/exam behind disclosure
   const creatingRef   = useRef(false);   // prevent double-submit
   const streamAbortRef = useRef(null);   // cancel in-flight SSE on unmount
+  const retryCountRef  = useRef(0);      // auto-retry: 0=fresh, 1=used first retry
+  const retryTimerRef  = useRef(null);   // pending retry setTimeout id
+  const createRef      = useRef(null);   // stable pointer to latest create()
 
   // Rotate loading messages every 3.5 s while generating; tick elapsed seconds
   useEffect(() => {
@@ -114,8 +117,11 @@ export default function Create({ onSaved, remaining, isPro, active = true, bookl
     return () => { clearInterval(msgId); clearInterval(secId); };
   }, [loading]);
 
-  // Abort any in-flight SSE stream on unmount
-  useEffect(() => () => streamAbortRef.current?.abort(), []);
+  // Abort any in-flight SSE stream on unmount; cancel pending auto-retry
+  useEffect(() => () => {
+    streamAbortRef.current?.abort();
+    clearTimeout(retryTimerRef.current);
+  }, []);
 
   // Fire once when the free-quota paywall screen renders
   useEffect(() => {
@@ -291,7 +297,18 @@ export default function Create({ onSaved, remaining, isPro, active = true, bookl
         if (!partial.includes("</html>")) htmlAccumulated = partial + "\n</body></html>";
         streamAborted = true;
         // Fall through to save the partial booklet below
+      } else if (retryCountRef.current < 1) {
+        // Auto-retry once — keep spinner visible, reset progress, retry after 2s
+        retryCountRef.current++;
+        trackError("stream_dropped_retrying");
+        setStreamChars(0);
+        setLoadingElapsed(0);
+        setLoadingMsgIdx(0);
+        creatingRef.current = false;
+        retryTimerRef.current = setTimeout(() => createRef.current?.(), 2000);
+        return;
       } else {
+        retryCountRef.current = 0;
         setLoading(false);
         creatingRef.current = false;
         trackError("stream_dropped");
@@ -358,6 +375,7 @@ export default function Create({ onSaved, remaining, isPro, active = true, bookl
       } catch {}
     }
   }, [canSubmit, mode, freeText, f, pageCount, withAnswerKey, onSaved, photoUrl, examGrade, examSubject, examTopic, noEmojis, customWorld]);
+  createRef.current = create; // keep stable pointer for auto-retry
 
   useEffect(() => {
     if (!active) return;

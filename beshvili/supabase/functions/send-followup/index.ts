@@ -87,17 +87,17 @@ Deno.serve(async (req) => {
   const fiveDaysAgo = new Date(now.getTime() -  5 * 24 * 60 * 60 * 1000).toISOString();
   const tenDaysAgo  = new Date(now.getTime() - 10 * 24 * 60 * 60 * 1000).toISOString();
 
-  // Load all profiles (free + pro, non-admin) in one query
+  // Load all profiles (free + pro, non-admin) — without dormant_followup_sent_at
+  // so this query works even if migration 0020 hasn't been applied yet.
   const { data: allProfiles, error: profilesError } = await admin
     .from("profiles")
-    .select("id, full_name, plan, followup_sent_at, dormant_followup_sent_at, created_at");
+    .select("id, full_name, plan, followup_sent_at, created_at");
 
   if (profilesError) {
     console.error("[send-followup] profiles query failed:", profilesError.message);
     return new Response(JSON.stringify({
       error: "profiles_query_failed",
       detail: profilesError.message,
-      hint: "Migration 0020_dormant_followup.sql may not have been applied — run Deploy Supabase workflow manually.",
     }), { status: 500, headers: cors });
   }
 
@@ -105,12 +105,27 @@ Deno.serve(async (req) => {
     full_name: string | null;
     plan: string;
     followup_sent_at: string | null;
-    dormant_followup_sent_at: string | null;
     created_at: string;
   }> = {};
   (allProfiles ?? []).forEach(p => { profileMap[p.id] = p; });
 
   const allIds = Object.keys(profileMap);
+
+  // Separately fetch dormant_followup_sent_at (added by migration 0020).
+  // If column doesn't exist yet, this query fails silently — Wave 2 is skipped.
+  let dormantByUser: Record<string, string | null> | null = null;
+  if (allIds.length > 0) {
+    const { data: dData, error: dErr } = await admin
+      .from("profiles")
+      .select("id, dormant_followup_sent_at")
+      .in("id", allIds);
+    if (!dErr && dData) {
+      dormantByUser = {};
+      dData.forEach((p: { id: string; dormant_followup_sent_at: string | null }) => {
+        dormantByUser![p.id] = p.dormant_followup_sent_at;
+      });
+    }
+  }
 
   // Booklets: count + last created_at per user
   const { data: allBooklets } = await admin.from("booklets").select("user_id, created_at").in("user_id", allIds);
@@ -304,9 +319,10 @@ Deno.serve(async (req) => {
   // Target: free users who created 1+ booklets, last booklet 5-10 days ago,
   //         never received a dormant followup
   // Strategy: value-first — "הנה רעיון לחוברת הבאה" not "חזרי לאפליקציה"
-  const wave2 = (allProfiles ?? []).filter(p => {
-    if (p.plan !== "free") return false; // pro users get renewal reminder instead
-    if (p.dormant_followup_sent_at !== null) return false; // already sent
+  // Wave 2 only runs if migration 0020 was applied (dormantByUser != null)
+  const wave2 = dormantByUser === null ? [] : (allProfiles ?? []).filter(p => {
+    if (p.plan !== "free") return false;
+    if ((dormantByUser![p.id] ?? null) !== null) return false; // already sent
     const lastBooklet = lastBookletByUser[p.id];
     if (!lastBooklet) return false;
     return lastBooklet <= fiveDaysAgo && lastBooklet >= tenDaysAgo;
@@ -364,6 +380,7 @@ Deno.serve(async (req) => {
       profiles_found: (allProfiles ?? []).length,
       auth_users_found: (authData?.users ?? []).length,
       booklets_found: (allBooklets ?? []).length,
+      wave2_skipped: dormantByUser === null,
     },
   }), { status: 200, headers: cors });
 });

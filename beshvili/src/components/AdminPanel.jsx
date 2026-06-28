@@ -111,11 +111,18 @@ export default function AdminPanel() {
     setRegenerating(false);
   };
 
+  const fmtFollowupResult = (res, err, label) => {
+    if (err) return `שגיאה: ${err.message}`;
+    const dbg = res?._debug;
+    const suffix = dbg ? ` · ${dbg.profiles_found} פרופילים נמצאו` : "";
+    return `${label}${suffix}`;
+  };
+
   const triggerFollowup = async () => {
     setSending(true); setSendResult("");
     const { data: res, error: err } = await supabase.functions.invoke("send-followup", { body: {} });
     setSending(false);
-    setSendResult(err ? `שגיאה: ${err.message}` : `נשלחו ${res?.sent ?? 0} מיילים מתוך ${res?.total ?? 0}`);
+    setSendResult(fmtFollowupResult(res, err, `נשלחו ${res?.sent ?? 0} מיילים מתוך ${res?.total ?? 0}`));
   };
 
   const triggerRenewal = async () => {
@@ -129,7 +136,7 @@ export default function AdminPanel() {
     setSendingToday(true); setTodayResult("");
     const { data: res, error: err } = await supabase.functions.invoke("send-followup", { body: { sameDay: true } });
     setSendingToday(false);
-    setTodayResult(err ? `שגיאה: ${err.message}` : `נשלחו ${res?.sent ?? 0} מיילים מתוך ${res?.wave0_candidates ?? 0} נרשמות היום`);
+    setTodayResult(fmtFollowupResult(res, err, `נשלחו ${res?.sent ?? 0} מיילים מתוך ${res?.wave0_candidates ?? 0} נרשמות היום`));
   };
 
   const triggerEmergencyBlast = async () => {
@@ -137,7 +144,7 @@ export default function AdminPanel() {
     setSendingEmergency(true); setEmergencyResult("");
     const { data: res, error: err } = await supabase.functions.invoke("send-followup", { body: { emergency: true } });
     setSendingEmergency(false);
-    setEmergencyResult(err ? `שגיאה: ${err.message}` : `נשלחו ${res?.sent ?? 0} מיילים מתוך ${res?.wave0e_candidates ?? 0} נרשמות היום`);
+    setEmergencyResult(fmtFollowupResult(res, err, `נשלחו ${res?.sent ?? 0} מיילים מתוך ${res?.wave0e_candidates ?? 0} נרשמות היום`));
   };
 
   if (loading) return <div className="text-center py-12 text-ink/40">טוען נתוני ניהול…</div>;
