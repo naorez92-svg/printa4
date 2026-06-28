@@ -174,9 +174,11 @@ Deno.serve(async (req) => {
   }
 
   // ── Wave 1: D+2 onboarding follow-up ─────────────────────────────────────
-  // Target: signed up 2-4 days ago, never received a follow-up
+  // Target: FREE users who signed up 2-4 days ago, never received a follow-up.
+  // Paid users (teacher/parent/pro) are excluded — they already converted, and
+  // the free-trial messaging ("3 חינמיות נשארו") is misleading for paying customers.
   const wave1 = (allProfiles ?? []).filter(p =>
-    p.plan !== "admin" &&
+    p.plan === "free" &&
     p.followup_sent_at === null &&
     p.created_at <= twoDaysAgo &&
     p.created_at >= fourDaysAgo
@@ -191,6 +193,7 @@ Deno.serve(async (req) => {
     let subject: string, html: string;
 
     if (count >= FREE_LIMIT) {
+      // Used all 3 free — push to upgrade
       subject = "אהבת? שדרגי לפרו — חוברות ללא הגבלה 🚀";
       html = buildEmailHtml(greeting,
         `<p style="color:#555;line-height:1.7;margin:0 0 16px;">
@@ -208,6 +211,7 @@ Deno.serve(async (req) => {
         "https://beshvili.com"
       );
     } else if (count > 0) {
+      // Created 1-2 booklets — encourage to use remaining
       const savedMin = count * 45;
       const savedStr = savedMin >= 60
         ? `${(savedMin / 60).toFixed(1).replace(".0", "")} שעות`
@@ -225,6 +229,7 @@ Deno.serve(async (req) => {
         "https://beshvili.com"
       );
     } else {
+      // Never created — remove onboarding friction
       subject = "עדיין לא ניסית? 60 שניות → חוברת מותאמת אישית ✨";
       html = buildEmailHtml(greeting,
         `<p style="color:#555;line-height:1.7;margin:0 0 16px;">
@@ -243,9 +248,12 @@ Deno.serve(async (req) => {
   }
 
   // ── Wave 2: Dormant re-engagement ────────────────────────────────────────
+  // Target: free users who created 1+ booklets, last booklet 5-10 days ago,
+  //         never received a dormant followup
+  // Strategy: value-first — "הנה רעיון לחוברת הבאה" not "חזרי לאפליקציה"
   const wave2 = (allProfiles ?? []).filter(p => {
-    if (p.plan !== "free") return false;
-    if (p.dormant_followup_sent_at !== null) return false;
+    if (p.plan !== "free") return false; // pro users get renewal reminder instead
+    if (p.dormant_followup_sent_at !== null) return false; // already sent
     const lastBooklet = lastBookletByUser[p.id];
     if (!lastBooklet) return false;
     return lastBooklet <= fiveDaysAgo && lastBooklet >= tenDaysAgo;
