@@ -567,11 +567,45 @@ Deno.serve(async (req) => {
     const monthlyLimit = isAdmin ? -1 : isTeacher ? TEACHER_MONTHLY_LIMIT : isParent ? PARENT_MONTHLY_LIMIT : FREE_BOOKLET_LIMIT;
     const remaining = isAdmin ? -1 : monthlyLimit - (isPaid ? usedMonthly : usedTotal) - 1;
 
-    return new Response(anthropicResp.body, {
+    // ── 7. Stream Anthropic SSE → client with keep-alive heartbeats ────────────
+    // Direct pipe breaks on mobile 4G: the network kills "idle" TCP connections
+    // during multi-second pauses between token batches (common between pages).
+    // SSE comment lines (": keep-alive\n\n") are spec-compliant no-ops — the
+    // client's `data: ` check silently skips them, but they reset the TCP idle timer.
+    // x-accel-buffering: no disables nginx/CDN buffering so chunks arrive immediately.
+    const enc = new TextEncoder();
+    const KEEP_ALIVE = enc.encode(": keep-alive\n\n");
+
+    const { readable, writable } = new TransformStream<Uint8Array, Uint8Array>();
+    const w = writable.getWriter();
+
+    const hb = setInterval(async () => {
+      try { await w.write(KEEP_ALIVE); } catch { /* writer closed */ }
+    }, 8000);
+
+    (async () => {
+      const reader = anthropicResp.body!.getReader();
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          await w.write(value);
+        }
+        clearInterval(hb);
+        await w.close();
+      } catch (e) {
+        clearInterval(hb);
+        console.error("[generate-booklet] stream error:", String(e));
+        try { await w.abort(e); } catch {}
+      }
+    })();
+
+    return new Response(readable, {
       headers: {
         ...cors,
         "content-type": "text/event-stream",
-        "cache-control": "no-cache",
+        "cache-control": "no-cache, no-transform",
+        "x-accel-buffering": "no",
         "x-remaining": String(remaining),
       },
     });
