@@ -491,50 +491,79 @@ export default function Create({ onSaved, remaining, isPro, active = true, bookl
           </div>
         )}
 
-        {/* Success banner — always visible */}
-        <div className="bg-gradient-to-l from-grow/15 to-brand/10 border border-grow/20 rounded-2xl px-5 py-4">
-          <div className="flex items-center gap-3 mb-2">
-            <span className="text-3xl">🎉</span>
-            <div className="flex-1">
-              <p className="font-bold text-ink text-base">החוברת מוכנה!</p>
-              <p className="text-xs text-ink/50 mt-0.5">
-                {saveWarning ? "מוכנה להדפסה" : "נשמרה בענן · מוכנה להדפסה"} · <span className="text-grow font-medium">⏱ חסכת ~{timeSaved} דק' הכנה!</span>
-              </p>
+        {/* Success banner */}
+        <div className="bg-gradient-to-l from-grow/20 to-emerald-50 border border-grow/25 rounded-2xl overflow-hidden">
+          <div className="px-5 py-4">
+            <div className="flex items-start gap-3">
+              <div className="flex-shrink-0 w-11 h-11 bg-grow/15 rounded-full flex items-center justify-center text-2xl">
+                🎉
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-display font-bold text-ink text-base">החוברת מוכנה!</p>
+                <p className="text-xs text-ink/55 mt-0.5">
+                  {saveWarning ? "מוכנה להדפסה ·" : "נשמרה בענן ·"}&nbsp;
+                  <span className="text-grow font-semibold">⏱ חסכת ~{timeSaved} דקות הכנה</span>
+                </p>
+              </div>
             </div>
-            {!isPro && remaining !== undefined && (
-              <span className="text-xs text-ink/40 bg-white rounded-full px-2.5 py-1 border border-ink/10">
-                {remaining} נותרו
-              </span>
-            )}
+
+            {/* ROI stats */}
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              <div className="bg-white/70 rounded-xl px-3 py-2 text-center">
+                <p className="text-[10px] text-ink/40 mb-0.5">זמן שחסכת עכשיו</p>
+                <p className="font-bold text-grow text-xl">⏱ {timeSaved} דק'</p>
+              </div>
+              <div className="bg-white/70 rounded-xl px-3 py-2 text-center">
+                <p className="text-[10px] text-ink/40 mb-0.5">
+                  {bookletCount > 1 ? "סה\"כ חסכת" : "שווי מול מורה פרטית"}
+                </p>
+                <p className="font-bold text-brand text-xl">
+                  {bookletCount > 1 ? totalSavedStr : `₪${Math.round(timeSaved / 60 * 120)}`}
+                </p>
+              </div>
+            </div>
           </div>
-          {bookletCount > 1 && (
-            <div className="flex items-center gap-2 bg-white/50 rounded-xl px-3 py-2 text-xs text-ink/60">
-              <span className="text-grow font-bold">✓</span>
-              <span>סה"כ עם בשבילי חסכת <strong className="text-grow">{totalSavedStr} הכנה</strong> — {bookletCount} חוברות נוצרו</span>
+
+          {/* Quota bar — free users only */}
+          {!isPro && (
+            <div className={`border-t px-5 py-3 flex items-center justify-between gap-3 ${
+              remaining === 0 ? "bg-red-50 border-red-200"
+              : remaining === 1 ? "bg-amber-50 border-amber-200"
+              : "bg-white/40 border-grow/15"
+            }`}>
+              <div className="flex-1 min-w-0">
+                <p className={`text-xs font-semibold ${remaining === 0 ? "text-red-700" : remaining === 1 ? "text-amber-700" : "text-ink/50"}`}>
+                  {remaining === 0
+                    ? "🚫 נגמרה המכסה החינמית"
+                    : remaining === 1
+                    ? "⚠️ נשארה חוברת חינמית אחת בלבד!"
+                    : `${remaining} חוברות חינמיות נותרו`}
+                </p>
+                <div className="flex gap-1 mt-1.5">
+                  {[...Array(FREE_LIMIT)].map((_, i) => (
+                    <div key={i} className={`h-1.5 rounded-full flex-1 transition-all ${
+                      i < bookletCount
+                        ? remaining === 0 ? "bg-red-400" : remaining === 1 ? "bg-amber-400" : "bg-brand"
+                        : "bg-ink/10"
+                    }`} />
+                  ))}
+                </div>
+              </div>
+              <button
+                onClick={() => { track("upgrade_intent_clicked", { source: "post_success_quota_bar", remaining }); openUpgrade(); }}
+                className={`flex-shrink-0 text-xs rounded-xl px-4 py-2 font-semibold transition-opacity hover:opacity-90 ${
+                  remaining === 0
+                    ? "bg-red-500 text-white shadow-sm"
+                    : remaining === 1
+                    ? "bg-gradient-to-l from-brand to-magic text-white shadow-sm"
+                    : "border border-magic/40 text-magic"
+                }`}
+              >
+                {remaining === 0 ? "שדרגי עכשיו 🚀" : remaining === 1 ? "שדרגי ✨" : "ראי תוכניות"}
+              </button>
             </div>
           )}
         </div>
-
-        {/* Upgrade nudge — shown when ≤2 free booklets remain */}
-        {!isPro && remaining > 0 && remaining <= 2 && (
-          <div className="bg-gradient-to-l from-magic/10 to-brand/10 border border-magic/20 rounded-2xl px-5 py-4">
-            <div className="flex items-center gap-3 mb-2">
-              <span className="text-2xl">⭐</span>
-              <div className="flex-1">
-                <p className="font-semibold text-ink text-sm">
-                  {remaining === 1 ? "נשארה לך חוברת חינמית אחת בלבד!" : `נשארו לך ${remaining} חוברות חינמיות`}
-                </p>
-                <p className="text-xs text-ink/50 mt-0.5">
-                  בתוכנית מורה: 20 חוברות = <strong className="text-magic">15 שעות הכנה חסכות בחודש</strong>
-                </p>
-              </div>
-              <button onClick={() => { track("upgrade_intent_clicked", { source: "post_success_nudge", remaining }); openUpgrade(); }} className="flex-shrink-0 bg-gradient-to-l from-brand to-magic text-white text-xs rounded-xl px-3 py-2 font-semibold hover:opacity-90 transition-opacity">
-                שדרגי
-              </button>
-            </div>
-            <div className="text-[10px] text-ink/40 text-center">הצטרפי ל-120+ מורות שכבר חוסכות זמן עם בשבילי 🎓</div>
-          </div>
-        )}
 
         {/* Booklet preview — shown immediately, always first */}
         <Preview html={html} onReset={reset} shareToken={shareToken} title={bookletTitle} active={active} context="create" bookletId={bookletId} />
@@ -952,32 +981,53 @@ export default function Create({ onSaved, remaining, isPro, active = true, bookl
 
         {/* Submit / loading */}
         {loading ? (
-          <div className="text-center py-8 space-y-3">
-            {mode === "exam" ? (
-              <p className="text-ink font-display font-semibold">📝 מכין מבחן {examSubject}{examGrade ? ` — ${examGrade}` : ""}</p>
-            ) : f.childName ? (
-              <p className="text-magic font-display font-semibold">✨ יוצרת חוברת עבור {f.childName}</p>
-            ) : null}
-            <div className="flex justify-center gap-1">
-              {[0, 1, 2].map((i) => (
-                <div key={i} className="w-2.5 h-2.5 rounded-full bg-magic animate-bounce" style={{ animationDelay: `${i * 0.15}s` }} />
-              ))}
+          <div className="py-10 space-y-5">
+            {/* Animated creation orb */}
+            <div className="flex justify-center">
+              <div className="relative w-20 h-20">
+                <div className="absolute inset-0 rounded-full border-4 border-magic/20 border-t-magic animate-spin" />
+                <div className="absolute inset-2 rounded-full border-2 border-brand/20 border-b-brand animate-spin" style={{ animationDuration: "1.5s", animationDirection: "reverse" }} />
+                <div className="absolute inset-0 flex items-center justify-center text-3xl">✨</div>
+              </div>
             </div>
-            <p className="text-ink/60 text-sm font-medium">{LOADING_MSGS[loadingMsgIdx]}</p>
-            {streamChars > 0
-              ? <p className="text-magic text-xs font-mono">{streamChars.toLocaleString("he-IL")} תווים נכתבו...</p>
-              : <p className="text-ink/30 text-xs">{mode === "quick" ? "עמוד A4 אחד · ~30 שניות" : `${pageCount} עמודי A4 · 30–90 שניות`}</p>
-            }
-            <div className="w-full bg-canvas rounded-full h-1.5 overflow-hidden">
-              {streamChars > 0
-                ? <div className="h-full bg-gradient-to-r from-brand via-magic to-grow rounded-full transition-all duration-300"
-                    style={{ width: `${Math.min(95, (streamChars / (pageCount * 3200)) * 100)}%` }} />
-                : <div className="h-full bg-gradient-to-r from-brand via-magic to-grow rounded-full animate-shimmer" />
-              }
+
+            {/* Context-aware title */}
+            <div className="text-center">
+              <p className="font-display font-bold text-ink text-lg">
+                {mode === "exam"
+                  ? `📝 מכין מבחן ${examSubject}${examGrade ? ` — ${examGrade}` : ""}`
+                  : f.childName
+                  ? `✨ יוצרת עבור ${f.childName}`
+                  : "✨ יוצרת חוברת..."}
+              </p>
+              <p className="text-ink/55 text-sm mt-1">{LOADING_MSGS[loadingMsgIdx]}</p>
             </div>
+
+            {/* Progress bar + stats */}
+            <div className="space-y-1.5">
+              <div className="w-full bg-canvas rounded-full h-2.5 overflow-hidden">
+                {streamChars > 0
+                  ? <div className="h-full bg-gradient-to-l from-brand via-magic to-grow rounded-full transition-all duration-500"
+                      style={{ width: `${Math.min(97, (streamChars / (pageCount * 3200)) * 100)}%` }} />
+                  : <div className="h-full bg-gradient-to-l from-brand via-magic to-grow rounded-full animate-shimmer" />
+                }
+              </div>
+              <div className="flex justify-between text-xs text-ink/35">
+                <span>{streamChars > 0 ? `${streamChars.toLocaleString("he-IL")} תווים` : (mode === "quick" ? "עמוד A4 אחד" : `${pageCount} עמודי A4`)}</span>
+                <span>⏱ {loadingElapsed}s</span>
+              </div>
+            </div>
+
+            {/* Tip shown while waiting */}
+            <div className="bg-magic/5 border border-magic/15 rounded-2xl px-4 py-3 text-center">
+              <p className="text-xs text-ink/60 leading-relaxed">
+                💡 <strong className="text-magic">ידעת?</strong> מורות פרטיות חוסכות בממוצע <strong>3 שעות הכנה בשבוע</strong> עם בשבילי — זמן שמוקדש ללמידה אמיתית
+              </p>
+            </div>
+
             {loadingElapsed >= 8 && typeof Notification !== "undefined" && Notification.permission !== "denied" && (
-              <p className="text-ink/40 text-xs bg-canvas rounded-xl px-3 py-2">
-                🔔 אפשר לנעול את המסך — נשלח לך התראה כשהחוברת מוכנה
+              <p className="text-center text-ink/35 text-xs">
+                🔔 אפשר לנעול את המסך — נשלח התראה כשהחוברת מוכנה
               </p>
             )}
           </div>
@@ -990,9 +1040,12 @@ export default function Create({ onSaved, remaining, isPro, active = true, bookl
           </button>
         ) : (
           <button onClick={create} disabled={!canSubmit}
-            className="w-full bg-gradient-to-l from-brand to-magic text-white rounded-xl p-3.5 font-display font-semibold disabled:opacity-40 hover:opacity-90 transition-opacity shadow-sm">
-            {mode === "quick" ? "⚡ צור דף מהיר (עמוד אחד)" : mode === "exam" ? `📝 צור מבחן (${pageCount} עמ')` : `✨ צור חוברת (${pageCount} עמ')`}
-            {canSubmit && <span className="mr-2 text-white/60 text-xs font-normal">Ctrl+Enter</span>}
+            className="w-full bg-gradient-to-l from-brand to-magic text-white rounded-2xl py-4 px-6 font-display font-bold text-base disabled:opacity-40 hover:opacity-90 active:scale-[0.98] transition-all shadow-md">
+            <div className="flex items-center justify-center gap-2">
+              <span className="text-xl">{mode === "quick" ? "⚡" : mode === "exam" ? "📝" : "✨"}</span>
+              <span>{mode === "quick" ? "צור דף מהיר" : mode === "exam" ? `צור מבחן (${pageCount} עמ')` : `צור חוברת (${pageCount} עמ')`}</span>
+            </div>
+            {canSubmit && <p className="text-white/50 text-xs font-normal mt-0.5">Ctrl+Enter</p>}
           </button>
         )}
       </div>
