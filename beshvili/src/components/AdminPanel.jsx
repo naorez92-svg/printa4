@@ -67,6 +67,8 @@ export default function AdminPanel() {
   const [todayResult, setTodayResult]   = useState("");
   const [sendingEmergency, setSendingEmergency] = useState(false);
   const [emergencyResult, setEmergencyResult]   = useState("");
+  const [sendingBlast, setSendingBlast]         = useState(false);
+  const [blastResult, setBlastResult]           = useState("");
 
   useEffect(() => {
     (async () => {
@@ -137,6 +139,15 @@ export default function AdminPanel() {
     const { data: res, error: err } = await supabase.functions.invoke("send-followup", { body: { sameDay: true } });
     setSendingToday(false);
     setTodayResult(fmtFollowupResult(res, err, `נשלחו ${res?.sent ?? 0} מיילים מתוך ${res?.wave0_candidates ?? 0} נרשמות היום`));
+  };
+
+  const triggerBlast = async () => {
+    if (!window.confirm("שלח מייל הכרזה לכל 104 המשתמשים? (ללא קריטריונים — לכולם)")) return;
+    setSendingBlast(true); setBlastResult("");
+    const { data: res, error: err } = await supabase.functions.invoke("send-followup", { body: { blast: true } });
+    setSendingBlast(false);
+    if (err) setBlastResult(`שגיאה: ${err.message}`);
+    else setBlastResult(`נשלחו ${res?.sent ?? 0} מיילים מתוך ${res?.total ?? 0}`);
   };
 
   const triggerEmergencyBlast = async () => {
@@ -681,6 +692,22 @@ export default function AdminPanel() {
 
       {/* Automation triggers */}
       <div className="grid grid-cols-2 gap-3">
+        {/* 📢 Blast to all users */}
+        <div className="bg-magic/5 rounded-2xl p-4 border-2 border-magic/30 col-span-2">
+          <div className="flex items-start gap-2 mb-1">
+            <span className="text-lg flex-shrink-0">📢</span>
+            <div>
+              <h3 className="font-bold text-magic text-sm">מייל הכרזה — לכל המשתמשים</h3>
+              <p className="text-xs text-ink/50 mt-0.5">שולח לכולם (ללא קריטריונים) · "שדרגנו, חזרנו, הנה מדריך קצר" · 60 שניות</p>
+            </div>
+          </div>
+          <button onClick={triggerBlast} disabled={sendingBlast}
+            className="bg-magic text-white rounded-xl px-3 py-2.5 text-sm font-bold disabled:opacity-50 hover:opacity-90 transition-opacity w-full mt-2">
+            {sendingBlast ? "שולח…" : "📢 שלח לכולם עכשיו"}
+          </button>
+          {blastResult && <p className="text-xs text-magic font-semibold mt-2">{blastResult}</p>}
+        </div>
+
         {/* 🚨 Emergency blast — full-width, prominent */}
         <div className="bg-red-50 rounded-2xl p-4 border-2 border-red-300 col-span-2">
           <div className="flex items-start gap-2 mb-1">
