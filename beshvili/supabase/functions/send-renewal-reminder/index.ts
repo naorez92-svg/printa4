@@ -3,7 +3,27 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
 // Called daily by GitHub Actions cron — sends renewal reminder to pro users at D+25
 // Also callable manually by admin from AdminPanel
 
+function getCors(req: Request) {
+  const origin = req.headers.get("origin") ?? "";
+  const allowed =
+    origin === "https://www.beshvili.com" ||
+    origin === "https://beshvili.com" ||
+    origin === "http://localhost:5173" ||
+    origin === "http://localhost:4173" ||
+    /^https:\/\/printa4-git-[a-z0-9-]+-naor-s-projects\.vercel\.app$/.test(origin);
+  return {
+    "Access-Control-Allow-Origin": allowed ? origin : "https://www.beshvili.com",
+    "Vary": "Origin",
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Access-Control-Max-Age": "86400",
+  };
+}
+
 Deno.serve(async (req) => {
+  const cors = getCors(req);
+  if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
+
   const admin = createClient(
     Deno.env.get("SUPABASE_URL")!,
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
@@ -12,7 +32,7 @@ Deno.serve(async (req) => {
 
   const resendKey = Deno.env.get("RESEND_API_KEY");
   if (!resendKey) {
-    return new Response(JSON.stringify({ error: "RESEND_API_KEY not configured" }), { status: 500 });
+    return new Response(JSON.stringify({ error: "RESEND_API_KEY not configured" }), { status: 500, headers: cors });
   }
 
   // Authorize: service role key (cron) or admin JWT
@@ -21,13 +41,12 @@ Deno.serve(async (req) => {
 
   if (token !== serviceRoleKey) {
     const { data: { user }, error } = await admin.auth.getUser(token);
-    if (error || !user) return new Response(JSON.stringify({ error: "unauthorized" }), { status: 401 });
+    if (error || !user) return new Response(JSON.stringify({ error: "unauthorized" }), { status: 401, headers: cors });
     const { data: profile } = await admin.from("profiles").select("plan").eq("id", user.id).single();
-    if (profile?.plan !== "admin") return new Response(JSON.stringify({ error: "forbidden" }), { status: 403 });
+    if (profile?.plan !== "admin") return new Response(JSON.stringify({ error: "forbidden" }), { status: 403, headers: cors });
   }
 
   const now = new Date();
-  // pro_since between 25 and 32 days ago (wide window so a missed day doesn't skip a user)
   const d25 = new Date(now.getTime() - 25 * 24 * 60 * 60 * 1000).toISOString();
   const d32 = new Date(now.getTime() - 32 * 24 * 60 * 60 * 1000).toISOString();
 
@@ -40,7 +59,7 @@ Deno.serve(async (req) => {
     .gte("pro_since", d32);
 
   if (!pendingProfiles?.length) {
-    return new Response(JSON.stringify({ sent: 0, message: "No pro users due for renewal reminder" }), { status: 200 });
+    return new Response(JSON.stringify({ sent: 0, message: "No pro users due for renewal reminder" }), { status: 200, headers: cors });
   }
 
   const userIds = pendingProfiles.map(p => p.id);
@@ -111,5 +130,5 @@ Deno.serve(async (req) => {
     }
   }
 
-  return new Response(JSON.stringify({ sent, total: pendingProfiles.length, errors }), { status: 200 });
+  return new Response(JSON.stringify({ sent, total: pendingProfiles.length, errors }), { status: 200, headers: cors });
 });
