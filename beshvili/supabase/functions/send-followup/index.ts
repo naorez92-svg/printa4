@@ -174,9 +174,11 @@ Deno.serve(async (req) => {
   }
 
   // ── Wave 1: D+2 onboarding follow-up ─────────────────────────────────────
-  // Target: signed up 2-4 days ago, never received a follow-up
+  // Target: FREE users who signed up 2-4 days ago, never received a follow-up.
+  // Paid users (teacher/parent/pro) are excluded — they already converted, and
+  // the free-trial messaging ("3 חינמיות נשארו") is misleading for paying customers.
   const wave1 = (allProfiles ?? []).filter(p =>
-    p.plan !== "admin" &&
+    p.plan === "free" &&
     p.followup_sent_at === null &&
     p.created_at <= twoDaysAgo &&
     p.created_at >= fourDaysAgo

@@ -51,13 +51,20 @@ Deno.serve(async (req) => {
   const d25 = new Date(now.getTime() - 25 * 24 * 60 * 60 * 1000).toISOString();
   const d32 = new Date(now.getTime() - 32 * 24 * 60 * 60 * 1000).toISOString();
 
-  const { data: pendingProfiles } = await admin
+  // Fetch profiles in the D+25–D+32 window, including renewal_reminder_sent_at so we
+  // can detect subscription renewal: if admin resets pro_since for a renewed subscriber,
+  // renewal_reminder_sent_at < pro_since → send a fresh reminder for the new cycle.
+  const { data: rawProfiles } = await admin
     .from("profiles")
-    .select("id, pro_since, plan")
+    .select("id, pro_since, plan, renewal_reminder_sent_at")
     .in("plan", ["pro", "parent", "teacher"])
-    .is("renewal_reminder_sent_at", null)
     .lte("pro_since", d25)
     .gte("pro_since", d32);
+
+  const pendingProfiles = (rawProfiles ?? []).filter(p =>
+    p.renewal_reminder_sent_at === null ||
+    (p.pro_since !== null && p.renewal_reminder_sent_at < p.pro_since)
+  );
 
   if (!pendingProfiles?.length) {
     return new Response(JSON.stringify({ sent: 0, message: "No pro users due for renewal reminder" }), { status: 200, headers: cors });
