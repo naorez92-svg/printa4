@@ -120,7 +120,7 @@ Deno.serve(async (req) => {
 
   // ── Wave 0: Same-day follow-up (manual only — triggered from admin panel) ──
   // Target: signed up today (>2h ago), never got any follow-up, 0 booklets created
-  let wave0: typeof (allProfiles ?? []) = [];
+  let wave0: NonNullable<typeof allProfiles> = [];
   if (body.sameDay) {
     wave0 = (allProfiles ?? []).filter(p =>
       p.plan !== "admin" &&
@@ -139,8 +139,8 @@ Deno.serve(async (req) => {
           נרשמת היום לבשבילי — עדיין לא יצרת את החוברת הראשונה שלך 😊
         </p>
         <p style="color:#555;line-height:1.7;margin:0 0 16px;">
-          זה ממש פשוט: לחצי על אחד מהנושאים בדף הבית (כמו &quot;הבנת הנקרא ג-ד&quot;) — הטופס יתמלא אוטומטית,
-          ואחר כך רק לחצי &quot;צור חוברת&quot;. <strong>תוך 60 שניות יש לך חוברת עבודה מלאה מוכנה להדפסה.</strong>
+          זה ממש פשוט: לחצי על אחד מהנושאים בדף הבית (כמו "הבנת הנקרא ג-ד") — הטופס יתמלא אוטומטית,
+          ואחר כך רק לחצי "צור חוברת". <strong>תוך 60 שניות יש לך חוברת עבודה מלאה מוכנה להדפסה.</strong>
         </p>
         <div style="background:#f0f0ff;border-radius:12px;padding:16px;margin:0 0 16px;text-align:right;">
           <p style="margin:0 0 6px;color:#6C5CE7;font-weight:bold;font-size:14px;">✨ 3 חוברות ראשונות — חינם לגמרי</p>
@@ -171,6 +171,7 @@ Deno.serve(async (req) => {
     let subject: string, html: string;
 
     if (count >= FREE_LIMIT) {
+      // Used all 3 free — push to upgrade
       subject = "אהבת? שדרגי לפרו — חוברות ללא הגבלה 🚀";
       html = buildEmailHtml(greeting,
         `<p style="color:#555;line-height:1.7;margin:0 0 16px;">
@@ -188,6 +189,7 @@ Deno.serve(async (req) => {
         "https://beshvili.com"
       );
     } else if (count > 0) {
+      // Created 1-2 booklets — encourage to use remaining
       const savedMin = count * 45;
       const savedStr = savedMin >= 60
         ? `${(savedMin / 60).toFixed(1).replace(".0", "")} שעות`
@@ -205,6 +207,7 @@ Deno.serve(async (req) => {
         "https://beshvili.com"
       );
     } else {
+      // Never created — remove onboarding friction
       subject = "עדיין לא ניסית? 60 שניות → חוברת מותאמת אישית ✨";
       html = buildEmailHtml(greeting,
         `<p style="color:#555;line-height:1.7;margin:0 0 16px;">
@@ -223,9 +226,12 @@ Deno.serve(async (req) => {
   }
 
   // ── Wave 2: Dormant re-engagement ────────────────────────────────────────
+  // Target: free users who created 1+ booklets, last booklet 5-10 days ago,
+  //         never received a dormant followup
+  // Strategy: value-first — "הנה רעיון לחוברת הבאה" not "חזרי לאפליקציה"
   const wave2 = (allProfiles ?? []).filter(p => {
-    if (p.plan !== "free") return false;
-    if (p.dormant_followup_sent_at !== null) return false;
+    if (p.plan !== "free") return false; // pro users get renewal reminder instead
+    if (p.dormant_followup_sent_at !== null) return false; // already sent
     const lastBooklet = lastBookletByUser[p.id];
     if (!lastBooklet) return false;
     return lastBooklet <= fiveDaysAgo && lastBooklet >= tenDaysAgo;
