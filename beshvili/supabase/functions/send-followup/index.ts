@@ -76,7 +76,7 @@ Deno.serve(async (req) => {
   }
 
   // Parse body after auth is confirmed
-  let body: { sameDay?: boolean; emergency?: boolean } = {};
+  let body: { sameDay?: boolean; emergency?: boolean; blast?: boolean } = {};
   try { body = await req.json(); } catch { /* no body or not JSON */ }
 
   const now = new Date();
@@ -145,6 +145,50 @@ Deno.serve(async (req) => {
 
   let sent = 0;
   const errors: string[] = [];
+
+  // ── Blast: send to ALL users regardless of criteria ───────────────────────
+  if (body.blast) {
+    for (const [userId, email] of Object.entries(emailById)) {
+      const profile = profileMap[userId];
+      if (profile?.plan === "admin") continue;
+      const name     = profile?.full_name ? esc(profile.full_name.split(" ")[0]) : null;
+      const greeting = name ? `שלום ${name}!` : "שלום!";
+      const subject  = "בשבילי — שדרגנו, חזרנו, ורוצים שתחזרי 📚";
+      const html = buildEmailHtml(greeting,
+        `<p style="color:#555;line-height:1.7;margin:0 0 16px;">
+          אנחנו שמחים לבשר — <strong>בשבילי עוברת הרצאה</strong> ומגיעה למורות פרטיות יותר ויותר 🎉
+        </p>
+        <p style="color:#555;line-height:1.7;margin:0 0 16px;">
+          לאחרונה חווינו תקלה טכנית שגרמה לבעיות ביצירת חוברות. <strong>תיקנו ושיפרנו את המערכת</strong> —
+          עכשיו הכל עובד מהר ויציב יותר מאי פעם.
+        </p>
+        <div style="background:#fff8e1;border-right:4px solid #F4A02C;border-radius:8px;padding:16px;margin:0 0 16px;text-align:right;">
+          <p style="margin:0 0 10px;color:#20184A;font-weight:bold;font-size:15px;">🚀 כיצד יוצרים חוברת ב-3 לחיצות:</p>
+          <ol style="margin:0;padding-right:20px;color:#555;font-size:14px;line-height:2.2;">
+            <li>לחצי על נושא מוכן (למשל <strong>"חיבור כיתה ב"</strong>) — הטופס מתמלא אוטומטית</li>
+            <li>בדקי ושנו פרטים אם צריך (שם תלמיד, כיתה, מספר עמודים)</li>
+            <li>לחצי <strong>"צור חוברת"</strong> — תוך ~60 שניות החוברת מוכנה להדפסה 🎉</li>
+          </ol>
+        </div>
+        <p style="color:#555;font-size:13px;text-align:center;margin:0;">
+          מורות פרטיות חוסכות 3+ שעות הכנה בשבוע · 3 חוברות ראשונות חינם לגמרי
+        </p>`,
+        "חזרי לנסות עכשיו ✨",
+        "https://beshvili.com"
+      );
+      const res = await fetch("https://api.resend.com/emails", {
+        method: "POST",
+        headers: { "Authorization": `Bearer ${resendKey}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ from: "בשבילי <hello@beshvili.com>", to: [email], subject, html }),
+      });
+      if (res.ok) sent++;
+      else errors.push(`${email}: ${await res.text()}`);
+    }
+    return new Response(JSON.stringify({
+      sent, errors, total: Object.keys(emailById).length,
+      _debug: { auth_users_found: (authData?.users ?? []).length },
+    }), { status: 200, headers: cors });
+  }
 
   async function sendEmail(userId: string, subject: string, html: string, markField: string) {
     const email = emailById[userId];
