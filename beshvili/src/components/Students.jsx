@@ -9,8 +9,29 @@ const GRADES = [
 ];
 const LEVELS = [["basic", "🌱 בסיסי"], ["medium", "⚡ בינוני"], ["advanced", "🚀 מתקדם"]];
 const LEVEL_LABELS = { basic: "🌱 בסיסי", medium: "⚡ בינוני", advanced: "🚀 מתקדם" };
+const LEVEL_COLORS = {
+  basic:    "bg-grow/10 text-grow",
+  medium:   "bg-brand/10 text-brand",
+  advanced: "bg-magic/10 text-magic",
+};
 const WORLDS = ["כדורגל", "גיימינג", "חיות", "חלל", "בישול", "מוזיקה", "סוסים", "נינג'ה", "פוקימון", "מינקראפט"];
+const WORLD_EMOJI = {
+  "כדורגל": "⚽", "גיימינג": "🎮", "חיות": "🐾",
+  "חלל": "🚀", "בישול": "🍳", "מוזיקה": "🎵",
+  "סוסים": "🐴", "נינג'ה": "🥷", "פוקימון": "⚡",
+  "מינקראפט": "🧱",
+};
+const AVATAR_COLORS = [
+  "bg-magic/15 text-magic", "bg-brand/15 text-brand",
+  "bg-grow/15 text-grow",   "bg-blue-100 text-blue-600",
+  "bg-pink-100 text-pink-600",
+];
 const EMPTY = { name: "", grade: "כיתה א", level: "medium", special_needs: "", world: "כדורגל" };
+
+function avatarColor(name) {
+  const code = [...(name || "א")].reduce((s, c) => s + c.charCodeAt(0), 0);
+  return AVATAR_COLORS[code % AVATAR_COLORS.length];
+}
 
 async function uploadPhoto(file) {
   if (file.size > 5 * 1024 * 1024) { alert("תמונה גדולה מדי — מקסימום 5MB"); return null; }
@@ -59,12 +80,111 @@ function PhotoUploader({ photoUrl, uploading, inputRef, onFileChange, onRemove }
   );
 }
 
+function StudentCard({ student, onQuickCreate, onEdit, onHistory, onDelete }) {
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const world = student.worlds?.[0];
+  const worldEmoji = world ? (WORLD_EMOJI[world] ?? "📚") : null;
+  const lvlColor = LEVEL_COLORS[student.level] ?? "bg-ink/8 text-ink/50";
+
+  return (
+    <div className="bg-white rounded-2xl shadow-sm border border-ink/5 overflow-hidden">
+      {/* Main row */}
+      <div className="px-4 py-3.5 flex items-center gap-3">
+        {/* Avatar */}
+        {student.photo_url ? (
+          <img
+            src={student.photo_url}
+            alt={student.name}
+            className="w-12 h-12 rounded-full object-cover flex-shrink-0 border-2 border-white shadow-sm"
+          />
+        ) : (
+          <div className={`w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 font-bold text-xl ${avatarColor(student.name)}`}>
+            {student.name[0]}
+          </div>
+        )}
+
+        {/* Info */}
+        <div className="flex-1 min-w-0">
+          <p className="font-semibold text-ink font-display leading-snug">{student.name}</p>
+          <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+            <span className={`text-[11px] font-medium rounded-full px-2 py-0.5 ${lvlColor}`}>
+              {LEVEL_LABELS[student.level] ?? student.level}
+            </span>
+            {worldEmoji && world && (
+              <span className="text-[11px] text-ink/50 bg-canvas rounded-full px-2 py-0.5">
+                {worldEmoji} {world}
+              </span>
+            )}
+            {student.special_needs && (
+              <span
+                className="text-[11px] text-amber-600 bg-amber-50 rounded-full px-2 py-0.5 cursor-help"
+                title={student.special_needs}
+              >
+                📌 הערות
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Primary CTA */}
+        <button
+          onClick={() => onQuickCreate(student)}
+          className="flex-shrink-0 bg-gradient-to-l from-brand to-magic text-white rounded-xl px-4 py-2.5 text-sm font-semibold hover:opacity-90 active:scale-95 transition-all shadow-sm whitespace-nowrap"
+        >
+          ✨ צור
+        </button>
+      </div>
+
+      {/* Secondary actions */}
+      <div className="border-t border-ink/5 bg-canvas/40 px-3 py-2 flex items-center justify-between">
+        <div className="flex gap-0.5">
+          <button
+            onClick={() => onHistory(student)}
+            className="flex items-center gap-1.5 text-xs text-ink/40 hover:text-ink/70 transition-colors px-2.5 py-1.5 rounded-lg hover:bg-ink/5"
+          >
+            <span>📅</span><span>היסטוריה</span>
+          </button>
+          <button
+            onClick={() => onEdit(student)}
+            className="flex items-center gap-1.5 text-xs text-ink/40 hover:text-magic transition-colors px-2.5 py-1.5 rounded-lg hover:bg-magic/5"
+          >
+            <span>✏️</span><span>עריכה</span>
+          </button>
+        </div>
+
+        {confirmDelete ? (
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => onDelete(student.id)}
+              className="text-xs font-semibold text-red-500 hover:text-red-700 px-2.5 py-1 rounded-lg bg-red-50 hover:bg-red-100 transition-colors"
+            >
+              מחק!
+            </button>
+            <button
+              onClick={() => setConfirmDelete(false)}
+              className="text-xs text-ink/30 hover:text-ink/60 px-2 py-1"
+            >
+              ביטול
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={() => setConfirmDelete(true)}
+            className="text-xs text-ink/20 hover:text-red-400 transition-colors px-2.5 py-1.5 rounded-lg hover:bg-red-50"
+          >
+            הסר ×
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function Students({ onBookletSaved, remaining, isPro }) {
   const [students, setStudents]   = useState([]);
   const [loading, setLoading]     = useState(true);
   const [loadError, setLoadError] = useState(null);
   const [saveError, setSaveError] = useState(null);
-  const [confirmDeleteId, setConfirmDeleteId] = useState(null);
   const [showAdd, setShowAdd]     = useState(false);
   const [form, setForm]           = useState(EMPTY);
   const [photoUrl, setPhotoUrl]   = useState(null);
@@ -169,7 +289,6 @@ export default function Students({ onBookletSaved, remaining, isPro }) {
 
   const deleteStudent = async (id) => {
     const { error } = await supabase.from("children").delete().eq("id", id);
-    setConfirmDeleteId(null);
     if (error) { setSaveError("המחיקה נכשלה — נסה שנית"); return; }
     fetchStudents();
   };
@@ -207,11 +326,18 @@ export default function Students({ onBookletSaved, remaining, isPro }) {
     <div className="space-y-4">
       {/* Header */}
       <div className="flex justify-between items-center">
-        <h2 className="text-lg font-semibold text-ink">👥 התלמידים שלי</h2>
+        <div>
+          <h2 className="text-xl font-semibold text-ink flex items-center gap-2">
+            👥 התלמידים שלי
+          </h2>
+          {!loading && students.length > 0 && (
+            <p className="text-xs text-ink/40 mt-0.5">{students.length} תלמידים שמורים</p>
+          )}
+        </div>
         {!showAdd && (
           <button
             onClick={() => setShowAdd(true)}
-            className="bg-magic text-white rounded-xl px-4 py-2 text-sm font-medium hover:opacity-90 transition-opacity shadow-sm"
+            className="bg-magic text-white rounded-xl px-4 py-2.5 text-sm font-semibold hover:opacity-90 active:scale-95 transition-all shadow-sm"
           >
             + הוסף תלמיד
           </button>
@@ -221,7 +347,7 @@ export default function Students({ onBookletSaved, remaining, isPro }) {
       {/* Add form */}
       {showAdd && (
         <div className="bg-white rounded-2xl p-5 shadow-sm border border-ink/5 space-y-3">
-          <h3 className="font-semibold text-ink">הוסף תלמיד/ה</h3>
+          <h3 className="font-semibold text-ink text-base">הוסף תלמיד/ה</h3>
 
           <input
             autoFocus
@@ -252,7 +378,7 @@ export default function Students({ onBookletSaved, remaining, isPro }) {
               <button
                 key={v}
                 onClick={() => setForm(p => ({ ...p, level: v }))}
-                className={`flex-1 rounded-xl p-2 text-sm font-medium border transition-colors ${form.level === v ? "bg-magic text-white border-magic shadow-sm" : "bg-canvas/50 border-ink/15 text-ink/60 hover:border-magic/50"}`}
+                className={`flex-1 rounded-xl p-2.5 text-sm font-medium border transition-colors ${form.level === v ? "bg-magic text-white border-magic shadow-sm" : "bg-canvas/50 border-ink/15 text-ink/60 hover:border-magic/50"}`}
               >
                 {t}
               </button>
@@ -278,16 +404,15 @@ export default function Students({ onBookletSaved, remaining, isPro }) {
             onChange={e => setForm(p => ({ ...p, special_needs: e.target.value }))}
           />
 
-          {saveError && (
-            <p className="text-red-500 text-xs text-center">{saveError}</p>
-          )}
+          {saveError && <p className="text-red-500 text-xs text-center">{saveError}</p>}
+
           <div className="flex gap-2">
             <button
               onClick={addStudent}
               disabled={saving || !form.name.trim()}
-              className="flex-1 bg-magic text-white rounded-xl p-3 font-medium disabled:opacity-40 hover:opacity-90 transition-opacity"
+              className="flex-1 bg-magic text-white rounded-xl p-3 font-semibold disabled:opacity-40 hover:opacity-90 transition-opacity"
             >
-              {saving ? "שומר..." : "💾 שמור"}
+              {saving ? "שומר..." : "💾 שמור תלמיד"}
             </button>
             <button
               onClick={() => { setShowAdd(false); setForm(EMPTY); setPhotoUrl(null); setSaveError(null); }}
@@ -299,7 +424,12 @@ export default function Students({ onBookletSaved, remaining, isPro }) {
         </div>
       )}
 
-      {loading && <div className="text-center py-12 text-ink/30">טוען...</div>}
+      {loading && (
+        <div className="flex justify-center py-12">
+          <div className="w-6 h-6 border-2 border-magic border-t-transparent rounded-full animate-spin" />
+        </div>
+      )}
+
       {loadError && (
         <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-red-600 text-sm text-center">
           {loadError}
@@ -311,12 +441,14 @@ export default function Students({ onBookletSaved, remaining, isPro }) {
         <div className="bg-white rounded-2xl p-8 shadow-sm border border-ink/5 text-center space-y-4">
           <div className="text-5xl">👩‍🏫</div>
           <div>
-            <p className="font-semibold text-ink">עדיין אין תלמידים שמורים</p>
-            <p className="text-ink/40 text-sm mt-1">שמרי תלמיד פעם אחת ואז צרי לו חוברת בלחיצה אחת</p>
+            <p className="font-semibold text-ink text-base">עדיין אין תלמידים שמורים</p>
+            <p className="text-ink/40 text-sm mt-1 leading-relaxed">
+              שמרי תלמיד פעם אחת —<br />ואז צרי לו חוברת מותאמת אישית בלחיצה אחת
+            </p>
           </div>
           <button
             onClick={() => setShowAdd(true)}
-            className="bg-magic text-white rounded-xl px-5 py-2.5 font-medium hover:opacity-90 transition-opacity"
+            className="bg-magic text-white rounded-xl px-6 py-3 font-semibold hover:opacity-90 transition-opacity shadow-sm"
           >
             + הוסף תלמיד ראשון
           </button>
@@ -326,119 +458,82 @@ export default function Students({ onBookletSaved, remaining, isPro }) {
       {/* Student cards grouped by grade */}
       {!loading && Object.entries(byGrade).map(([grade, list]) => (
         <div key={grade} className="space-y-2">
-          <p className="text-xs font-semibold text-ink/35 uppercase tracking-wider px-1">{grade} · {list.length} תלמידים</p>
-          {list.map(student => (
-            <div key={student.id}>
-              {editId === student.id ? (
-                <div className="bg-white rounded-2xl px-4 py-4 shadow-sm border border-magic/30 space-y-3">
-                  <p className="font-semibold text-ink text-sm">✏️ עריכת {student.name}</p>
-                  <input
-                    autoFocus
-                    className="w-full border border-ink/20 rounded-xl p-3 outline-none focus:border-magic text-right bg-canvas/50 text-sm"
-                    value={editForm.name}
-                    onChange={e => setEditForm(p => ({ ...p, name: e.target.value }))}
-                    placeholder="שם *"
-                  />
-                  <PhotoUploader
-                    photoUrl={editPhotoUrl}
-                    uploading={editPhotoUploading}
-                    inputRef={editPhotoRef}
-                    onFileChange={handleEditPhoto}
-                    onRemove={() => setEditPhotoUrl(null)}
-                  />
-                  <select
-                    className="w-full border border-ink/20 rounded-xl p-3 bg-canvas/50 text-right outline-none focus:border-magic text-sm"
-                    value={editForm.grade}
-                    onChange={e => setEditForm(p => ({ ...p, grade: e.target.value }))}
-                  >
-                    {GRADES.map(g => <option key={g}>{g}</option>)}
-                  </select>
-                  <div className="flex gap-2">
-                    {LEVELS.map(([v, t]) => (
-                      <button key={v} onClick={() => setEditForm(p => ({ ...p, level: v }))}
-                        className={`flex-1 rounded-xl p-2 text-xs font-medium border transition-colors ${editForm.level === v ? "bg-magic text-white border-magic" : "bg-canvas/50 border-ink/15 text-ink/60"}`}>
-                        {t}
-                      </button>
-                    ))}
-                  </div>
-                  <select
-                    className="w-full border border-ink/20 rounded-xl p-3 bg-canvas/50 text-right outline-none focus:border-magic text-sm"
-                    value={editForm.world}
-                    onChange={e => setEditForm(p => ({ ...p, world: e.target.value }))}
-                  >
-                    {WORLDS.map(w => <option key={w}>{w}</option>)}
-                  </select>
-                  <textarea
-                    className="w-full border border-ink/20 rounded-xl p-3 outline-none focus:border-magic text-right resize-none bg-canvas/50 text-xs"
-                    placeholder="הערות (אופציונלי)"
-                    rows={2}
-                    value={editForm.special_needs}
-                    onChange={e => setEditForm(p => ({ ...p, special_needs: e.target.value }))}
-                  />
-                  {saveError && (
-                    <p className="text-red-500 text-xs text-center">{saveError}</p>
-                  )}
-                  <div className="flex gap-2">
-                    <button onClick={saveEdit} disabled={saving || !editForm.name.trim()}
-                      className="flex-1 bg-magic text-white rounded-xl p-2.5 text-sm font-medium disabled:opacity-40 hover:opacity-90">
-                      {saving ? "שומר..." : "💾 שמור"}
-                    </button>
-                    <button onClick={() => { setEditId(null); setEditForm(null); setEditPhotoUrl(null); setSaveError(null); }}
-                      className="px-5 border border-ink/15 rounded-xl text-ink/50 hover:text-ink text-sm">
-                      ביטול
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <div className="bg-white rounded-2xl px-4 py-3.5 shadow-sm border border-ink/5 flex items-center gap-3">
-                  {student.photo_url ? (
-                    <img src={student.photo_url} alt={student.name} className="w-10 h-10 rounded-full object-cover flex-shrink-0 border-2 border-white shadow-sm" />
-                  ) : (
-                    <div className="w-10 h-10 rounded-full bg-magic/10 flex items-center justify-center flex-shrink-0 text-magic font-bold text-base">
-                      {student.name[0]}
-                    </div>
-                  )}
-                  <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-ink">{student.name}</p>
-                    <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                      <span className="text-xs text-ink/40">{LEVEL_LABELS[student.level] || student.level}</span>
-                      {student.worlds?.[0] && (
-                        <span className="text-xs text-magic/70 bg-magic/8 rounded-full px-2 py-0.5">{student.worlds[0]}</span>
-                      )}
-                      {student.special_needs && (
-                        <span className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5 cursor-help" title={student.special_needs}>
-                          📌 הערות
-                        </span>
-                      )}
-                    </div>
-                  </div>
+          {/* Grade divider */}
+          <div className="flex items-center gap-2 px-1 py-0.5">
+            <span className="text-xs font-semibold text-ink/50 whitespace-nowrap">{grade}</span>
+            <div className="flex-1 h-px bg-ink/8" />
+            <span className="text-xs text-ink/30">{list.length} תלמידים</span>
+          </div>
 
-                  <button onClick={() => setHistory(student)}
-                    className="border border-ink/15 text-ink/50 rounded-xl px-3 py-2 text-sm hover:text-ink hover:border-ink/30 transition-colors whitespace-nowrap" title="היסטוריה">
-                    📅
-                  </button>
-                  <button onClick={() => startEdit(student)}
-                    className="border border-ink/15 text-ink/50 rounded-xl px-3 py-2 text-sm hover:text-magic hover:border-magic/40 transition-colors whitespace-nowrap" title="עריכה">
-                    ✏️
-                  </button>
-                  <button onClick={() => setQuickCreate(student)}
-                    className="bg-gradient-to-l from-brand to-magic text-white rounded-xl px-4 py-2 text-sm font-semibold hover:opacity-90 transition-opacity shadow-sm whitespace-nowrap">
-                    ✨ צור
-                  </button>
-                  {confirmDeleteId === student.id ? (
-                    <div className="flex items-center gap-1 flex-shrink-0">
-                      <button onClick={() => deleteStudent(student.id)} className="text-red-500 text-xs font-semibold hover:text-red-700 transition-colors px-1">מחק</button>
-                      <button onClick={() => setConfirmDeleteId(null)} className="text-ink/30 text-xs hover:text-ink/60 transition-colors px-1">ביטול</button>
-                    </div>
-                  ) : (
-                    <button onClick={() => setConfirmDeleteId(student.id)}
-                      className="text-ink/20 hover:text-red-400 transition-colors text-xl leading-none flex-shrink-0" title="מחק">
-                      ×
+          {list.map(student => (
+            editId === student.id ? (
+              <div key={student.id} className="bg-white rounded-2xl px-4 py-4 shadow-sm border border-magic/30 space-y-3">
+                <p className="font-semibold text-ink text-sm">✏️ עריכת {student.name}</p>
+                <input
+                  autoFocus
+                  className="w-full border border-ink/20 rounded-xl p-3 outline-none focus:border-magic text-right bg-canvas/50 text-sm"
+                  value={editForm.name}
+                  onChange={e => setEditForm(p => ({ ...p, name: e.target.value }))}
+                  placeholder="שם *"
+                />
+                <PhotoUploader
+                  photoUrl={editPhotoUrl}
+                  uploading={editPhotoUploading}
+                  inputRef={editPhotoRef}
+                  onFileChange={handleEditPhoto}
+                  onRemove={() => setEditPhotoUrl(null)}
+                />
+                <select
+                  className="w-full border border-ink/20 rounded-xl p-3 bg-canvas/50 text-right outline-none focus:border-magic text-sm"
+                  value={editForm.grade}
+                  onChange={e => setEditForm(p => ({ ...p, grade: e.target.value }))}
+                >
+                  {GRADES.map(g => <option key={g}>{g}</option>)}
+                </select>
+                <div className="flex gap-2">
+                  {LEVELS.map(([v, t]) => (
+                    <button key={v} onClick={() => setEditForm(p => ({ ...p, level: v }))}
+                      className={`flex-1 rounded-xl p-2 text-xs font-medium border transition-colors ${editForm.level === v ? "bg-magic text-white border-magic" : "bg-canvas/50 border-ink/15 text-ink/60"}`}>
+                      {t}
                     </button>
-                  )}
+                  ))}
                 </div>
-              )}
-            </div>
+                <select
+                  className="w-full border border-ink/20 rounded-xl p-3 bg-canvas/50 text-right outline-none focus:border-magic text-sm"
+                  value={editForm.world}
+                  onChange={e => setEditForm(p => ({ ...p, world: e.target.value }))}
+                >
+                  {WORLDS.map(w => <option key={w}>{w}</option>)}
+                </select>
+                <textarea
+                  className="w-full border border-ink/20 rounded-xl p-3 outline-none focus:border-magic text-right resize-none bg-canvas/50 text-xs"
+                  placeholder="הערות (אופציונלי)"
+                  rows={2}
+                  value={editForm.special_needs}
+                  onChange={e => setEditForm(p => ({ ...p, special_needs: e.target.value }))}
+                />
+                {saveError && <p className="text-red-500 text-xs text-center">{saveError}</p>}
+                <div className="flex gap-2">
+                  <button onClick={saveEdit} disabled={saving || !editForm.name.trim()}
+                    className="flex-1 bg-magic text-white rounded-xl p-2.5 text-sm font-semibold disabled:opacity-40 hover:opacity-90">
+                    {saving ? "שומר..." : "💾 שמור"}
+                  </button>
+                  <button onClick={() => { setEditId(null); setEditForm(null); setEditPhotoUrl(null); setSaveError(null); }}
+                    className="px-5 border border-ink/15 rounded-xl text-ink/50 hover:text-ink text-sm">
+                    ביטול
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <StudentCard
+                key={student.id}
+                student={student}
+                onQuickCreate={setQuickCreate}
+                onEdit={startEdit}
+                onHistory={setHistory}
+                onDelete={deleteStudent}
+              />
+            )
           ))}
         </div>
       ))}
