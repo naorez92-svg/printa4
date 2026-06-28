@@ -118,6 +118,7 @@ export default function Login() {
   const [heroError, setHeroError] = useState("");
   const [subjectIdx, setSubjectIdx]       = useState(0);
   const [subjectVisible, setSubjectVisible] = useState(true);
+  const [openFaq, setOpenFaq] = useState(null);
 
   useEffect(() => {
     const t = setInterval(() => {
@@ -530,6 +531,90 @@ export default function Login() {
                     {[1,2,3,4,5].map(s => <span key={s} className="text-brand text-xs">★</span>)}
                   </div>
                 </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── FAQ ── */}
+      <section className="py-14 px-5 bg-canvas">
+        <div className="max-w-2xl mx-auto">
+          <div className="text-center mb-10">
+            <h2 className="text-2xl font-bold text-ink mb-2 font-display">שאלות שכולם שואלים</h2>
+            <p className="text-ink/50 text-sm">כולל השאלה הכי חשובה — למה לא פשוט להשתמש ב-ChatGPT?</p>
+          </div>
+          <div className="space-y-3">
+            {[
+              {
+                q: "למה לא פשוט להשתמש ב-ChatGPT, Gemini או Claude?",
+                a: (
+                  <div className="space-y-3">
+                    <p>ChatGPT נותן לך <strong>טקסט גולמי</strong> — את עדיין צריכה לעצב אותו, לפרמט, לחשוב על המבנה, ולחזור כמה פעמים עם פרומפטים עד שיצא משהו שאפשר להדפיס. זה לוקח 20-40 דקות.</p>
+                    <div className="grid grid-cols-2 gap-3 text-sm">
+                      <div className="bg-red-50 border border-red-100 rounded-xl p-3">
+                        <p className="font-bold text-red-600 mb-2">ChatGPT / Gemini</p>
+                        <ul className="space-y-1 text-ink/60 text-xs">
+                          <li>❌ טקסט בלבד — צריך לעצב בעצמך</li>
+                          <li>❌ לא יודע מה לומדים בכיתה ג׳ בישראל</li>
+                          <li>❌ צריך לכתוב פרומפט מדויק בכל פעם</li>
+                          <li>❌ אין שמירה, ארכיון, או היסטוריה</li>
+                          <li>❌ ~20 דקות עד חוברת מוכנה</li>
+                        </ul>
+                      </div>
+                      <div className="bg-grow/5 border border-grow/20 rounded-xl p-3">
+                        <p className="font-bold text-grow mb-2">בשבילי</p>
+                        <ul className="space-y-1 text-ink/60 text-xs">
+                          <li>✅ חוברת מעוצבת, מוכנה להדפסה</li>
+                          <li>✅ יודע כיתות, רמות, ותכנית ישראלית</li>
+                          <li>✅ 3 שדות → לחיצה → מוכן</li>
+                          <li>✅ ארכיון בענן לכל החוברות</li>
+                          <li>✅ 60 שניות</li>
+                        </ul>
+                      </div>
+                    </div>
+                    <p className="text-xs text-ink/50">בשבילי בנויה על אותה AI (Claude של Anthropic) — אבל הכל מוגדר מראש, מעוצב, ומותאם לצרכים של מורות בישראל.</p>
+                  </div>
+                ),
+              },
+              {
+                q: "כמה זמן לוקח ליצור חוברת?",
+                a: "בממוצע 45-90 שניות מרגע שלחצת 'צור חוברת'. מילוי הטופס לוקח עוד 30 שניות. כלומר — תוך פחות מ-2 דקות יש לך חוברת מוכנה להדפסה.",
+              },
+              {
+                q: "האם צריך ידע טכני או לדעת לכתוב פרומפטים?",
+                a: "בכלל לא. בשבילי עובדת עם 3 שדות פשוטים: שם התלמיד, כיתה, ומה תרצי לתרגל. יש גם נושאים מוכנים שאפשר ללחוץ עליהם — הטופס מתמלא אוטומטית.",
+              },
+              {
+                q: "האם החוברת מותאמת לתכנית הלימודים הישראלית?",
+                a: "כן. בשבילי יודעת מה לומדים בכל כיתה — חיבור וחיסור בכיתה ב', הכפלה בכיתה ג', שברים בכיתה ד'. אפשר גם לציין רמה (בסיסי / בינוני / מתקדם) ולהתאים לצרכים מיוחדים כמו ADHD, דיסלקציה, או מחוננות.",
+              },
+              {
+                q: "אפשר לערוך את החוברת אחרי שנוצרה?",
+                a: "כרגע לא — אבל אפשר ליצור גרסה חדשה עם הנחיות מעודכנות. מורות רבות מוצאות שהחוברת יוצאת כל כך טובה שהן לא צריכות לערוך. אם יש תוספת שרצית — פשוט ציינו אותה בשדה 'הנחיות חופשיות'.",
+              },
+              {
+                q: "האם הנתונים של התלמידים שלי מוגנים?",
+                a: "לחלוטין. בשבילי לא שומרת שמות תלמידים אמיתיים — רק את מה שאת מזינה (שם, כיתה, נושא). אנחנו עובדים עם Supabase שמצפין את כל הנתונים ועומד בתקנות GDPR. לא מוכרים נתונים לאף גורם.",
+              },
+              {
+                q: "מה קורה אחרי 3 החוברות החינמיות?",
+                a: "האפליקציה תציג הצעה לשדרג. לא נחייב אותך אוטומטית — אין כרטיס אשראי ברירת מחדל. אם תרצי להמשיך, תוכנית מורה עולה ₪59/חודש (20 חוברות) ותוכנית הורה ₪19/חודש (5 חוברות). ביטול בכל עת דרך WhatsApp.",
+              },
+            ].map(({ q, a }, i) => (
+              <div key={i} className="bg-white rounded-2xl border border-ink/8 overflow-hidden shadow-sm">
+                <button
+                  onClick={() => setOpenFaq(openFaq === i ? null : i)}
+                  className="w-full text-right px-5 py-4 flex items-center justify-between gap-3 hover:bg-canvas/50 transition-colors"
+                >
+                  <span className="font-semibold text-ink text-sm leading-snug">{q}</span>
+                  <span className={`text-magic flex-shrink-0 text-lg transition-transform duration-200 ${openFaq === i ? "rotate-45" : ""}`}>+</span>
+                </button>
+                {openFaq === i && (
+                  <div className="px-5 pb-5 text-sm text-ink/65 leading-relaxed border-t border-ink/5 pt-4">
+                    {typeof a === "string" ? <p>{a}</p> : a}
+                  </div>
+                )}
               </div>
             ))}
           </div>
