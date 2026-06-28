@@ -3,6 +3,23 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
 // Called daily by GitHub Actions cron (9:00am Israel) with service role key
 // OR manually from admin panel
 
+function getCors(req: Request) {
+  const origin = req.headers.get("origin") ?? "";
+  const allowed =
+    origin === "https://www.beshvili.com" ||
+    origin === "https://beshvili.com" ||
+    origin === "http://localhost:5173" ||
+    origin === "http://localhost:4173" ||
+    /^https:\/\/printa4-git-[a-z0-9-]+-naor-s-projects\.vercel\.app$/.test(origin);
+  return {
+    "Access-Control-Allow-Origin": allowed ? origin : "https://www.beshvili.com",
+    "Vary": "Origin",
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Access-Control-Max-Age": "86400",
+  };
+}
+
 const FREE_LIMIT = 3; // must match useProfile.js + DB trigger
 
 // HTML-escape user-controlled values (full_name) before interpolation.
@@ -34,6 +51,9 @@ function buildEmailHtml(greeting: string, bodyHtml: string, ctaText: string, cta
 }
 
 Deno.serve(async (req) => {
+  const cors = getCors(req);
+  if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
+
   const admin = createClient(
     Deno.env.get("SUPABASE_URL")!,
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
@@ -42,7 +62,7 @@ Deno.serve(async (req) => {
 
   const resendKey = Deno.env.get("RESEND_API_KEY");
   if (!resendKey) {
-    return new Response(JSON.stringify({ error: "RESEND_API_KEY not configured" }), { status: 500 });
+    return new Response(JSON.stringify({ error: "RESEND_API_KEY not configured" }), { status: 500, headers: cors });
   }
 
   // Authorize: service role key (cron) or admin JWT — BEFORE reading body
@@ -50,9 +70,9 @@ Deno.serve(async (req) => {
   const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
   if (token !== serviceRoleKey) {
     const { data: { user }, error } = await admin.auth.getUser(token);
-    if (error || !user) return new Response(JSON.stringify({ error: "unauthorized" }), { status: 401 });
+    if (error || !user) return new Response(JSON.stringify({ error: "unauthorized" }), { status: 401, headers: cors });
     const { data: profile } = await admin.from("profiles").select("plan").eq("id", user.id).single();
-    if (profile?.plan !== "admin") return new Response(JSON.stringify({ error: "forbidden" }), { status: 403 });
+    if (profile?.plan !== "admin") return new Response(JSON.stringify({ error: "forbidden" }), { status: 403, headers: cors });
   }
 
   // Parse body after auth is confirmed
@@ -284,5 +304,5 @@ Deno.serve(async (req) => {
     wave2_candidates: wave2.length,
     total: wave0.length + wave1.length + wave2.length,
     errors,
-  }), { status: 200 });
+  }), { status: 200, headers: cors });
 });
