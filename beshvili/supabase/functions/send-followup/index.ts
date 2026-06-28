@@ -76,7 +76,7 @@ Deno.serve(async (req) => {
   }
 
   // Parse body after auth is confirmed
-  let body: { sameDay?: boolean } = {};
+  let body: { sameDay?: boolean; emergency?: boolean } = {};
   try { body = await req.json(); } catch { /* no body or not JSON */ }
 
   const now = new Date();
@@ -167,6 +167,50 @@ Deno.serve(async (req) => {
           <p style="margin:0;color:#555;font-size:13px;line-height:1.7;">מורות פרטיות חוסכות 3+ שעות הכנה בשבוע · כל חוברת מוכנה ב-60 שניות</p>
         </div>`,
         "צרי את החוברת הראשונה שלך ✨",
+        "https://beshvili.com"
+      );
+      await sendEmail(p.id, subject, html, "followup_sent_at");
+    }
+  }
+
+  // ── Wave 0E: Emergency re-engagement blast ────────────────────────────────
+  // Triggered manually when a large signup wave shows 0 activation.
+  // Overrides the followup_sent_at dedup so users who already got Wave 0 also
+  // get this (today's only — we don't spam old users).
+  // Uses an honest "we noticed you had trouble" framing + personal step-by-step guide.
+  let wave0e: NonNullable<typeof allProfiles> = [];
+  if (body.emergency) {
+    wave0e = (allProfiles ?? []).filter(p =>
+      p.plan !== "admin" &&
+      p.created_at >= oneDayAgo &&   // today's signups only
+      (bookletsByUser[p.id] ?? 0) === 0
+    );
+
+    for (const p of wave0e) {
+      const name     = p.full_name ? esc(p.full_name.split(" ")[0]) : null;
+      const greeting = name ? `שלום ${name}!` : "שלום!";
+      const subject  = "שמנו לב שנתקעת — הנה עזרה אישית 🙏";
+      const html = buildEmailHtml(greeting,
+        `<p style="color:#555;line-height:1.7;margin:0 0 16px;">
+          נרשמת היום לבשבילי — תודה רבה! 🎉<br>
+          שמנו לב שלא יצרת חוברת עדיין — ייתכן שהיה עומס על האפליקציה בגלל גל כניסות גדול היום, ואנחנו מצטערים אם נתקעת.
+        </p>
+        <div style="background:#fff8e1;border-right:4px solid #F4A02C;border-radius:8px;padding:16px;margin:0 0 16px;text-align:right;">
+          <p style="margin:0 0 10px;color:#20184A;font-weight:bold;font-size:15px;">🚀 כך יוצרים חוברת ב-3 לחיצות:</p>
+          <ol style="margin:0;padding-right:20px;color:#555;font-size:14px;line-height:2.2;">
+            <li>לחצי על נושא (למשל <strong>"➕ כיתה ב — חיבור"</strong>) — הטופס יתמלא לבד</li>
+            <li>בדקי שהכל נכון ושנו אם צריך</li>
+            <li>לחצי <strong>"צור חוברת"</strong> — תוך 60 שניות החוברת מוכנה! 🎉</li>
+          </ol>
+        </div>
+        <div style="background:#f0f0ff;border-radius:12px;padding:16px;margin:0 0 16px;text-align:center;">
+          <p style="margin:0 0 6px;color:#6C5CE7;font-weight:bold;font-size:15px;">🎁 3 חוברות ראשונות — חינם לגמרי</p>
+          <p style="margin:0;color:#555;font-size:13px;">מורות פרטיות חוסכות 3+ שעות הכנה בשבוע · כל חוברת ב-60 שניות</p>
+        </div>
+        <p style="color:#555;font-size:13px;text-align:center;margin:0;">
+          יש שאלה? ענה למייל הזה ונעזור 💬
+        </p>`,
+        "נסי עכשיו — 60 שניות ✨",
         "https://beshvili.com"
       );
       await sendEmail(p.id, subject, html, "followup_sent_at");
@@ -302,9 +346,10 @@ Deno.serve(async (req) => {
   return new Response(JSON.stringify({
     sent,
     wave0_candidates: wave0.length,
+    wave0e_candidates: wave0e.length,
     wave1_candidates: wave1.length,
     wave2_candidates: wave2.length,
-    total: wave0.length + wave1.length + wave2.length,
+    total: wave0.length + wave0e.length + wave1.length + wave2.length,
     errors,
   }), { status: 200, headers: cors });
 });

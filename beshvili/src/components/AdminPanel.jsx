@@ -65,6 +65,8 @@ export default function AdminPanel() {
   const [renewalResult, setRenewalResult]   = useState("");
   const [sendingToday, setSendingToday] = useState(false);
   const [todayResult, setTodayResult]   = useState("");
+  const [sendingEmergency, setSendingEmergency] = useState(false);
+  const [emergencyResult, setEmergencyResult]   = useState("");
 
   useEffect(() => {
     (async () => {
@@ -128,6 +130,14 @@ export default function AdminPanel() {
     const { data: res, error: err } = await supabase.functions.invoke("send-followup", { body: { sameDay: true } });
     setSendingToday(false);
     setTodayResult(err ? `שגיאה: ${err.message}` : `נשלחו ${res?.sent ?? 0} מיילים מתוך ${res?.wave0_candidates ?? 0} נרשמות היום`);
+  };
+
+  const triggerEmergencyBlast = async () => {
+    if (!window.confirm("שלח בלאסט חירום לכל נרשמות היום עם 0 חוברות? (כולל מי שכבר קיבלו פולואפ)")) return;
+    setSendingEmergency(true); setEmergencyResult("");
+    const { data: res, error: err } = await supabase.functions.invoke("send-followup", { body: { emergency: true } });
+    setSendingEmergency(false);
+    setEmergencyResult(err ? `שגיאה: ${err.message}` : `נשלחו ${res?.sent ?? 0} מיילים מתוך ${res?.wave0e_candidates ?? 0} נרשמות היום`);
   };
 
   if (loading) return <div className="text-center py-12 text-ink/40">טוען נתוני ניהול…</div>;
@@ -686,6 +696,22 @@ export default function AdminPanel() {
 
       {/* Automation triggers */}
       <div className="grid grid-cols-2 gap-3">
+        {/* 🚨 Emergency blast — full-width, prominent */}
+        <div className="bg-red-50 rounded-2xl p-4 border-2 border-red-300 col-span-2">
+          <div className="flex items-start gap-2 mb-1">
+            <span className="text-lg flex-shrink-0">🚨</span>
+            <div>
+              <h3 className="font-bold text-red-700 text-sm">בלאסט חירום — נרשמות היום עם 0 חוברות</h3>
+              <p className="text-xs text-red-400 mt-0.5">שולח לכולן (גם מי שקיבלה פולואפ כבר) · "שמנו לב שנתקעת, הנה עזרה אישית" · 60 שניות</p>
+            </div>
+          </div>
+          <button onClick={triggerEmergencyBlast} disabled={sendingEmergency}
+            className="bg-red-500 text-white rounded-xl px-3 py-2.5 text-sm font-bold disabled:opacity-50 hover:opacity-90 transition-opacity w-full mt-2">
+            {sendingEmergency ? "שולח…" : "🚨 שלח בלאסט חירום עכשיו"}
+          </button>
+          {emergencyResult && <p className="text-xs text-red-600 font-semibold mt-2">{emergencyResult}</p>}
+        </div>
+
         <div className="bg-canvas rounded-2xl p-4 border border-magic/30">
           <h3 className="font-bold text-ink mb-1 text-sm">⚡ נרשמות של היום</h3>
           <p className="text-xs text-ink/40 mb-3">שלח עכשיו לכל מי שנרשמה היום ועוד לא יצרה חוברת (2+ שעות).</p>
