@@ -201,38 +201,55 @@ Deno.serve(async (req) => {
     const clean = (val: unknown, max = MAX_FIELD_LEN): string =>
       String(val ?? "").trim().substring(0, max);
 
-    const subject     = clean(body.subject, 50);    // הלכה | משנה | תנ"ך | מקור_חיים | פרשת_השבוע | מחשבת_ישראל
+    // Allowlists — reject unknown values outright to prevent prompt injection via fallback path.
+    // The client sends subject ids with spaces (e.g. "מקור חיים"); match exactly.
+    const VALID_SUBJECTS = ["הלכה", "משנה", "תנ\"ך", "מקור חיים", "פרשת השבוע", "מחשבת ישראל"];
+    const VALID_OUTPUT_TYPES = ["דף_עבודה", "שאלות_הבנה", "סיכום", "מבחן", "כרטיסיות", "מפת_מושגים"];
+
+    const rawSubject    = clean(body.subject, 50);
+    const rawOutputType = clean(body.outputType, 50);
+
+    if (!VALID_SUBJECTS.includes(rawSubject)) {
+      return new Response(JSON.stringify({ error: "invalid_subject" }), { status: 400, headers: cors });
+    }
+    if (!VALID_OUTPUT_TYPES.includes(rawOutputType)) {
+      return new Response(JSON.stringify({ error: "invalid_output_type" }), { status: 400, headers: cors });
+    }
+
+    const subject     = rawSubject;
+    const outputType  = rawOutputType;
     const grade       = clean(body.grade, 20);      // א | ב | ... | ט
     const topic       = clean(body.topic, 300);     // הנושא הנבחר
-    const outputType  = clean(body.outputType, 50); // דף_עבודה | שאלות_הבנה | סיכום | מבחן | כרטיסיות | מפת_מושגים
     const level       = ["basic", "medium", "advanced"].includes(body.level) ? body.level : "medium";
     const notes       = clean(body.notes, MAX_NOTES_LEN); // הוראות נוספות מהמורה
 
     const maxPages = isTeacher ? TEACHER_MAX_PAGES : isParent ? PARENT_MAX_PAGES : FREE_MAX_PAGES;
     const pageCount = Math.min(maxPages, Math.max(1, Number.isInteger(body.pageCount) ? body.pageCount : 2));
 
-    if (!subject || !topic) {
-      return new Response(JSON.stringify({ error: "subject and topic required" }), { status: 400, headers: cors });
+    if (!topic) {
+      return new Response(JSON.stringify({ error: "topic required" }), { status: 400, headers: cors });
     }
 
     // ── 5. Build AI prompt ─────────────────────────────────────────────────────
     const apiKey = Deno.env.get("ANTHROPIC_API_KEY");
     if (!apiKey) throw new Error("ANTHROPIC_API_KEY missing");
 
-    // Sanitize user inputs against prompt injection
+    // Sanitize user inputs against prompt injection.
+    // subject/outputType are already allowlist-validated above; only topic/grade/notes are free-form.
     const esc = (s: string) => s
       .replace(/<\/?user_input\b[^>]*>/gi, "")
       .replace(/<\/?system\b[^>]*>/gi, "")
       .replace(/<\/?instructions?\b[^>]*>/gi, "")
       .replace(/<\/?INST\b[^>]*>/gi, "");
 
+    // Subject descriptors (client sends space-separated ids, not underscore)
     const subjectLabel: Record<string, string> = {
       "הלכה":          "הלכה",
       "משנה":          "משנה",
       "תנ\"ך":         "תנ\"ך",
-      "מקור_חיים":     "מקור חיים (הרב חיים דוד הלוי)",
-      "פרשת_השבוע":    "פרשת השבוע",
-      "מחשבת_ישראל":   "מחשבת ישראל",
+      "מקור חיים":     "מקור חיים (הרב חיים דוד הלוי)",
+      "פרשת השבוע":    "פרשת השבוע",
+      "מחשבת ישראל":   "מחשבת ישראל",
     };
     const outputLabel: Record<string, string> = {
       "דף_עבודה":      "📄 דף עבודה",

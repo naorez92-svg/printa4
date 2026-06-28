@@ -170,9 +170,9 @@ export default function JewishCreate({ onSaved, remaining, isPro, bookletCount =
     setHtml(null);
     setError(null);
     setSaveWarning(false);
-    retryCountRef.current = 0;
 
-    const { data: { session } } = await supabase.auth.getSession();
+    const { data } = await supabase.auth.getSession();
+    const session = data?.session;
     if (!session) {
       setLoading(false);
       creatingRef.current = false;
@@ -228,6 +228,10 @@ export default function JewishCreate({ onSaved, remaining, isPro, bookletCount =
     let updateTimer = 0;
     let streamHadError = false;
     let streamErrorMsg = null;
+    let streamAborted = false;
+
+    let wakeLock = null;
+    try { wakeLock = await navigator.wakeLock?.request("screen"); } catch {}
 
     try {
       while (true) {
@@ -262,6 +266,7 @@ export default function JewishCreate({ onSaved, remaining, isPro, bookletCount =
       const partial = htmlAccumulated.trim();
       if (partial.length > 6000 && (partial.includes("<!DOCTYPE") || partial.includes("<html"))) {
         if (!partial.includes("</html>")) htmlAccumulated = partial + "\n</body></html>";
+        streamAborted = true;
       } else if (retryCountRef.current < 1) {
         retryCountRef.current++;
         setStreamChars(0); setLoadingElapsed(0); setLoadingMsgIdx(0);
@@ -275,6 +280,8 @@ export default function JewishCreate({ onSaved, remaining, isPro, bookletCount =
         setError(`generic:החיבור נקטע — לחצי שוב על "צור חומר" כדי לנסות שוב`);
         return;
       }
+    } finally {
+      wakeLock?.release().catch(() => {});
     }
 
     setLoading(false);
@@ -288,7 +295,7 @@ export default function JewishCreate({ onSaved, remaining, isPro, bookletCount =
 
     // Save to booklets table
     const outputLabel = OUTPUT_TYPES.find(o => o.id === outputType)?.label ?? outputType;
-    const title = `${subject} כיתה ${grade} — ${effectiveTopic.substring(0, 50)} (${outputLabel})`;
+    const title = `${subject} כיתה ${grade} — ${effectiveTopic.substring(0, 50)}${streamAborted ? " (חלקי)" : ""} (${outputLabel})`;
 
     const { error: insertErr } = await supabase.from("booklets").insert({
       user_id: session.user.id,
@@ -302,6 +309,8 @@ export default function JewishCreate({ onSaved, remaining, isPro, bookletCount =
     if (insertErr) {
       setSaveWarning(true);
       track("jewish_save_failed", { message: insertErr.message });
+    } else if (streamAborted) {
+      setSaveWarning(true);
     }
 
     track("jewish_completed", { subject, grade, topic: effectiveTopic, outputType, level, pageCount });
@@ -347,7 +356,11 @@ export default function JewishCreate({ onSaved, remaining, isPro, bookletCount =
           {SUBJECTS.map(s => (
             <button
               key={s.id}
-              onClick={() => setSubject(s.id)}
+              onClick={() => {
+                const newGrades = CURRICULUM[s.id] ? Object.keys(CURRICULUM[s.id]) : GRADES;
+                setSubject(s.id);
+                if (!newGrades.includes(grade)) setGrade(newGrades[0]);
+              }}
               className={`flex items-start gap-2 p-3 rounded-xl border text-right transition-all ${
                 subject === s.id
                   ? "border-magic bg-magic/8 shadow-sm"
