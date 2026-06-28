@@ -63,6 +63,8 @@ export default function AdminPanel() {
   const [sendResult, setSendResult]     = useState("");
   const [sendingRenewal, setSendingRenewal] = useState(false);
   const [renewalResult, setRenewalResult]   = useState("");
+  const [sendingToday, setSendingToday] = useState(false);
+  const [todayResult, setTodayResult]   = useState("");
 
   useEffect(() => {
     (async () => {
@@ -119,6 +121,13 @@ export default function AdminPanel() {
     const { data: res, error: err } = await supabase.functions.invoke("send-renewal-reminder", { body: {} });
     setSendingRenewal(false);
     setRenewalResult(err ? `שגיאה: ${err.message}` : `נשלחו ${res?.sent ?? 0} תזכורות מתוך ${res?.total ?? 0}`);
+  };
+
+  const triggerSameDayFollowup = async () => {
+    setSendingToday(true); setTodayResult("");
+    const { data: res, error: err } = await supabase.functions.invoke("send-followup", { body: { sameDay: true } });
+    setSendingToday(false);
+    setTodayResult(err ? `שגיאה: ${err.message}` : `נשלחו ${res?.sent ?? 0} מיילים מתוך ${res?.wave0_candidates ?? 0} נרשמות היום`);
   };
 
   if (loading) return <div className="text-center py-12 text-ink/40">טוען נתוני ניהול…</div>;
@@ -677,16 +686,25 @@ export default function AdminPanel() {
 
       {/* Automation triggers */}
       <div className="grid grid-cols-2 gap-3">
+        <div className="bg-canvas rounded-2xl p-4 border border-magic/30">
+          <h3 className="font-bold text-ink mb-1 text-sm">⚡ נרשמות של היום</h3>
+          <p className="text-xs text-ink/40 mb-3">שלח עכשיו לכל מי שנרשמה היום ועוד לא יצרה חוברת (2+ שעות).</p>
+          <button onClick={triggerSameDayFollowup} disabled={sendingToday}
+            className="bg-magic text-white rounded-xl px-3 py-2 text-xs font-medium disabled:opacity-50 hover:opacity-90 transition-opacity w-full">
+            {sendingToday ? "שולח…" : "שלח לחדשות ✨"}
+          </button>
+          {todayResult && <p className="text-xs text-grow mt-2">{todayResult}</p>}
+        </div>
         <div className="bg-canvas rounded-2xl p-4 border border-ink/5">
           <h3 className="font-bold text-ink mb-1 text-sm">פולואפ D+2</h3>
           <p className="text-xs text-ink/40 mb-3">אוטומטי דרך GitHub Actions. אפשר ידנית.</p>
           <button onClick={triggerFollowup} disabled={sending}
-            className="bg-magic text-white rounded-xl px-3 py-2 text-xs font-medium disabled:opacity-50 hover:opacity-90 transition-opacity w-full">
+            className="bg-magic/60 text-white rounded-xl px-3 py-2 text-xs font-medium disabled:opacity-50 hover:opacity-90 transition-opacity w-full">
             {sending ? "שולח…" : "שלח עכשיו ✉️"}
           </button>
           {sendResult && <p className="text-xs text-grow mt-2">{sendResult}</p>}
         </div>
-        <div className="bg-canvas rounded-2xl p-4 border border-ink/5">
+        <div className="bg-canvas rounded-2xl p-4 border border-ink/5 col-span-2">
           <h3 className="font-bold text-ink mb-1 text-sm">תזכורת חידוש D+25</h3>
           <p className="text-xs text-ink/40 mb-3">מזכיר לפרו לחדש 5 ימים לפני הסוף.</p>
           <button onClick={triggerRenewal} disabled={sendingRenewal}

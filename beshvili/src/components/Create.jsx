@@ -650,6 +650,12 @@ export default function Create({ onSaved, remaining, isPro, active = true, bookl
         {/* Templates — show 6 by default, rest behind "עוד" toggle to reduce overload */}
         <div>
           <p className="text-xs text-ink/50 mb-2 font-semibold">👇 בחר נושא להתחיל — או מלא בעצמך למטה</p>
+          {bookletCount === 0 && !f.goal && (
+            <div className="flex items-center gap-2 bg-magic/6 border border-magic/15 rounded-xl px-3 py-2 mb-2 text-xs text-magic/80">
+              <span className="flex-shrink-0">☝️</span>
+              <span><strong>לחצי על נושא</strong> ← הטופס יתמלא אוטומטית. אחר כך רק "צור חוברת" ב-60 שניות</span>
+            </div>
+          )}
           <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
             {(showAllTemplates ? TEMPLATES : TEMPLATES.slice(0, 6)).map((t) => (
               <button key={t.label} onClick={() => applyTmpl(t)}
