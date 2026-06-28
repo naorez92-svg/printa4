@@ -417,22 +417,30 @@ Deno.serve(async (req) => {
     }
 
     // ── 3. Rate limiting (1 per 60s per user) via profiles.last_generation_at ──
-    // Using a dedicated column instead of last booklet row — deleting booklets
-    // no longer bypasses the rate limit.
-    const { data: profileForRate } = await admin
+    // Atomic CAS: UPDATE only if the column is NULL or older than RATE_LIMIT_SECONDS.
+    // This prevents a TOCTOU race where two concurrent requests both pass a read-check
+    // before either writes the timestamp. If UPDATE returns 0 rows, the user is still
+    // within the window and we 429 them.
+    const rateCutoff = new Date(Date.now() - RATE_LIMIT_SECONDS * 1000).toISOString();
+    const { data: rateLockRow } = await admin
       .from("profiles")
-      .select("last_generation_at")
+      .update({ last_generation_at: new Date().toISOString() })
       .eq("id", user.id)
-      .single();
+      .or(`last_generation_at.is.null,last_generation_at.lt.${rateCutoff}`)
+      .select("id")
+      .maybeSingle();
 
-    if (profileForRate?.last_generation_at) {
-      const elapsedSec = (Date.now() - new Date(profileForRate.last_generation_at).getTime()) / 1000;
-      if (elapsedSec < RATE_LIMIT_SECONDS) {
-        return new Response(
-          JSON.stringify({ error: "rate_limited", wait: Math.ceil(RATE_LIMIT_SECONDS - elapsedSec) }),
-          { status: 429, headers: cors }
-        );
-      }
+    if (!rateLockRow) {
+      // Another concurrent request already claimed the slot, or we're still within 60s.
+      const { data: currentProfile } = await admin
+        .from("profiles").select("last_generation_at").eq("id", user.id).single();
+      const elapsedSec = currentProfile?.last_generation_at
+        ? (Date.now() - new Date(currentProfile.last_generation_at).getTime()) / 1000
+        : 0;
+      return new Response(
+        JSON.stringify({ error: "rate_limited", wait: Math.ceil(Math.max(0, RATE_LIMIT_SECONDS - elapsedSec)) }),
+        { status: 429, headers: cors }
+      );
     }
 
     // ── 4. Parse + sanitize input ────────────────────────────────────────────
@@ -555,9 +563,7 @@ Deno.serve(async (req) => {
       throw new Error(`Anthropic ${status}: ${await anthropicResp.text()}`);
     }
 
-    // Stamp rate-limit timestamp BEFORE returning stream — prevents bypass by closing mid-stream
-    await admin.from("profiles").update({ last_generation_at: new Date().toISOString() }).eq("id", user.id);
-
+    // Rate-limit timestamp already stamped atomically above (step 3 CAS).
     const monthlyLimit = isAdmin ? -1 : isTeacher ? TEACHER_MONTHLY_LIMIT : isParent ? PARENT_MONTHLY_LIMIT : FREE_BOOKLET_LIMIT;
     const remaining = isAdmin ? -1 : monthlyLimit - (isPaid ? usedMonthly : usedTotal) - 1;
 
