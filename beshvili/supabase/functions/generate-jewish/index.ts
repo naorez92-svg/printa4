@@ -103,9 +103,11 @@ const JEWISH_SYSTEM = `אתה מומחה פדגוגי בחינוך יהודי ד
   <blockquote style="border-right:3px solid #d97706;background:#fffbeb;padding:8px 12px;margin:8px 0;font-size:10.5px;font-style:italic;border-radius:0 4px 4px 0">
     [טקסט הציטוט] <span style="font-size:9px;color:#92400e;font-style:normal">(מסכת/ספר פרק:פסוק)</span>
   </blockquote>
-• A4: @page{size:A4;margin:0} כל .page: width:210mm; min-height:296mm; padding:14mm; margin:10px auto; page-break-after:always; overflow:hidden; box-sizing:border-box; position:relative
+• A4: @page{size:A4;margin:0} כל .page: width:210mm; min-height:296mm; padding:14mm; margin:10px auto; page-break-after:always; box-sizing:border-box; position:relative (ללא overflow:hidden — תוכן חייב להיכנס בתוך העמוד)
+• כל שאלה/פריט תוכן בנפרד יקבל page-break-inside:avoid כדי שלא ייחתך באמצע: <div style="page-break-inside:avoid">...</div>
 • @media print: .no-print{display:none!important} body{margin:0;background:white} .page{margin:0;box-shadow:none;border:none} .page:last-child{page-break-after:avoid}
 • -webkit-print-color-adjust:exact!important; print-color-adjust:exact!important
+• חלוקת תוכן בין עמודים: הכנס פחות שאלות/פריטים לכל עמוד — עדיף 8–10 שאלות אמריקאיות לעמוד, לא 15+
 
 === כללי ברזל ===
 • קוד HTML גולמי בלבד — מ-<!DOCTYPE html> עד </html> — ללא \`\`\`html, ללא הסברים, ללא שום טקסט לפניו/אחריו
@@ -131,7 +133,6 @@ Deno.serve(async (req) => {
   );
 
   try {
-    // ── 1. JWT verification ────────────────────────────────────────────────────
     const jwt = req.headers.get("authorization")?.replace("Bearer ", "");
     if (!jwt) {
       return new Response(JSON.stringify({ error: "unauthorized" }), { status: 401, headers: cors });
@@ -141,7 +142,6 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: "unauthorized" }), { status: 401, headers: cors });
     }
 
-    // ── 2. Plan check + quota ──────────────────────────────────────────────────
     const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString();
     const [{ data: profile }, { count: monthlyCount }] = await Promise.all([
       admin.from("profiles").select("plan, total_booklets_created").eq("id", user.id).single(),
@@ -174,7 +174,6 @@ Deno.serve(async (req) => {
       }
     }
 
-    // ── 3. Rate limiting (atomic CAS — same slot as generate-booklet) ──────────
     const rateCutoff = new Date(Date.now() - RATE_LIMIT_SECONDS * 1000).toISOString();
     const { data: rateLockRow } = await admin
       .from("profiles")
@@ -196,13 +195,10 @@ Deno.serve(async (req) => {
       );
     }
 
-    // ── 4. Parse + sanitize input ──────────────────────────────────────────────
     const body = await req.json();
     const clean = (val: unknown, max = MAX_FIELD_LEN): string =>
       String(val ?? "").trim().substring(0, max);
 
-    // Allowlists — reject unknown values outright to prevent prompt injection via fallback path.
-    // The client sends subject ids with spaces (e.g. "מקור חיים"); match exactly.
     const VALID_SUBJECTS = ["הלכה", "משנה", "תנ\"ך", "מקור חיים", "פרשת השבוע", "מחשבת ישראל"];
     const VALID_OUTPUT_TYPES = ["דף_עבודה", "שאלות_הבנה", "סיכום", "מבחן", "כרטיסיות", "מפת_מושגים"];
 
@@ -218,10 +214,10 @@ Deno.serve(async (req) => {
 
     const subject     = rawSubject;
     const outputType  = rawOutputType;
-    const grade       = clean(body.grade, 20);      // א | ב | ... | ט
-    const topic       = clean(body.topic, 300);     // הנושא הנבחר
+    const grade       = clean(body.grade, 20);
+    const topic       = clean(body.topic, 300);
     const level       = ["basic", "medium", "advanced"].includes(body.level) ? body.level : "medium";
-    const notes       = clean(body.notes, MAX_NOTES_LEN); // הוראות נוספות מהמורה
+    const notes       = clean(body.notes, MAX_NOTES_LEN);
 
     const maxPages = isTeacher ? TEACHER_MAX_PAGES : isParent ? PARENT_MAX_PAGES : FREE_MAX_PAGES;
     const pageCount = Math.min(maxPages, Math.max(1, Number.isInteger(body.pageCount) ? body.pageCount : 2));
@@ -230,19 +226,15 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: "topic required" }), { status: 400, headers: cors });
     }
 
-    // ── 5. Build AI prompt ─────────────────────────────────────────────────────
     const apiKey = Deno.env.get("ANTHROPIC_API_KEY");
     if (!apiKey) throw new Error("ANTHROPIC_API_KEY missing");
 
-    // Sanitize user inputs against prompt injection.
-    // subject/outputType are already allowlist-validated above; only topic/grade/notes are free-form.
     const esc = (s: string) => s
       .replace(/<\/?user_input\b[^>]*>/gi, "")
       .replace(/<\/?system\b[^>]*>/gi, "")
       .replace(/<\/?instructions?\b[^>]*>/gi, "")
       .replace(/<\/?INST\b[^>]*>/gi, "");
 
-    // Subject descriptors (client sends space-separated ids, not underscore)
     const subjectLabel: Record<string, string> = {
       "הלכה":          "הלכה",
       "משנה":          "משנה",
@@ -275,7 +267,6 @@ ${notes ? `הוראות נוספות מהמורה: ${esc(notes)}` : ""}
 
 קוד HTML גולמי בלבד, ללא הסברים.`;
 
-    // ── 6. Call Anthropic (streaming) ─────────────────────────────────────────
     const maxTokens = Math.min(48000, Math.max(12000, pageCount * 8000));
 
     const anthropicResp = await fetch("https://api.anthropic.com/v1/messages", {
@@ -307,7 +298,6 @@ ${notes ? `הוראות נוספות מהמורה: ${esc(notes)}` : ""}
     const monthlyLimit = isAdmin ? -1 : isTeacher ? TEACHER_MONTHLY_LIMIT : isParent ? PARENT_MONTHLY_LIMIT : FREE_BOOKLET_LIMIT;
     const remaining = isAdmin ? -1 : monthlyLimit - (isPaid ? usedMonthly : usedTotal) - 1;
 
-    // ── 7. Stream SSE → client with keep-alive heartbeats ─────────────────────
     const enc = new TextEncoder();
     const KEEP_ALIVE = enc.encode(": keep-alive\n\n");
 
