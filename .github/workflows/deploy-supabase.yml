@@ -24,6 +24,7 @@ jobs:
           supabase functions deploy send-renewal-reminder --project-ref gywpdzkvkdisonuzhsib --no-verify-jwt
           supabase functions deploy view-booklet --project-ref gywpdzkvkdisonuzhsib --no-verify-jwt
           supabase functions deploy notify-lead --project-ref gywpdzkvkdisonuzhsib --no-verify-jwt
+          supabase functions deploy health-check --project-ref gywpdzkvkdisonuzhsib --no-verify-jwt
         working-directory: beshvili
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
