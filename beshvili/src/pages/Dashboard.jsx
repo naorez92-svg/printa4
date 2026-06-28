@@ -209,7 +209,7 @@ export default function Dashboard() {
             <Create active={tab === "create"} onSaved={() => refresh()} remaining={remaining} isPro={isPro} bookletCount={bookletCount} onUpgrade={() => setShowUpgrade(true)} />
           </div>
           {tab === "students" && <Students onBookletSaved={() => { refresh(); setTab("history"); }} remaining={remaining} isPro={isPro} />}
-          {tab === "history" && <History />}
+          {tab === "history" && <History isPro={isPro} onUpgrade={() => setShowUpgrade(true)} />}
           {tab === "branding" && isPro && <BrandingSettings profile={profile} onSaved={refresh} />}
           {tab === "admin" && isAdmin && <AdminPanel />}
         </main>
