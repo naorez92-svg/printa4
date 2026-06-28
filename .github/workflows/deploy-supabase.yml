@@ -19,6 +19,7 @@ jobs:
       - name: Deploy Edge Functions
         run: |
           supabase functions deploy generate-booklet --project-ref gywpdzkvkdisonuzhsib --no-verify-jwt
+          supabase functions deploy generate-jewish --project-ref gywpdzkvkdisonuzhsib --no-verify-jwt
           supabase functions deploy admin-stats --project-ref gywpdzkvkdisonuzhsib --no-verify-jwt
           supabase functions deploy send-followup --project-ref gywpdzkvkdisonuzhsib --no-verify-jwt
           supabase functions deploy send-renewal-reminder --project-ref gywpdzkvkdisonuzhsib --no-verify-jwt

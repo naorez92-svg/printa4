@@ -7,12 +7,14 @@ import UpgradeModal from "../components/UpgradeModal";
 import FeedbackWidget from "../components/FeedbackWidget";
 import AdminPanel from "../components/AdminPanel";
 import BrandingSettings from "../components/BrandingSettings";
+import JewishCreate from "../components/JewishCreate";
 import { useProfile, FREE_LIMIT } from "../hooks/useProfile";
 import InstallPWA from "../components/InstallPWA";
 import Logo from "../components/Logo";
 
 const NAV = [
   ["create",   "✨", "צור חוברת"],
+  ["jewish",   "✡️", "יהדות"],
   ["students", "👥", "תלמידים"],
   ["history",  "📂", "החוברות שלי"],
 ];
@@ -220,6 +222,7 @@ export default function Dashboard() {
           <div className={tab === "create" ? "" : "hidden"}>
             <Create active={tab === "create"} onSaved={() => refresh()} remaining={remaining} isPro={isPro} bookletCount={bookletCount} onUpgrade={() => setShowUpgrade(true)} />
           </div>
+          {tab === "jewish" && <JewishCreate onSaved={() => refresh()} remaining={remaining} isPro={isPro} bookletCount={bookletCount} onUpgrade={() => setShowUpgrade(true)} />}
           {tab === "students" && <Students onBookletSaved={() => { refresh(); setTab("history"); }} remaining={remaining} isPro={isPro} />}
           {tab === "history" && <History isPro={isPro} onUpgrade={() => setShowUpgrade(true)} />}
           {tab === "branding" && isPro && <BrandingSettings profile={profile} onSaved={refresh} />}

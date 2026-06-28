@@ -503,6 +503,59 @@ export default function Login() {
         </div>
       </section>
 
+      {/* ── Jewish Studies section ── */}
+      <section className="py-14 px-5 bg-gradient-to-b from-canvas to-white">
+        <div className="max-w-3xl mx-auto">
+          <div className="text-center mb-8">
+            <div className="inline-flex items-center gap-2 bg-magic/10 border border-magic/20 rounded-full px-4 py-1.5 mb-4">
+              <span className="text-sm">✡️</span>
+              <span className="text-xs font-semibold text-magic">חדש — מקצועות יהדות</span>
+            </div>
+            <h2 className="text-2xl font-bold text-ink mb-2 font-display">חומרי יהדות לפי תכנית המפמ"ר</h2>
+            <p className="text-ink/55 text-sm max-w-lg mx-auto leading-relaxed">
+              מורות לחינוך דתי לאומי — עכשיו אפשר ליצור דפי עבודה, מבחנים וסיכומים בכל מקצועות היהדות,
+              מותאמים לתכנית הלימודים הרשמית של משרד החינוך.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-8">
+            {[
+              { icon: "⚖️", label: "הלכה",         desc: "ל\"ט מלאכות, ברכות, כשרות — לפי כיתה" },
+              { icon: "📜", label: "משנה",          desc: "תענית, ראש השנה, ברכות, אבות — שלמות" },
+              { icon: "📖", label: "תנ\"ך",          desc: "חמ\"ד — בראשית עד כתובים לפי שכבה" },
+              { icon: "🕍", label: "מקור חיים",     desc: "הרב חיים דוד הלוי — כיתות ז-ט" },
+              { icon: "✡️", label: "פרשת השבוע",   desc: "פרשה שוטפת + רש\"י + שאלות עיון" },
+              { icon: "🔯", label: "מחשבת ישראל",  desc: "אמונה, ציונות דתית, תורה שבע\"פ" },
+            ].map(({ icon, label, desc }) => (
+              <div key={label} className="bg-white rounded-2xl p-4 border border-magic/10 shadow-sm">
+                <div className="text-2xl mb-2">{icon}</div>
+                <div className="font-bold text-sm text-ink mb-1">{label}</div>
+                <div className="text-[11px] text-ink/50 leading-snug">{desc}</div>
+              </div>
+            ))}
+          </div>
+
+          <div className="bg-gradient-to-l from-magic/10 to-brand/10 border border-magic/20 rounded-2xl px-5 py-4">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+              {[
+                { icon: "📄", label: "דף עבודה" },
+                { icon: "📝", label: "מבחן 100 נק'" },
+                { icon: "📋", label: "סיכום שיעור" },
+                { icon: "🃏", label: "כרטיסיות חזרה" },
+              ].map(({ icon, label }) => (
+                <div key={label} className="bg-white/70 rounded-xl px-3 py-2.5 text-center border border-magic/10">
+                  <div className="text-xl mb-1">{icon}</div>
+                  <div className="text-[11px] font-semibold text-ink">{label}</div>
+                </div>
+              ))}
+            </div>
+            <p className="text-center text-xs text-ink/55">
+              כל החומרים מותאמים לתכנית הלימודים הרשמית · ציטוטי מקורות מדויקים · עברית תקנית · מוכן להדפסה A4
+            </p>
+          </div>
+        </div>
+      </section>
+
       {/* ── Testimonials ── */}
       <section className="py-14 px-5 bg-ink">
         <div className="max-w-3xl mx-auto">
