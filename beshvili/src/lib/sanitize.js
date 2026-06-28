@@ -41,9 +41,18 @@ export function sanitizeBookletHtml(h) {
         const scheme = val.toLowerCase();
         const bad =
           /^(javascript|vbscript):/.test(scheme) ||
-          // data:/blob: are script/navigation sinks here — but allow inline images.
-          (/^(data|blob):/.test(scheme) && !/^data:image\//.test(scheme));
-        if (bad) el.removeAttribute(attr.name);
+          // data:/blob: are script/navigation sinks — allow only raster image data URIs.
+          // SVG data URIs (data:image/svg+xml) are excluded: they can carry inline scripts
+          // and are not needed for AI-generated booklet content.
+          (/^(data|blob):/.test(scheme) && !/^data:image\/(png|jpeg|jpg|gif|webp|avif);base64,/i.test(scheme));
+        if (bad) {
+          // For xlink:href (SVG namespaced attribute) removeAttribute("xlink:href") is a
+          // no-op in standards-compliant browsers — must use the namespaced variant.
+          if (name === "xlink:href") {
+            el.removeAttributeNS("http://www.w3.org/1999/xlink", "href");
+          }
+          el.removeAttribute(attr.name);
+        }
       } else if (name === "srcdoc") {
         el.removeAttribute(attr.name);
       } else if (name === "style" && /(javascript|vbscript):|expression\s*\(/i.test(val)) {
