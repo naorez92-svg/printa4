@@ -91,6 +91,7 @@ export default function Create({ onSaved, remaining, isPro, active = true, bookl
   const [shareToken, setShareToken] = useState(null);
   const [bookletTitle, setBookletTitle] = useState(null);
   const [showRating, setShowRating] = useState(false);
+  const [saveWarning, setSaveWarning] = useState(false);   // generated OK but cloud-save failed
   const [error, setError]         = useState(null); // null | "quota" | "quota_monthly" | "rate:{wait}" | "generic:{msg}"
   const [rateCountdown, setRateCountdown] = useState(null);
   const [childSaved, setChildSaved] = useState(false);
@@ -326,7 +327,17 @@ export default function Create({ onSaved, remaining, isPro, active = true, bookl
       goal: mode === "free" ? freeText.trim().substring(0, 200) : mode === "exam" ? examTopic : f.goal,
       level: f.level, html: generatedHtml,
     }).select("id, share_token").single();
-    if (insertErr) { trackError("db_insert_failed"); setError(`generic:שמירה נכשלה — ${insertErr.message}`); return; }
+    if (insertErr) {
+      // A save failure must NOT discard a ~90s generation — show the booklet so the
+      // user can still print / download it; only the cloud copy is missing.
+      trackError("db_insert_failed", { message: insertErr.message });
+      track("booklet_completed", { booklet_id: null, pages: pageCount, mode, durationSec: Math.round((Date.now() - startedAt) / 1000), chars: htmlAccumulated.length, save_failed: true });
+      setSaveWarning(true);
+      setBookletTitle(title);
+      setHtml(generatedHtml);
+      onSaved?.(); // refresh quota count even though the DB row wasn't saved
+      return;
+    }
 
     setBookletId(inserted?.id ?? null);
     setShareToken(inserted?.share_token ?? null);
@@ -379,7 +390,7 @@ export default function Create({ onSaved, remaining, isPro, active = true, bookl
     e.target.value = "";
   }, []);
 
-  const reset = () => { setHtml(null); setF(EMPTY); setFreeText(""); setError(null); setBookletId(null); setShareToken(null); setBookletTitle(null); setShowRating(false); setChildSaved(false); setPhotoUrl(null); };
+  const reset = () => { setHtml(null); setF(EMPTY); setFreeText(""); setError(null); setBookletId(null); setShareToken(null); setBookletTitle(null); setShowRating(false); setChildSaved(false); setPhotoUrl(null); setSaveWarning(false); };
   const set   = (k) => (e) => setF((p) => ({ ...p, [k]: e.target.value }));
   const applyTmpl = (tmpl) => {
     track("template_chip_clicked", { label: tmpl.label, grade: tmpl.f.grade, world: tmpl.f.world, level: tmpl.f.level });
@@ -472,6 +483,14 @@ export default function Create({ onSaved, remaining, isPro, active = true, bookl
 
     return (
       <section className="space-y-4">
+        {/* Save-warning banner — cloud save failed but booklet was generated */}
+        {saveWarning && (
+          <div className="bg-amber-50 border border-amber-300 rounded-2xl px-5 py-4 text-right">
+            <p className="font-bold text-amber-800 text-sm">⚠️ החוברת נוצרה אבל לא נשמרה בענן</p>
+            <p className="text-xs text-amber-700 mt-1">הדפיסי אותה עכשיו כדי לא לאבד אותה. היסטוריה לא תציג חוברת זו.</p>
+          </div>
+        )}
+
         {/* Success banner — always visible */}
         <div className="bg-gradient-to-l from-grow/15 to-brand/10 border border-grow/20 rounded-2xl px-5 py-4">
           <div className="flex items-center gap-3 mb-2">
@@ -479,7 +498,7 @@ export default function Create({ onSaved, remaining, isPro, active = true, bookl
             <div className="flex-1">
               <p className="font-bold text-ink text-base">החוברת מוכנה!</p>
               <p className="text-xs text-ink/50 mt-0.5">
-                נשמרה בענן · מוכנה להדפסה · <span className="text-grow font-medium">⏱ חסכת ~{timeSaved} דק' הכנה!</span>
+                {saveWarning ? "מוכנה להדפסה" : "נשמרה בענן · מוכנה להדפסה"} · <span className="text-grow font-medium">⏱ חסכת ~{timeSaved} דק' הכנה!</span>
               </p>
             </div>
             {!isPro && remaining !== undefined && (
