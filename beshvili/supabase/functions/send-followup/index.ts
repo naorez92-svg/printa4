@@ -70,7 +70,7 @@ Deno.serve(async (req) => {
   const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
   if (token !== serviceRoleKey) {
     const { data: { user }, error } = await admin.auth.getUser(token);
-    if (error || !user) return new Response(JSON.stringify({ error: "unauthorized" }), { status: 401, headers: cors });
+    if (error || !user) return new Response(JSON.stringify({ error: "unauthorized" }), { status: 401, headers: cors });  
     const { data: profile } = await admin.from("profiles").select("plan").eq("id", user.id).single();
     if (profile?.plan !== "admin") return new Response(JSON.stringify({ error: "forbidden" }), { status: 403, headers: cors });
   }
@@ -88,9 +88,18 @@ Deno.serve(async (req) => {
   const tenDaysAgo  = new Date(now.getTime() - 10 * 24 * 60 * 60 * 1000).toISOString();
 
   // Load all profiles (free + pro, non-admin) in one query
-  const { data: allProfiles } = await admin
+  const { data: allProfiles, error: profilesError } = await admin
     .from("profiles")
     .select("id, full_name, plan, followup_sent_at, dormant_followup_sent_at, created_at");
+
+  if (profilesError) {
+    console.error("[send-followup] profiles query failed:", profilesError.message);
+    return new Response(JSON.stringify({
+      error: "profiles_query_failed",
+      detail: profilesError.message,
+      hint: "Migration 0020_dormant_followup.sql may not have been applied — run Deploy Supabase workflow manually.",
+    }), { status: 500, headers: cors });
+  }
 
   const profileMap: Record<string, {
     full_name: string | null;
@@ -131,7 +140,7 @@ Deno.serve(async (req) => {
       body: JSON.stringify({ from: "בשבילי <hello@beshvili.com>", to: [email], subject, html }),
     });
     if (res.ok) {
-      await admin.from("profiles").update({ [markField]: now.toISOString() }).eq("id", userId);
+      await admin.from("profiles").update({ [markField]: now.toISOString() }).eq("id", userId);  
       sent++;
     } else {
       errors.push(`${email}: ${await res.text()}`);
@@ -196,7 +205,7 @@ Deno.serve(async (req) => {
           שמנו לב שלא יצרת חוברת עדיין — ייתכן שהיה עומס על האפליקציה בגלל גל כניסות גדול היום, ואנחנו מצטערים אם נתקעת.
         </p>
         <div style="background:#fff8e1;border-right:4px solid #F4A02C;border-radius:8px;padding:16px;margin:0 0 16px;text-align:right;">
-          <p style="margin:0 0 10px;color:#20184A;font-weight:bold;font-size:15px;">🚀 כך יוצרים חוברת ב-3 לחיצות:</p>
+          <p style="margin:0 0 10px;color:#20184A;font-weight:bold;font-size:15px;">🚀 כך יוצרים חוברת ב-3 לחיצו—:">
           <ol style="margin:0;padding-right:20px;color:#555;font-size:14px;line-height:2.2;">
             <li>לחצי על נושא (למשל <strong>"➕ כיתה ב — חיבור"</strong>) — הטופס יתמלא לבד</li>
             <li>בדקי שהכל נכון ושנו אם צריך</li>
@@ -351,5 +360,10 @@ Deno.serve(async (req) => {
     wave2_candidates: wave2.length,
     total: wave0.length + wave0e.length + wave1.length + wave2.length,
     errors,
+    _debug: {
+      profiles_found: (allProfiles ?? []).length,
+      auth_users_found: (authData?.users ?? []).length,
+      booklets_found: (allBooklets ?? []).length,
+    },
   }), { status: 200, headers: cors });
 });
