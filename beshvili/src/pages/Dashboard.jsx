@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { supabase } from "../lib/supabase";
 import Create from "../components/Create";
 import History from "../components/History";
@@ -41,6 +41,18 @@ export default function Dashboard() {
   const [tab, setTab]             = useState("create");
   const [showUpgrade, setShowUpgrade] = useState(false);
   const { profile, plan, bookletCount, monthlyBookletCount, monthlyLimit, remaining, isPro, isAdmin, loading, refresh } = useProfile();
+
+  const prevBookletCountRef = useRef(null);
+  useEffect(() => {
+    if (loading) return;
+    if (prevBookletCountRef.current === null) { prevBookletCountRef.current = bookletCount; return; }
+    if (!isPro && bookletCount > prevBookletCountRef.current && remaining === 1) {
+      prevBookletCountRef.current = bookletCount;
+      const t = setTimeout(() => setShowUpgrade(true), 1800);
+      return () => clearTimeout(t);
+    }
+    prevBookletCountRef.current = bookletCount;
+  }, [bookletCount, remaining, isPro, loading]);
 
   const tabs = [
     ...NAV,
