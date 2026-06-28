@@ -103,9 +103,11 @@ const JEWISH_SYSTEM = `אתה מומחה פדגוגי בחינוך יהודי ד
   <blockquote style="border-right:3px solid #d97706;background:#fffbeb;padding:8px 12px;margin:8px 0;font-size:10.5px;font-style:italic;border-radius:0 4px 4px 0">
     [טקסט הציטוט] <span style="font-size:9px;color:#92400e;font-style:normal">(מסכת/ספר פרק:פסוק)</span>
   </blockquote>
-• A4: @page{size:A4;margin:0} כל .page: width:210mm; min-height:296mm; padding:14mm; margin:10px auto; page-break-after:always; overflow:hidden; box-sizing:border-box; position:relative
+• A4: @page{size:A4;margin:0} כל .page: width:210mm; min-height:296mm; padding:14mm; margin:10px auto; page-break-after:always; box-sizing:border-box; position:relative (ללא overflow:hidden — תוכן חייב להיכנס בתוך העמוד)
+• כל שאלה/פריט תוכן בנפרד יקבל page-break-inside:avoid כדי שלא ייחתך באמצע: <div style="page-break-inside:avoid">...</div>
 • @media print: .no-print{display:none!important} body{margin:0;background:white} .page{margin:0;box-shadow:none;border:none} .page:last-child{page-break-after:avoid}
 • -webkit-print-color-adjust:exact!important; print-color-adjust:exact!important
+• חלוקת תוכן בין עמודים: הכנס פחות שאלות/פריטים לכל עמוד — עדיף 8–10 שאלות אמריקאיות לעמוד, לא 15+
 
 === כללי ברזל ===
 • קוד HTML גולמי בלבד — מ-<!DOCTYPE html> עד </html> — ללא \`\`\`html, ללא הסברים, ללא שום טקסט לפניו/אחריו
