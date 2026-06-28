@@ -65,6 +65,8 @@ export default function AdminPanel() {
   const [renewalResult, setRenewalResult]   = useState("");
   const [sendingToday, setSendingToday] = useState(false);
   const [todayResult, setTodayResult]   = useState("");
+  const [sendingEmergency, setSendingEmergency] = useState(false);
+  const [emergencyResult, setEmergencyResult]   = useState("");
 
   useEffect(() => {
     (async () => {
@@ -130,6 +132,14 @@ export default function AdminPanel() {
     setTodayResult(err ? `שגיאה: ${err.message}` : `נשלחו ${res?.sent ?? 0} מיילים מתוך ${res?.wave0_candidates ?? 0} נרשמות היום`);
   };
 
+  const triggerEmergencyBlast = async () => {
+    if (!window.confirm("שלח בלאסט חירום לכל נרשמות היום עם 0 חוברות? (כולל מי שכבר קיבלו פולואפ)")) return;
+    setSendingEmergency(true); setEmergencyResult("");
+    const { data: res, error: err } = await supabase.functions.invoke("send-followup", { body: { emergency: true } });
+    setSendingEmergency(false);
+    setEmergencyResult(err ? `שגיאה: ${err.message}` : `נשלחו ${res?.sent ?? 0} מיילים מתוך ${res?.wave0e_candidates ?? 0} נרשמות היום`);
+  };
+
   if (loading) return <div className="text-center py-12 text-ink/40">טוען נתוני ניהול…</div>;
   if (error)   return <div className="text-center py-12 text-red-500 text-sm">{error}</div>;
   if (!data)   return null;
@@ -146,10 +156,10 @@ export default function AdminPanel() {
   const paidUsers    = revenueLines.reduce((s, r) => s + r.count, 0);
 
   const statCards = [
-    { label: "סה״כ משתמשים",  value: data.totalUsers,         icon: "👥" },
+    { label: "סהִּכ משתמשים",  value: data.totalUsers,         icon: "👥" },
     { label: "השבוע",          value: data.usersThisWeek,      icon: "📅" },
     { label: "היום",           value: data.usersToday,         icon: "⚡" },
-    { label: "סה״כ חוברות",   value: data.totalBooklets,      icon: "📚" },
+    { label: "סהִּכ חוברות",   value: data.totalBooklets,      icon: "📚" },
     { label: "חוברות השבוע",  value: data.bookletsThisWeek,   icon: "📊" },
     { label: "חוברות היום",   value: data.bookletsToday,      icon: "🔥" },
   ];
@@ -180,7 +190,6 @@ export default function AdminPanel() {
   return (
     <div className="space-y-6">
 
-      {/* ── AI strategic insight ── */}
       <div className={`rounded-2xl p-5 border-2 shadow-sm bg-gradient-to-bl ${insight ? `${im.ring} ${im.bg}` : "border-magic/20 from-magic/5 to-brand/5"}`}>
         <div className="flex items-center justify-between mb-2">
           <h3 className="font-bold text-ink text-sm flex items-center gap-2">
@@ -216,7 +225,6 @@ export default function AdminPanel() {
         )}
       </div>
 
-      {/* Agent proposals */}
       {proposals.length > 0 ? (
         <div className="space-y-3">
           <div className="flex items-center justify-between">
@@ -249,7 +257,6 @@ export default function AdminPanel() {
         </div>
       )}
 
-      {/* Funnel (last 7 days) */}
       <div className="bg-white rounded-2xl p-4 border border-ink/5 shadow-sm">
         <h3 className="font-bold text-ink mb-3 text-sm">📊 משפך 7 ימים אחרונים</h3>
         {fs.sessions === 0 && fs.started === 0 ? (
@@ -276,11 +283,10 @@ export default function AdminPanel() {
         )}
       </div>
 
-      {/* Upgrade funnel */}
       <div className="bg-white rounded-2xl p-4 border border-ink/5 shadow-sm">
         <h3 className="font-bold text-ink mb-3 text-sm">💰 משפך שדרוג — 7 ימים</h3>
         {(fs.upgradeOpened ?? 0) === 0 && (fs.ctaClicked ?? 0) === 0 && (fs.leads ?? 0) === 0 ? (
-          <p className="text-xs text-ink/30">עדיין אין נתוני שדרוג — ייאסף החל מהיום</p>
+          <p className="text-xs text-ink/30">עדיין אין נתוני שדרוג — ייאסף החל מהיום (מי ראה מסך תשלום, מי לחץ, מי השאיר ליד)</p>
         ) : (
           <div className="flex items-center gap-3">
             <div className="flex-1 text-center bg-canvas rounded-xl p-3">
@@ -308,7 +314,6 @@ export default function AdminPanel() {
         )}
       </div>
 
-      {/* Full funnel analytics */}
       {an.totalEvents > 0 ? (
         <div className="space-y-4">
           <div className="bg-white rounded-2xl p-4 border border-ink/5 shadow-sm">
@@ -391,7 +396,6 @@ export default function AdminPanel() {
         </div>
       )}
 
-      {/* Quality signals */}
       {(data.ratedBooklets > 0 || data.churnRiskCount > 0) && (
         <div className="bg-white rounded-2xl p-4 border border-ink/5 shadow-sm">
           <h3 className="font-bold text-ink mb-3 text-sm">🎯 איכות ונטישה</h3>
@@ -431,7 +435,6 @@ export default function AdminPanel() {
         </div>
       )}
 
-      {/* Dormant users */}
       {(data.dormantCount ?? 0) > 0 && (
         <div className="bg-white rounded-2xl p-4 border border-amber-200 shadow-sm">
           <div className="flex items-center justify-between mb-2">
@@ -476,7 +479,6 @@ export default function AdminPanel() {
         </div>
       )}
 
-      {/* Stats grid */}
       <div className="grid grid-cols-3 gap-3">
         {statCards.map(({ label, value, icon }) => (
           <div key={label} className="bg-white rounded-2xl p-4 border border-ink/5 text-center shadow-sm">
@@ -487,7 +489,6 @@ export default function AdminPanel() {
         ))}
       </div>
 
-      {/* Retention funnel */}
       {data.totalNonAdminUsers > 0 && (
         <div className="bg-white rounded-2xl p-4 border border-ink/5 shadow-sm">
           <h3 className="font-bold text-ink mb-3 text-sm">🔄 שימור — מסלול המשתמש</h3>
@@ -513,7 +514,6 @@ export default function AdminPanel() {
         </div>
       )}
 
-      {/* Upgrade opportunities */}
       {(data.freeAtLimitCount ?? 0) > 0 && (
         <div className="bg-white rounded-2xl p-4 border border-brand/25 shadow-sm">
           <div className="flex items-center justify-between mb-2">
@@ -546,7 +546,6 @@ export default function AdminPanel() {
         </div>
       )}
 
-      {/* Economics / P&L */}
       <div className="bg-white rounded-2xl p-4 border border-ink/5 shadow-sm">
         <h3 className="font-bold text-ink mb-3 text-sm">💰 כלכלה — חודש נוכחי</h3>
         <div className="space-y-1.5 mb-3">
@@ -602,7 +601,7 @@ export default function AdminPanel() {
             <div className="text-[10px] text-ink/40">ARPU</div>
           </div>
         </div>
-        <p className="text-[10px] text-ink/25 mt-2 text-center">עלות API מחושבת לפי הערכה — ~0.65 ₪/חוברת</p>
+        <p className="text-[10px] text-ink/25 mt-2 text-center">עלות API מחושבת לפי הערכה — ~0.65 ₪/חוברת (Sonnet + adaptive thinking)</p>
         {paidUsers > 0 && (
           <div className="mt-2 bg-grow/8 rounded-xl px-3 py-2 text-center border border-grow/15">
             <p className="text-xs font-bold text-grow">
@@ -615,7 +614,6 @@ export default function AdminPanel() {
         )}
       </div>
 
-      {/* Plan breakdown */}
       <div className="bg-white rounded-2xl p-4 border border-ink/5 shadow-sm">
         <div className="flex items-center justify-between mb-3">
           <h3 className="font-bold text-ink text-sm">פילוח תוכניות</h3>
@@ -648,7 +646,6 @@ export default function AdminPanel() {
         )}
       </div>
 
-      {/* Popular topics */}
       {data.topTopics?.length > 0 && (
         <div className="bg-white rounded-2xl p-4 border border-ink/5 shadow-sm">
           <h3 className="font-bold text-ink mb-3 text-sm">נושאים פופולריים 🔥 (200 אחרונים)</h3>
@@ -677,6 +674,22 @@ export default function AdminPanel() {
 
       {/* Automation triggers */}
       <div className="grid grid-cols-2 gap-3">
+        {/* 🚨 Emergency blast — full-width, prominent */}
+        <div className="bg-red-50 rounded-2xl p-4 border-2 border-red-300 col-span-2">
+          <div className="flex items-start gap-2 mb-1">
+            <span className="text-lg flex-shrink-0">🚨</span>
+            <div>
+              <h3 className="font-bold text-red-700 text-sm">בלאסט חירום — נרשמות היום עם 0 חוברות</h3>
+              <p className="text-xs text-red-400 mt-0.5">שולח לכולן (גם מי שקיבלה פולואפ כבר) · "שמנו לב שנתקעת, הנה עזרה אישית" · 60 שניות</p>
+            </div>
+          </div>
+          <button onClick={triggerEmergencyBlast} disabled={sendingEmergency}
+            className="bg-red-500 text-white rounded-xl px-3 py-2.5 text-sm font-bold disabled:opacity-50 hover:opacity-90 transition-opacity w-full mt-2">
+            {sendingEmergency ? "שולח…" : "🚨 שלח בלאסט חירום עכשיו"}
+          </button>
+          {emergencyResult && <p className="text-xs text-red-600 font-semibold mt-2">{emergencyResult}</p>}
+        </div>
+
         <div className="bg-canvas rounded-2xl p-4 border border-magic/30">
           <h3 className="font-bold text-ink mb-1 text-sm">⚡ נרשמות של היום</h3>
           <p className="text-xs text-ink/40 mb-3">שלח עכשיו לכל מי שנרשמה היום ועוד לא יצרה חוברת (2+ שעות).</p>
@@ -706,7 +719,6 @@ export default function AdminPanel() {
         </div>
       </div>
 
-      {/* Recent users */}
       <div className="bg-white rounded-2xl p-4 border border-ink/5 shadow-sm">
         <h3 className="font-bold text-ink mb-3 text-sm">משתמשים אחרונים ({data.recentUsers?.length})</h3>
         <div className="overflow-x-auto">
@@ -763,7 +775,6 @@ export default function AdminPanel() {
         </div>
       </div>
 
-      {/* Recent feedback */}
       {data.recentFeedback?.length > 0 && (
         <div className="bg-white rounded-2xl p-4 border border-ink/5 shadow-sm">
           <h3 className="font-bold text-ink mb-3 text-sm">פידבקים אחרונים ({data.recentFeedback.length})</h3>
@@ -778,7 +789,6 @@ export default function AdminPanel() {
         </div>
       )}
 
-      {/* Recent leads */}
       {data.recentLeads?.length > 0 && (
         <div className="bg-white rounded-2xl p-4 border border-ink/5 shadow-sm">
           <h3 className="font-bold text-ink mb-3 text-sm">ליידים — בקשות שדרוג ({data.recentLeads.length})</h3>
