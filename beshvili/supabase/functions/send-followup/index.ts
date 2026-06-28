@@ -120,7 +120,7 @@ Deno.serve(async (req) => {
 
   // ── Wave 0: Same-day follow-up (manual only — triggered from admin panel) ──
   // Target: signed up today (>2h ago), never got any follow-up, 0 booklets created
-  let wave0: typeof (allProfiles ?? []) = [];
+  let wave0: NonNullable<typeof allProfiles> = [];
   if (body.sameDay) {
     wave0 = (allProfiles ?? []).filter(p =>
       p.plan !== "admin" &&
