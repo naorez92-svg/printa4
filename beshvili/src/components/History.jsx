@@ -44,7 +44,24 @@ function isToday(ts) {
   return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate();
 }
 
-export default function History() {
+function UpgradeNudge({ onUpgrade }) {
+  return (
+    <div className="bg-gradient-to-l from-magic/10 to-brand/10 border border-magic/25 rounded-2xl px-4 py-3.5 flex items-center gap-3">
+      <div className="flex-1">
+        <p className="text-sm font-semibold text-ink">✨ מרוצה? תגדילי את האפקט</p>
+        <p className="text-xs text-ink/55 mt-0.5">תוכנית מורה — 20 חוברות לחודש, מפתח תשובות, ניהול תלמידים</p>
+      </div>
+      <button
+        onClick={onUpgrade}
+        className="flex-shrink-0 bg-gradient-to-l from-brand to-magic text-white rounded-xl px-4 py-2 text-sm font-semibold hover:opacity-90 transition-opacity shadow-sm whitespace-nowrap"
+      >
+        שדרגי ✨
+      </button>
+    </div>
+  );
+}
+
+export default function History({ isPro = false, onUpgrade }) {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
@@ -130,6 +147,9 @@ export default function History() {
       {filtered.map((b, i) => (
         <BookletRow key={b.id} booklet={b} onDelete={onDelete} index={i} />
       ))}
+      {!loading && items.length >= 2 && !isPro && onUpgrade && (
+        <UpgradeNudge onUpgrade={onUpgrade} />
+      )}
     </section>
   );
 }
