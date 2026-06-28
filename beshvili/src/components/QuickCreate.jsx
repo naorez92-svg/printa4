@@ -41,6 +41,7 @@ export default function QuickCreate({ student, onClose, onSaved, remaining, isPr
   const [html, setHtml]             = useState(null);
   const [bookletId, setBookletId]   = useState(null);
   const [showRating, setShowRating] = useState(false);
+  const [saveWarning, setSaveWarning] = useState(false);
   const [error, setError]           = useState(null);
   const [shareToken, setShareToken] = useState(null);
   const [rateCountdown, setRateCountdown] = useState(null);
@@ -216,8 +217,12 @@ export default function QuickCreate({ student, onClose, onSaved, remaining, isPr
       html: finalHtml,
     }).select("id, share_token").single();
     if (insertErr) {
-      trackError("db_insert_failed");
-      setError(`generic:שמירה נכשלה — ${insertErr.message}`);
+      // Don't discard a ~90s generation — show the booklet anyway, just without a cloud copy.
+      // Don't call onSaved here — it would close the panel and the user would lose the booklet view.
+      trackError("db_insert_failed", { message: insertErr.message });
+      track("booklet_completed", { booklet_id: null, pages: pageCount, mode: "student_quick", child_id: student?.id, save_failed: true });
+      setSaveWarning(true);
+      setHtml(finalHtml);
       return;
     }
 
@@ -232,6 +237,12 @@ export default function QuickCreate({ student, onClose, onSaved, remaining, isPr
   if (html) {
     return (
       <section className="space-y-4">
+        {saveWarning && (
+          <div className="bg-amber-50 border border-amber-300 rounded-2xl px-5 py-4 text-right">
+            <p className="font-bold text-amber-800 text-sm">⚠️ החוברת נוצרה אבל לא נשמרה בענן</p>
+            <p className="text-xs text-amber-700 mt-1">הדפיסי אותה עכשיו כדי לא לאבד אותה. היסטוריה לא תציג חוברת זו.</p>
+          </div>
+        )}
         {showRating && bookletId ? (
           <BookletRating
             bookletId={bookletId}
@@ -241,8 +252,8 @@ export default function QuickCreate({ student, onClose, onSaved, remaining, isPr
         ) : (
           <div className="bg-white rounded-2xl p-5 shadow-sm border border-green-100">
             <div className="flex items-center gap-2 text-green-700 font-medium mb-4">
-              <span className="text-xl">✅</span>
-              <span>החוברת נוצרה עבור {student.name}!</span>
+              <span className="text-xl">{saveWarning ? "⚠️" : "✅"}</span>
+              <span>החוברת {saveWarning ? "נוצרה (לא נשמרה)" : "נוצרה"} עבור {student.name}!</span>
             </div>
             <Preview html={html} onReset={onClose} shareToken={shareToken} context="quick" bookletId={bookletId} />
           </div>
