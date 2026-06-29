@@ -19,7 +19,10 @@ export function openExternal(url) {
   const noHash = url.split("#")[0];
   if (IS_ANDROID) {
     const clean = noHash.replace(/^https?:\/\//, "");
-    window.location.href = `intent://${clean}#Intent;scheme=https;package=com.android.chrome;end`;
+    // browser_fallback_url: if Chrome isn't installed, Android opens the URL in
+    // the default browser instead of dead-ending with "no app found".
+    const fallback = encodeURIComponent(noHash);
+    window.location.href = `intent://${clean}#Intent;scheme=https;package=com.android.chrome;S.browser_fallback_url=${fallback};end`;
     return;
   }
   try { navigator.clipboard?.writeText(noHash); } catch { /* ignore */ }
