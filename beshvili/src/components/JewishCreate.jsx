@@ -108,6 +108,7 @@ export default function JewishCreate({ onSaved, remaining, isPro, bookletCount =
   const [level,   setLevel]   = useState("medium");
   const [notes,   setNotes]   = useState("");
   const [pageCount, setPageCount] = useState(2);
+  const [fastMode, setFastMode]   = useState(false); // ⚡ faster, lighter generation
   const [loading, setLoading] = useState(false);
   const [loadingMsgIdx, setLoadingMsgIdx] = useState(0);
   const [streamChars, setStreamChars] = useState(0);
@@ -204,7 +205,7 @@ export default function JewishCreate({ onSaved, remaining, isPro, bookletCount =
           "Authorization": `Bearer ${session.access_token}`,
           "apikey": import.meta.env.VITE_SUPABASE_ANON_KEY,
         },
-        body: JSON.stringify({ subject, grade, topic: effectiveTopic, outputType, level, notes, pageCount, noStream: useNoStream }),
+        body: JSON.stringify({ subject, grade, topic: effectiveTopic, outputType, level, notes, pageCount, noStream: useNoStream, fast: fastMode }),
       });
     } catch (e) {
       setLoading(false);
@@ -372,7 +373,7 @@ export default function JewishCreate({ onSaved, remaining, isPro, bookletCount =
 
     track("jewish_completed", { subject, grade, topic: effectiveTopic, outputType, level, pageCount });
     onSaved?.();
-  }, [canSubmit, subject, grade, effectiveTopic, outputType, level, notes, pageCount, onSaved]);
+  }, [canSubmit, subject, grade, effectiveTopic, outputType, level, notes, pageCount, onSaved, fastMode]);
 
   createRef.current = create;
 
@@ -619,6 +620,23 @@ export default function JewishCreate({ onSaved, remaining, isPro, bookletCount =
           {error.startsWith("generic:") && <p>{error.slice(8)}</p>}
         </div>
       )}
+
+      {/* Speed vs depth toggle */}
+      <button
+        type="button"
+        onClick={() => setFastMode(v => !v)}
+        className={`w-full rounded-xl p-3 text-sm font-medium border transition-all flex items-center justify-between ${
+          fastMode ? "border-brand bg-brand/8 text-ink" : "border-ink/15 bg-white text-ink/60"
+        }`}
+      >
+        <span className="flex items-center gap-2">
+          <span className="text-base">{fastMode ? "⚡" : "📚"}</span>
+          {fastMode ? "מצב מהיר — חומר קליל, מוכן הרבה יותר מהר" : "מצב מלא — חומר עשיר ומפורט (איטי יותר)"}
+        </span>
+        <span className={`text-xs px-2 py-0.5 rounded-full ${fastMode ? "bg-brand text-white" : "bg-ink/10 text-ink/50"}`}>
+          {fastMode ? "מהיר" : "מלא"}
+        </span>
+      </button>
 
       {/* Generate button */}
       <button

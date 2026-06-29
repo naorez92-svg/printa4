@@ -76,6 +76,7 @@ export default function Create({ onSaved, remaining, isPro, active = true, bookl
   const [f, setF]                 = useState(EMPTY);
   const [freeText, setFreeText]   = useState("");
   const [pageCount, setPageCount] = useState(5);
+  const [fastMode, setFastMode]   = useState(false); // ⚡ faster, lighter generation
   const [withAnswerKey, setWithAnswerKey] = useState(false);
   const [examGrade,   setExamGrade]   = useState(EXAM_GRADES[2]);  // כיתה ה default
   const [examSubject, setExamSubject] = useState("");
@@ -202,6 +203,7 @@ export default function Create({ onSaved, remaining, isPro, active = true, bookl
       ? { examMode: true, examGrade, examSubject, examTopic, noEmojis, pageCount, withAnswerKey }
       : { ...f, world: effectiveWorld, pageCount, withAnswerKey, ...(photoUrl ? { childPhotoUrl: photoUrl } : {}) };
     if (useNoStream) body.noStream = true;
+    if (fastMode) body.fast = true;
 
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) {
@@ -488,7 +490,7 @@ export default function Create({ onSaved, remaining, isPro, active = true, bookl
         });
       } catch {}
     }
-  }, [canSubmit, mode, freeText, f, pageCount, withAnswerKey, onSaved, photoUrl, examGrade, examSubject, examTopic, noEmojis, customWorld]);
+  }, [canSubmit, mode, freeText, f, pageCount, withAnswerKey, onSaved, photoUrl, examGrade, examSubject, examTopic, noEmojis, customWorld, fastMode]);
   createRef.current = create; // keep stable pointer for auto-retry
 
   useEffect(() => {
@@ -1188,6 +1190,25 @@ export default function Create({ onSaved, remaining, isPro, active = true, bookl
             🚀 שדרגי לפרו להמשיך
           </button>
         ) : (
+          <>
+          {/* Speed vs depth: let the user trade quality for a much faster (and cheaper) result */}
+          {mode !== "quick" && (
+            <button
+              type="button"
+              onClick={() => setFastMode(v => !v)}
+              className={`w-full mb-2 rounded-xl p-3 text-sm font-medium border transition-all flex items-center justify-between ${
+                fastMode ? "border-brand bg-brand/8 text-ink" : "border-ink/15 bg-white text-ink/60"
+              }`}
+            >
+              <span className="flex items-center gap-2">
+                <span className="text-base">{fastMode ? "⚡" : "📚"}</span>
+                {fastMode ? "מצב מהיר — דף קליל, מוכן הרבה יותר מהר" : "מצב מלא — דף עשיר ומפורט (איטי יותר)"}
+              </span>
+              <span className={`text-xs px-2 py-0.5 rounded-full ${fastMode ? "bg-brand text-white" : "bg-ink/10 text-ink/50"}`}>
+                {fastMode ? "מהיר" : "מלא"}
+              </span>
+            </button>
+          )}
           <button id="create-submit-btn" onClick={create} disabled={!canSubmit}
             className="w-full bg-gradient-to-l from-brand to-magic text-white rounded-2xl py-4 px-6 font-display font-bold text-base disabled:opacity-40 hover:opacity-90 active:scale-[0.98] transition-all shadow-md">
             <div className="flex items-center justify-center gap-2">
@@ -1196,6 +1217,7 @@ export default function Create({ onSaved, remaining, isPro, active = true, bookl
             </div>
             {canSubmit && <p className="text-white/50 text-xs font-normal mt-0.5">Ctrl+Enter</p>}
           </button>
+          </>
         )}
         {/* Tell first-timers exactly what's missing instead of a silently-disabled button */}
         {!loading && !canSubmit && !(!isPro && remaining === 0) && (
