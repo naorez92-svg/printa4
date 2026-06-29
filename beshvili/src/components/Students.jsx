@@ -38,7 +38,10 @@ async function uploadPhoto(file) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
   const ext = file.name.split(".").pop() || "jpg";
-  const path = `${user.id}/${Date.now()}.${ext}`;
+  // Unguessable filename (random UUID) so a leaked photo URL can't be used to
+  // brute-force a user's other children's photos. See Create.jsx for rationale.
+  const rand = (crypto?.randomUUID?.() ?? `${Date.now()}-${Math.round(Math.random() * 1e9)}`);
+  const path = `${user.id}/${rand}.${ext}`;
   const { error } = await supabase.storage.from("child-photos").upload(path, file, { upsert: true });
   if (error) { console.error("photo upload:", error); return null; }
   const { data: { publicUrl } } = supabase.storage.from("child-photos").getPublicUrl(path);

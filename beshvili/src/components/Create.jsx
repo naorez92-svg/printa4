@@ -512,7 +512,11 @@ export default function Create({ onSaved, remaining, isPro, active = true, bookl
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) { setPhotoUploading(false); return; }
     const ext = file.name.split(".").pop() || "jpg";
-    const path = `${user.id}/${Date.now()}.${ext}`;
+    // Unguessable filename: a shared booklet embeds this public URL (leaking the
+    // user's folder id), so a timestamp name let someone brute-force a user's
+    // OTHER children's photos. A random UUID makes each photo a secret capability.
+    const rand = (crypto?.randomUUID?.() ?? `${Date.now()}-${Math.round(Math.random() * 1e9)}`);
+    const path = `${user.id}/${rand}.${ext}`;
     const { error: upErr } = await supabase.storage.from("child-photos").upload(path, file, { upsert: true });
     if (upErr) {
       setPhotoUploading(false);
