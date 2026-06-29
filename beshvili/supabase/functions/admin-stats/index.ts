@@ -56,6 +56,7 @@ Deno.serve(async (req) => {
   const fourDaysAgo  = new Date(now.getTime() - 4  * 24 * 60 * 60 * 1000).toISOString();
   const todayStart   = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
   const monthStart   = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+  const monthAgo     = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString();
 
   // Fetch all core data in parallel
   const [
@@ -69,6 +70,7 @@ Deno.serve(async (req) => {
     { data: recentLeads },
     { data: allBookletUserIds },
     { data: allBookletRows },
+    { data: lifecycleEvents },
   ] = await Promise.all([
     admin.auth.admin.listUsers({ perPage: 1000 }),
     admin.from("booklets").select("*", { count: "exact", head: true }),
@@ -80,6 +82,10 @@ Deno.serve(async (req) => {
     admin.from("leads").select("name, phone, created_at").order("created_at", { ascending: false }).limit(15),
     admin.from("booklets").select("user_id, created_at"),
     admin.from("booklets").select("user_id, title, world, goal, created_at, difficulty_feedback").order("created_at", { ascending: false }).limit(200),
+    // Booklet-lifecycle events (last 30d) — used to tell "tried & failed" from "never tried"
+    admin.from("events").select("event, user_id, metadata, created_at")
+      .in("event", ["booklet_started", "booklet_error"])
+      .gte("created_at", monthAgo).order("created_at", { ascending: false }).limit(50000),
   ]);
 
   const users = authData?.users ?? [];
@@ -97,6 +103,25 @@ Deno.serve(async (req) => {
     bookletsByUser[b.user_id] = (bookletsByUser[b.user_id] ?? 0) + 1;
     if (!lastBookletByUser[b.user_id] || b.created_at > lastBookletByUser[b.user_id]) {
       lastBookletByUser[b.user_id] = b.created_at;
+    }
+  });
+
+  // ── Per-user generation attempts (last 30d) ───────────────────────────────
+  // startedByUser  = how many times the user pressed "create" (booklet_started)
+  // errorByUser    = how many generation errors + the most-recent error type
+  // This is what distinguishes a SILENT BUG (tried → 0 saved) from non-activation
+  // (never tried). A 0-booklet user with startedCount > 0 generated something that
+  // never reached the DB — a real failure worth investigating.
+  const startedByUser: Record<string, number> = {};
+  const errorByUser:   Record<string, { count: number; lastType: string | null }> = {};
+  (lifecycleEvents ?? []).forEach((e: { event: string; user_id: string | null; metadata: Record<string, unknown> | null }) => {
+    if (!e.user_id) return;
+    if (e.event === "booklet_started") {
+      startedByUser[e.user_id] = (startedByUser[e.user_id] ?? 0) + 1;
+    } else if (e.event === "booklet_error") {
+      const prev = errorByUser[e.user_id] ?? { count: 0, lastType: null };
+      // events come ordered newest-first, so the first error seen is the latest
+      errorByUser[e.user_id] = { count: prev.count + 1, lastType: prev.lastType ?? ((e.metadata?.type as string) ?? "unknown") };
     }
   });
 
@@ -196,7 +221,44 @@ Deno.serve(async (req) => {
       name: profileMap[u.id]?.full_name,
       followupSent: profileMap[u.id]?.followup_sent_at,
       lastBookletAt: lastBookletByUser[u.id] ?? null,
+      startedCount: startedByUser[u.id] ?? 0,
+      errorCount:   errorByUser[u.id]?.count ?? 0,
+      lastErrorType: errorByUser[u.id]?.lastType ?? null,
     }));
+
+  // ── Silent-failure detector ───────────────────────────────────────────────
+  // Users who pressed "create" (booklet_started) in the last 30d but have ZERO
+  // booklets saved. If this number is high, generation is failing before the DB
+  // insert — a real bug. If it's ~0, the 0-booklet users simply never tried
+  // (normal cold-traffic non-activation, not a bug). The error breakdown points
+  // at the cause (ai_overloaded/stream_dropped/db_insert_failed = real issues;
+  // quota = the paywall working as intended).
+  const silentFailUsers = users.filter(u => {
+    const plan = profileMap[u.id]?.plan ?? "free";
+    return plan !== "admin" && (bookletsByUser[u.id] ?? 0) === 0 && (startedByUser[u.id] ?? 0) > 0;
+  });
+  const silentFailErrorBreakdown: Record<string, number> = {};
+  silentFailUsers.forEach(u => {
+    const t = errorByUser[u.id]?.lastType ?? "no_error_logged";
+    silentFailErrorBreakdown[t] = (silentFailErrorBreakdown[t] ?? 0) + 1;
+  });
+  const silentFailures = {
+    count: silentFailUsers.length,
+    errorBreakdown: Object.entries(silentFailErrorBreakdown)
+      .map(([type, count]) => ({ type, count }))
+      .sort((a, b) => b.count - a.count),
+    users: silentFailUsers
+      .sort((a, b) => (startedByUser[b.id] ?? 0) - (startedByUser[a.id] ?? 0))
+      .slice(0, 20)
+      .map(u => ({
+        email: u.email,
+        name: profileMap[u.id]?.full_name ?? null,
+        startedCount: startedByUser[u.id] ?? 0,
+        errorCount: errorByUser[u.id]?.count ?? 0,
+        lastErrorType: errorByUser[u.id]?.lastType ?? null,
+        createdAt: u.created_at,
+      })),
+  };
 
   // Funnel + full analytics from events (last 7 days)
   let funnelStats = { sessions: 0, started: 0, completed: 0, upgradeOpened: 0, ctaClicked: 0, leads: 0 };
@@ -538,6 +600,7 @@ Deno.serve(async (req) => {
     freeAtLimitUsers,
     dormantCount,
     dormantUsers,
+    silentFailures,
     proposals: pendingProposals,
   }), { headers: { ...cors, "content-type": "application/json" } });
 });
