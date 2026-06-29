@@ -144,21 +144,27 @@ export default function AdminPanel() {
   const [searchResults, setSearchResults]       = useState(null);
   const [searching, setSearching]               = useState(false);
 
-  const loadStats = async () => {
+  const loadStats = async (attempt = 0) => {
     setError("");
     setLoading(true);
     const { data: res, error: err } = await supabase.functions.invoke("admin-stats");
     if (err) {
-      // Try to read the function's JSON error body (FunctionsHttpError carries
-      // the Response in .context); fall back to the raw message. A bare
-      // "Failed to send a request" usually means a cold start / timeout — say so.
+      const isFetch = /failed to send a request/i.test(err.message || "");
+      // A bare fetch-failure (no response) is almost always a cold start right
+      // after a deploy — the function takes a few seconds to wake. Auto-retry a
+      // couple of times before bothering the admin, so the blip stays invisible.
+      if (isFetch && attempt < 2) {
+        await new Promise(r => setTimeout(r, 1800));
+        return loadStats(attempt + 1);
+      }
+      // Read the function's JSON error body (FunctionsHttpError carries the
+      // Response in .context) so a real crash shows its reason, not the opaque message.
       let detail = "";
       try { detail = (await err.context?.json?.())?.detail || ""; } catch { /* not JSON */ }
-      const isFetch = /failed to send a request/i.test(err.message || "");
       setError(detail
         ? `שגיאת שרת: ${detail}`
         : isFetch
-          ? "השרת לא הגיב (ייתכן עומס רגעי או טעינה ראשונית) — נסי שוב 🔄"
+          ? "השרת לא הגיב אחרי כמה ניסיונות (ייתכן עומס רגעי) — נסי שוב 🔄"
           : err.message);
     } else {
       setData(res);
@@ -286,7 +292,7 @@ export default function AdminPanel() {
   if (error)   return (
     <div className="text-center py-12 space-y-4">
       <p className="text-red-500 text-sm">{error}</p>
-      <button onClick={loadStats} className="px-5 py-2 rounded-xl bg-magic text-white text-sm font-semibold hover:opacity-90">
+      <button onClick={() => loadStats()} className="px-5 py-2 rounded-xl bg-magic text-white text-sm font-semibold hover:opacity-90">
         🔄 נסי שוב
       </button>
     </div>
