@@ -137,7 +137,7 @@ export default function UpgradeModal({ onClose, bookletCount = 0, source = "unkn
         <div className="flex justify-between items-start">
           <div>
             <h2 className="text-xl font-bold text-ink font-display">שדרגי לבשבילי פרו</h2>
-            <p className="text-sm text-ink/50">3 חוברות ניסיון · ביטול בכל עת</p>
+            <p className="text-sm text-ink/50">2 חוברות ניסיון · ביטול בכל עת</p>
           </div>
           <button onClick={onClose} className="text-ink/30 hover:text-ink text-3xl leading-none">×</button>
         </div>

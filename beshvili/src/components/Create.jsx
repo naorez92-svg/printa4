@@ -55,7 +55,7 @@ const GOAL_PICKS = [
   { icon: "🔢", label: "חיבור וחיסור",     goal: "חיבור וחיסור: אלגוריתמים, מעבר עשרת, בעיות" },
 ];
 const EMPTY = { childName: "", grade: "", world: "כדורגל", goal: "", level: "medium" };
-const PAGE_OPTIONS = [3, 5, 7, 10];
+const PAGE_OPTIONS = [2, 5, 7, 10];
 const LOADING_MSGS = [
   "מכינה את החוברת... ✍️",
   "בונה תרגילים מגוונים...",
@@ -75,7 +75,7 @@ export default function Create({ onSaved, remaining, isPro, active = true, bookl
   });
   const [f, setF]                 = useState(EMPTY);
   const [freeText, setFreeText]   = useState("");
-  const [pageCount, setPageCount] = useState(5);
+  const [pageCount, setPageCount] = useState(2);
   const [fastMode, setFastMode]   = useState(false); // ⚡ faster, lighter generation
   const [withAnswerKey, setWithAnswerKey] = useState(false);
   const [examGrade,   setExamGrade]   = useState(EXAM_GRADES[2]);  // כיתה ה default
@@ -1082,7 +1082,7 @@ export default function Create({ onSaved, remaining, isPro, active = true, bookl
           <p className="text-xs text-ink/40 mb-2 font-medium">כמות עמודים</p>
           <div className="flex gap-2">
             {PAGE_OPTIONS.map((n) => {
-              const isLocked = !isPro && n > 5;
+              const isLocked = !isPro && n > 2;
               return (
                 <button
                   key={n}
@@ -1102,7 +1102,7 @@ export default function Create({ onSaved, remaining, isPro, active = true, bookl
               );
             })}
           </div>
-          {!isPro && <p className="text-[10px] text-ink/30 mt-1 text-center">7 ו-10 עמודים זמינים בתוכנית בתשלום</p>}
+          {!isPro && <p className="text-[10px] text-ink/30 mt-1 text-center">חוברות גדולות יותר (5–10 עמ') זמינות בתוכנית בתשלום</p>}
         </div>}
 
         {/* Answer key toggle — hidden in quick mode */}

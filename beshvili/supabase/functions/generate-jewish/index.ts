@@ -1,13 +1,13 @@
 import { createClient } from "jsr:@supabase/supabase-js@2";
 
 // v1 — Jewish studies content generator (מפמ"ר curriculum)
-const FREE_BOOKLET_LIMIT   = 3;
+const FREE_BOOKLET_LIMIT   = 2;
 const PARENT_MONTHLY_LIMIT = 5;
 const TEACHER_MONTHLY_LIMIT = 20;
 const RATE_LIMIT_SECONDS   = 60;
 const MAX_FIELD_LEN        = 500;
 const MAX_NOTES_LEN        = 1000;
-const FREE_MAX_PAGES       = 4;
+const FREE_MAX_PAGES       = 2;
 const PARENT_MAX_PAGES     = 8;
 const TEACHER_MAX_PAGES    = 15;
 

@@ -20,7 +20,7 @@ function getCors(req: Request) {
   };
 }
 
-const FREE_LIMIT = 3; // must match useProfile.js + DB trigger
+const FREE_LIMIT = 2; // must match useProfile.js + DB trigger
 
 // HTML-escape user-controlled values (full_name) before interpolation.
 const esc = (s: string) => String(s ?? "")
@@ -211,7 +211,7 @@ Deno.serve(async (req) => {
           </ol>
         </div>
         <p style="color:#555;font-size:13px;text-align:center;margin:0;">
-          מורות פרטיות חוסכות 3+ שעות הכנה בשבוע · 3 חוברות ראשונות חינם לגמרי
+          מורות פרטיות חוסכות 3+ שעות הכנה בשבוע · 2 חוברות ראשונות חינם לגמרי
         </p>`,
       "חזרי לנסות עכשיו ✨",
       "https://beshvili.com"
@@ -301,7 +301,7 @@ Deno.serve(async (req) => {
           ואחר כך רק לחצי "צור חוברת". <strong>תוך 60 שניות יש לך חוברת עבודה מלאה מוכנה להדפסה.</strong>
         </p>
         <div style="background:#f0f0ff;border-radius:12px;padding:16px;margin:0 0 16px;text-align:right;">
-          <p style="margin:0 0 6px;color:#6C5CE7;font-weight:bold;font-size:14px;">✨ 3 חוברות ראשונות — חינם לגמרי</p>
+          <p style="margin:0 0 6px;color:#6C5CE7;font-weight:bold;font-size:14px;">✨ 2 חוברות ראשונות — חינם לגמרי</p>
           <p style="margin:0;color:#555;font-size:13px;line-height:1.7;">מורות פרטיות חוסכות 3+ שעות הכנה בשבוע · כל חוברת מוכנה ב-60 שניות</p>
         </div>`,
         "צרי את החוברת הראשונה שלך ✨",
@@ -342,7 +342,7 @@ Deno.serve(async (req) => {
           </ol>
         </div>
         <div style="background:#f0f0ff;border-radius:12px;padding:16px;margin:0 0 16px;text-align:center;">
-          <p style="margin:0 0 6px;color:#6C5CE7;font-weight:bold;font-size:15px;">🎁 3 חוברות ראשונות — חינם לגמרי</p>
+          <p style="margin:0 0 6px;color:#6C5CE7;font-weight:bold;font-size:15px;">🎁 2 חוברות ראשונות — חינם לגמרי</p>
           <p style="margin:0;color:#555;font-size:13px;">מורות פרטיות חוסכות 3+ שעות הכנה בשבוע · כל חוברת ב-60 שניות</p>
         </div>
         <p style="color:#555;font-size:13px;text-align:center;margin:0;">
@@ -419,7 +419,7 @@ Deno.serve(async (req) => {
         </p>
         <p style="color:#555;line-height:1.7;margin:0 0 16px;">
           זה לוקח 60 שניות בלבד: שם התלמיד, הכיתה, הנושא — והAI יוצר חוברת עבודה מלאה מוכנה להדפסה.
-          <strong>3 חוברות ראשונות חינם לגמרי.</strong>
+          <strong>2 חוברות ראשונות חינם לגמרי.</strong>
         </p>`,
         "נסי עכשיו חינם ✨",
         "https://beshvili.com"

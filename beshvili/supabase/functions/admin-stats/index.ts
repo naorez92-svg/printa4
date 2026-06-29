@@ -208,7 +208,7 @@ Deno.serve(async (req) => {
     }));
 
   // Retention metrics
-  const FREE_LIMIT_THRESHOLD = 3;
+  const FREE_LIMIT_THRESHOLD = 2;
   const totalNonAdminUsers = users.filter(u => (profileMap[u.id]?.plan ?? "free") !== "admin").length;
   const usersWithAnyBooklet = users.filter(u => {
     const plan = profileMap[u.id]?.plan ?? "free";
