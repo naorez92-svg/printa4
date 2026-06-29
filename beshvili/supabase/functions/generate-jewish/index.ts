@@ -227,6 +227,7 @@ Deno.serve(async (req) => {
 
     const maxPages = isTeacher ? TEACHER_MAX_PAGES : isParent ? PARENT_MAX_PAGES : FREE_MAX_PAGES;
     const pageCount = Math.min(maxPages, Math.max(1, Number.isInteger(body.pageCount) ? body.pageCount : 2));
+    const noStream = body.noStream === true; // in-app browsers (FB/IG webview)
 
     if (!topic) {
       return new Response(JSON.stringify({ error: "topic required" }), { status: 400, headers: cors });
@@ -283,7 +284,43 @@ ${notes ? `הוראות נוספות מהמורה: ${esc(notes)}` : ""}
     const monthlyLimit = isAdmin ? -1 : isTeacher ? TEACHER_MONTHLY_LIMIT : isParent ? PARENT_MONTHLY_LIMIT : FREE_BOOKLET_LIMIT;
     const remaining = isAdmin ? -1 : monthlyLimit - (isPaid ? usedMonthly : usedTotal) - 1;
 
-    // ── 7. Stream SSE → client; call Anthropic inside the pump ────────────────
+    // No-stream mode (in-app browsers: Facebook/Instagram webview can't read SSE).
+    // Generate fully server-side and return one JSON response.
+    if (noStream) {
+      const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+      try {
+        for (let attempt = 1; attempt <= 3; attempt++) {
+          const r = await fetch("https://api.anthropic.com/v1/messages", {
+            method: "POST",
+            signal: AbortSignal.timeout(270_000),
+            headers: { "content-type": "application/json", "x-api-key": apiKey, "anthropic-version": "2023-06-01", "anthropic-beta": "prompt-caching-2024-07-31" },
+            body: JSON.stringify({
+              model: "claude-sonnet-4-6",
+              max_tokens: maxTokens,
+              system: [{ type: "text", text: JEWISH_SYSTEM, cache_control: { type: "ephemeral" } }],
+              messages: [{ role: "user", content: userMsg }],
+            }),
+          });
+          if (r.ok) {
+            const data = await r.json();
+            const html = (data?.content ?? []).filter((b: { type: string }) => b.type === "text").map((b: { text: string }) => b.text).join("");
+            return new Response(JSON.stringify({ html, remaining }), { status: 200, headers: cors });
+          }
+          if ((r.status === 529 || r.status === 503 || r.status === 429) && attempt < 3) {
+            await r.body?.cancel().catch(() => {});
+            await sleep(1200 * attempt);
+            continue;
+          }
+          console.error(`[generate-jewish] no-stream Anthropic ${r.status}`);
+          return new Response(JSON.stringify({ error: r.status === 529 || r.status === 503 ? "ai_overloaded" : "ai_error" }), { status: 503, headers: cors });
+        }
+        return new Response(JSON.stringify({ error: "ai_overloaded" }), { status: 503, headers: cors });
+      } catch (e) {
+        const code = e instanceof Error && e.name === "TimeoutError" ? "ai_timeout" : "internal_error";
+        return new Response(JSON.stringify({ error: code }), { status: 500, headers: cors });
+      }
+    }
+
     // Return the SSE stream immediately and call Anthropic inside the pump — the
     // client's fetch resolves at once instead of hanging until Anthropic's first
     // byte (which under load surfaced as an unrecoverable "network" error before

@@ -183,6 +183,9 @@ export default function JewishCreate({ onSaved, remaining, isPro, bookletCount =
     const ctrl = new AbortController();
     streamAbortRef.current = ctrl;
 
+    // In-app browsers (Facebook/Instagram webview) can't read SSE — request a
+    // single non-stream JSON response so generation works inside the in-app browser.
+    const useNoStream = /FBAN|FBAV|Instagram|Line\/|WhatsApp|MicroMessenger|Snapchat|Pinterest|TikTok|musical_ly|; wv\)/i.test(navigator.userAgent || "");
     const fnUrl = `${import.meta.env.VITE_SUPABASE_URL ?? "https://gywpdzkvkdisonuzhsib.supabase.co"}/functions/v1/generate-jewish`;
     let resp;
     try {
@@ -194,13 +197,16 @@ export default function JewishCreate({ onSaved, remaining, isPro, bookletCount =
           "Authorization": `Bearer ${session.access_token}`,
           "apikey": import.meta.env.VITE_SUPABASE_ANON_KEY,
         },
-        body: JSON.stringify({ subject, grade, topic: effectiveTopic, outputType, level, notes, pageCount }),
+        body: JSON.stringify({ subject, grade, topic: effectiveTopic, outputType, level, notes, pageCount, noStream: useNoStream }),
       });
     } catch (e) {
       setLoading(false);
       creatingRef.current = false;
       if (ctrl.signal.aborted) return;
-      setError(`generic:שגיאת רשת — ${String(e)}`);
+      const inApp = /FBAN|FBAV|Instagram|Line\/|WhatsApp|MicroMessenger|; wv\)/i.test(navigator.userAgent || "");
+      setError(inApp
+        ? "generic:כדי ליצור חומר, פתחי את הדף בדפדפן רגיל (Chrome/Safari) — לא מתוך אפליקציה כמו וואטסאפ/אינסטגרם 🙏"
+        : `generic:שגיאת רשת — בדקי את החיבור ונסי שוב`);
       return;
     }
 
@@ -220,15 +226,28 @@ export default function JewishCreate({ onSaved, remaining, isPro, bookletCount =
       return;
     }
 
+    let htmlAccumulated = "";
+    let streamHadError = false;
+    let streamErrorMsg = null;
+    let streamAborted = false;
+
+    if (useNoStream) {
+      // In-app browser path: one JSON response, no SSE.
+      try {
+        const j = await resp.json();
+        htmlAccumulated = j?.html ?? "";
+      } catch (e) {
+        if (ctrl.signal.aborted) { creatingRef.current = false; return; }
+        setLoading(false); creatingRef.current = false;
+        setError("generic:לא הצלחנו לקבל את החומר — נסי שוב 🙏");
+        return;
+      }
+    } else {
     // Read SSE stream
     const reader = resp.body.getReader();
     const decoder = new TextDecoder();
     let buffer = "";
-    let htmlAccumulated = "";
     let updateTimer = 0;
-    let streamHadError = false;
-    let streamErrorMsg = null;
-    let streamAborted = false;
 
     let wakeLock = null;
     try { wakeLock = await navigator.wakeLock?.request("screen"); } catch {}
@@ -283,6 +302,7 @@ export default function JewishCreate({ onSaved, remaining, isPro, bookletCount =
     } finally {
       wakeLock?.release().catch(() => {});
     }
+    } // end streaming branch
 
     setLoading(false);
     creatingRef.current = false;
