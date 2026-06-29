@@ -93,6 +93,7 @@ export default function Create({ onSaved, remaining, isPro, active = true, bookl
   const [bookletTitle, setBookletTitle] = useState(null);
   const [showRating, setShowRating] = useState(false);
   const [saveWarning, setSaveWarning] = useState(false);   // generated OK but cloud-save failed
+  const [cappedPages, setCappedPages] = useState(null);    // in-app cap shortened the booklet
   const [error, setError]         = useState(null); // null | "quota" | "quota_monthly" | "rate:{wait}" | "generic:{msg}"
   const [rateCountdown, setRateCountdown] = useState(null);
   const [childSaved, setChildSaved] = useState(false);
@@ -313,6 +314,7 @@ export default function Create({ onSaved, remaining, isPro, active = true, bookl
       try {
         const j = await resp.json();
         htmlAccumulated = j?.html ?? "";
+        if (j?.capped) setCappedPages(j.pages ?? 3); // FB cap shortened the booklet
       } catch (e) {
         wakeLock?.release().catch(() => {});
         if (ctrl.signal.aborted) { creatingRef.current = false; return; }
@@ -524,7 +526,7 @@ export default function Create({ onSaved, remaining, isPro, active = true, bookl
     e.target.value = "";
   }, []);
 
-  const reset = () => { setHtml(null); setF(EMPTY); setFreeText(""); setError(null); setBookletId(null); setShareToken(null); setBookletTitle(null); setShowRating(false); setChildSaved(false); setPhotoUrl(null); setSaveWarning(false); };
+  const reset = () => { setHtml(null); setF(EMPTY); setFreeText(""); setError(null); setBookletId(null); setShareToken(null); setBookletTitle(null); setShowRating(false); setChildSaved(false); setPhotoUrl(null); setSaveWarning(false); setCappedPages(null); };
   const set   = (k) => (e) => setF((p) => ({ ...p, [k]: e.target.value }));
   const applyTmpl = (tmpl) => {
     track("template_chip_clicked", { label: tmpl.label, grade: tmpl.f.grade, world: tmpl.f.world, level: tmpl.f.level });
@@ -617,6 +619,14 @@ export default function Create({ onSaved, remaining, isPro, active = true, bookl
 
     return (
       <section className="space-y-4">
+        {/* In-app cap notice — the booklet was shortened because it was made inside Facebook */}
+        {cappedPages && (
+          <div className="bg-blue-50 border border-blue-200 rounded-2xl px-5 py-4 text-right">
+            <p className="font-bold text-blue-800 text-sm">ℹ️ נוצרו {cappedPages} עמודים (במקום המספר שביקשת)</p>
+            <p className="text-xs text-blue-700 mt-1">בתוך פייסבוק מוגבל ל-{cappedPages} עמודים. לחוברת המלאה — פתחי בדפדפן רגיל (הכפתור למעלה) ונסי שוב.</p>
+          </div>
+        )}
+
         {/* Save-warning banner — cloud save failed but booklet was generated */}
         {saveWarning && (
           <div className="bg-amber-50 border border-amber-300 rounded-2xl px-5 py-4 text-right">
