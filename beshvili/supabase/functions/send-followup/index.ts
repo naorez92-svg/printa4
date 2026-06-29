@@ -139,8 +139,19 @@ Deno.serve(async (req) => {
     }
   });
 
-  // Auth emails
-  const { data: authData, error: authListErr } = await admin.auth.admin.listUsers({ perPage: 1000 });
+  // Auth emails. listUsers can intermittently return empty/error under GoTrue
+  // admin-API rate limits (this panel + cron jobs hit it often); retry once so a
+  // blast never silently finds 0 recipients.
+  // deno-lint-ignore no-explicit-any
+  let authData: any = null;
+  // deno-lint-ignore no-explicit-any
+  let authListErr: any = null;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const r = await admin.auth.admin.listUsers({ perPage: 1000 });
+    authData = r.data; authListErr = r.error;
+    if (!authListErr && (authData?.users?.length ?? 0) > 0) break;
+    if (attempt === 0) await new Promise((res) => setTimeout(res, 800));
+  }
   if (authListErr) console.error("[send-followup] listUsers failed:", authListErr.message);
   const emailById: Record<string, string> = {};
   (authData?.users ?? []).forEach(u => { if (u.email) emailById[u.id] = u.email; });
