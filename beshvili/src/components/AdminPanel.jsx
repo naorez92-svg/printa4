@@ -825,7 +825,7 @@ export default function AdminPanel() {
             </span>
           </div>
           <p className="text-[11px] text-ink/40 mb-3">
-            משתמשים חינם שהגיעו ל-3 חוברות — הכי קרובים להמרה
+            משתמשים חינם שהגיעו ל-2 חוברות — הכי קרובים להמרה
           </p>
           <div className="space-y-1.5 max-h-52 overflow-y-auto">
             {(data.freeAtLimitUsers ?? []).map((u, i) => (

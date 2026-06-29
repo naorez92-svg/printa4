@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { supabase } from "../lib/supabase";
 
-export const FREE_LIMIT = 3;
+export const FREE_LIMIT = 2;
 export const PARENT_MONTHLY_LIMIT = 5;
 export const TEACHER_MONTHLY_LIMIT = 20;
 

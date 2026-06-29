@@ -2,13 +2,13 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
 
 // v14 — teacher branding: name, logo, tagline, phone, color injected into every booklet
 // ── Commercial limits ────────────────────────────────────────────
-const FREE_BOOKLET_LIMIT     = 3;   // free-tier total (lifetime) — matches useProfile.js FREE_LIMIT
+const FREE_BOOKLET_LIMIT     = 2;   // free-tier total (lifetime) — matches useProfile.js FREE_LIMIT
 const PARENT_MONTHLY_LIMIT   = 5;   // parent tier (19₪) per calendar month
 const TEACHER_MONTHLY_LIMIT  = 20;  // teacher tier (59₪) per calendar month — also "pro" legacy
 const RATE_LIMIT_SECONDS     = 60;  // min gap between generations per user
 const MAX_FREE_TEXT_LEN      = 2000;
 const MAX_FIELD_LEN          = 500;
-const FREE_MAX_PAGES         = 5;   // free tier: max 5 pages (paid plans get 10/20)
+const FREE_MAX_PAGES         = 2;   // free tier: max 2 pages (great-but-small taste; paid gets 8/15)
 const PARENT_MAX_PAGES       = 10;
 const TEACHER_MAX_PAGES      = 20;
 

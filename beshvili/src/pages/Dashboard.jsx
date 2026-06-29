@@ -176,7 +176,7 @@ export default function Dashboard() {
               <div className="flex items-start gap-3 mb-3">
                 <span className="text-2xl flex-shrink-0 mt-0.5">🎁</span>
                 <div className="flex-1">
-                  <p className="font-semibold text-ink text-sm">ברוכה הבאה! 3 חוברות חינמיות מחכות לך</p>
+                  <p className="font-semibold text-ink text-sm">ברוכה הבאה! 2 חוברות חינמיות מחכות לך</p>
                   <p className="text-xs text-ink/55 mt-0.5 leading-relaxed">
                     מורות פרטיות חוסכות <strong className="text-magic">3+ שעות הכנה בשבוע</strong> עם בשבילי — כל חוברת מוכנה ב-60 שניות במקום שעה
                   </p>

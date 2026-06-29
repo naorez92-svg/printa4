@@ -566,7 +566,7 @@ export default function JewishCreate({ onSaved, remaining, isPro, bookletCount =
         <div className="flex-1 min-w-[120px]">
           <label className="block text-xs font-semibold text-ink/60 mb-2">עמודים</label>
           <div className="flex gap-1.5">
-            {(isPro ? [2, 3, 4, 5] : [2, 3, 4]).map(n => (
+            {(isPro ? [2, 3, 4, 5] : [1, 2]).map(n => (
               <button
                 key={n}
                 onClick={() => setPageCount(n)}

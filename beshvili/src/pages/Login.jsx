@@ -290,7 +290,7 @@ export default function Login() {
             onClick={() => goToLoginForm("hero")}
             className="inline-block bg-gradient-to-l from-brand to-magic text-white rounded-2xl px-10 py-4 text-xl font-display font-semibold hover:scale-105 transition-all shadow-2xl shadow-magic/30 active:scale-100"
           >
-            ✨ התחילי חינם — 3 חוברות מתנה
+            ✨ התחילי חינם — 2 חוברות מתנה
           </button>
 
           {/* ── Compact hero login card ── */}
@@ -727,7 +727,7 @@ export default function Login() {
               <div className="text-3xl font-bold text-ink mb-1 font-display">₪0</div>
               <div className="text-xs text-ink/40 mb-4">לתמיד · ללא כרטיס אשראי</div>
               <ul className="space-y-2 text-sm text-ink/70 mb-5">
-                {["3 חוברות להתנסות", "עד 5 עמודים", "שמירה בענן"].map((f) => (
+                {["2 חוברות להתנסות", "עד 2 עמודים", "שמירה בענן"].map((f) => (
                   <li key={f} className="flex items-center gap-2"><span className="text-grow">✓</span>{f}</li>
                 ))}
               </ul>
@@ -773,7 +773,7 @@ export default function Login() {
               ))}
             </div>
             <h2 className="text-2xl font-bold text-ink font-display mb-2">מוכנה להתחיל?</h2>
-            <p className="text-ink/50">3 חוברות חינם · ללא כרטיס אשראי · 30 שניות הרשמה</p>
+            <p className="text-ink/50">2 חוברות חינם · ללא כרטיס אשראי · 30 שניות הרשמה</p>
           </div>
           <div className="bg-canvas rounded-2xl p-6 border border-ink/10 shadow-sm">
             {step === "verify" ? (
