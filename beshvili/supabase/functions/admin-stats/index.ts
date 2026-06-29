@@ -1,3 +1,6 @@
+// redeploy marker v2 — force a fresh bundle: the live worker was returning 503
+// on every request (incl. OPTIONS) with deployment_id:null = a stale/corrupt
+// deployment the CLI kept skipping as "No change found".
 import { createClient } from "jsr:@supabase/supabase-js@2";
 
 function getCors(req: Request) {
