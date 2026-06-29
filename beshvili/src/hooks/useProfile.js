@@ -26,7 +26,7 @@ export function useProfile() {
       // a booklet cannot reset the free-tier quota.
       // maybeSingle(): a brand-new user whose profile row isn't visible yet returns
       // null (not an error), so they're treated as a fresh free user, not broken.
-      const [{ data: p, error: pErr }, { count: monthly }] = await Promise.all([
+      const [{ data: p, error: pErr }, { count: monthly, error: cErr }] = await Promise.all([
         supabase.from("profiles").select("plan, full_name, total_booklets_created, teacher_display_name, teacher_tagline, teacher_phone, teacher_logo_url, teacher_color").eq("id", user.id).maybeSingle(),
         supabase.from("booklets").select("*", { count: "exact", head: true }).eq("user_id", user.id).gte("created_at", monthStart),
       ]);
@@ -39,7 +39,9 @@ export function useProfile() {
         setProfile(p);
         setBookletCount(p.total_booklets_created ?? 0);
       }
-      setMonthlyBookletCount(monthly ?? 0);
+      // On a count-query error keep the previous value — don't reset a paying user's
+      // displayed monthly usage to 0 (which would over-state their remaining quota).
+      if (!cErr) setMonthlyBookletCount(monthly ?? 0);
     } catch (e) {
       setError(e);
     } finally {
