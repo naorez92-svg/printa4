@@ -537,55 +537,60 @@ Deno.serve(async (req) => {
     // are explicit and exhaustive. Disabling thinking means all max_tokens go to HTML.
     const maxTokens = Math.min(64000, Math.max(20000, pageCount * 6000));
 
-    const anthropicResp = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      signal: AbortSignal.timeout(270_000), // 270s — headroom before Deno's 300s hard limit
-      headers: {
-        "content-type": "application/json",
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
-        "anthropic-beta": "prompt-caching-2024-07-31",
-      },
-      body: JSON.stringify({
-        model: "claude-sonnet-4-6",
-        max_tokens: maxTokens,
-        stream: true,
-        system: [{ type: "text", text: activeSystem, cache_control: { type: "ephemeral" } }],
-        messages: [{ role: "user", content: activeUserMsg }],
-      }),
-    });
-
-    if (!anthropicResp.ok) {
-      const status = anthropicResp.status;
-      if (status === 529 || status === 503) {
-        return new Response(JSON.stringify({ error: "ai_overloaded" }), { status: 503, headers: cors });
-      }
-      throw new Error(`Anthropic ${status}: ${await anthropicResp.text()}`);
-    }
-
     // Rate-limit timestamp already stamped atomically above (step 3 CAS).
     const monthlyLimit = isAdmin ? -1 : isTeacher ? TEACHER_MONTHLY_LIMIT : isParent ? PARENT_MONTHLY_LIMIT : FREE_BOOKLET_LIMIT;
     const remaining = isAdmin ? -1 : monthlyLimit - (isPaid ? usedMonthly : usedTotal) - 1;
 
-    // ── 7. Stream Anthropic SSE → client with keep-alive heartbeats ────────────
-    // Direct pipe breaks on mobile 4G: the network kills "idle" TCP connections
-    // during multi-second pauses between token batches (common between pages).
-    // SSE comment lines (": keep-alive\n\n") are spec-compliant no-ops — the
-    // client's `data: ` check silently skips them, but they reset the TCP idle timer.
-    // x-accel-buffering: no disables nginx/CDN buffering so chunks arrive immediately.
+    // ── 7. Stream to client with keep-alive heartbeats ─────────────────────────
+    // CRITICAL: we return the SSE stream IMMEDIATELY and call Anthropic *inside*
+    // the pump. Previously the handler did `await fetch(anthropic)` BEFORE
+    // returning, so the client's fetch hung until Anthropic produced its first
+    // byte — under load / slow mobile links that wait exceeded the gateway/socket
+    // timeout and the client saw an unrecoverable "network" error before any
+    // response arrived. Returning the stream first makes the client's fetch
+    // resolve in milliseconds; Anthropic latency and errors now surface as
+    // in-stream SSE events the client already handles, and the 8s heartbeats keep
+    // the TCP connection alive through multi-second pauses (mobile 4G kills idle
+    // sockets). x-accel-buffering: no disables CDN buffering so chunks flush live.
     const enc = new TextEncoder();
     const KEEP_ALIVE = enc.encode(": keep-alive\n\n");
+    const sseError = (type: string) => enc.encode(`data: ${JSON.stringify({ type: "error", error: { type } })}\n\n`);
 
     const { readable, writable } = new TransformStream<Uint8Array, Uint8Array>();
     const w = writable.getWriter();
 
-    const hb = setInterval(async () => {
-      try { await w.write(KEEP_ALIVE); } catch { /* writer closed */ }
-    }, 8000);
+    const hb = setInterval(() => { w.write(KEEP_ALIVE).catch(() => {}); }, 8000);
 
     (async () => {
-      const reader = anthropicResp.body!.getReader();
       try {
+        const anthropicResp = await fetch("https://api.anthropic.com/v1/messages", {
+          method: "POST",
+          signal: AbortSignal.timeout(270_000), // 270s — headroom before Deno's 300s hard limit
+          headers: {
+            "content-type": "application/json",
+            "x-api-key": apiKey,
+            "anthropic-version": "2023-06-01",
+            "anthropic-beta": "prompt-caching-2024-07-31",
+          },
+          body: JSON.stringify({
+            model: "claude-sonnet-4-6",
+            max_tokens: maxTokens,
+            stream: true,
+            system: [{ type: "text", text: activeSystem, cache_control: { type: "ephemeral" } }],
+            messages: [{ role: "user", content: activeUserMsg }],
+          }),
+        });
+
+        if (!anthropicResp.ok) {
+          const status = anthropicResp.status;
+          console.error(`[generate-booklet] Anthropic ${status}`);
+          await w.write(sseError(status === 529 || status === 503 ? "overloaded_error" : "api_error"));
+          clearInterval(hb);
+          await w.close();
+          return;
+        }
+
+        const reader = anthropicResp.body!.getReader();
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
@@ -596,7 +601,9 @@ Deno.serve(async (req) => {
       } catch (e) {
         clearInterval(hb);
         console.error("[generate-booklet] stream error:", String(e));
-        try { await w.abort(e); } catch {}
+        const type = e instanceof Error && e.name === "TimeoutError" ? "timeout_error" : "overloaded_error";
+        try { await w.write(sseError(type)); } catch { /* writer already closed */ }
+        try { await w.close(); } catch {}
       }
     })();
 
