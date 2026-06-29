@@ -304,6 +304,7 @@ export default function Create({ onSaved, remaining, isPro, active = true, bookl
     let streamHadError = false;
     let streamErrorMsg = null;
     let streamErrType = null;
+    let stopReason = null; // Anthropic message_delta.stop_reason — "max_tokens" = truncated
 
     if (useNoStream) {
       // In-app browser path: the server returns the whole booklet in one JSON.
@@ -359,6 +360,8 @@ export default function Create({ onSaved, remaining, isPro, active = true, bookl
                 setStreamChars(htmlAccumulated.length);
                 updateTimer = now;
               }
+            } else if (ev.type === "message_delta" && ev.delta?.stop_reason) {
+              stopReason = ev.delta.stop_reason;
             } else if (ev.type === "error") {
               streamHadError = true;
               const errType = ev.error?.type ?? "unknown";
@@ -414,6 +417,15 @@ export default function Create({ onSaved, remaining, isPro, active = true, bookl
 
     if (streamHadError) { trackError("stream_error", { errType: streamErrType }); setError(streamErrorMsg); return; }
 
+    // Truncated by the token budget: the booklet is incomplete (missing its last
+    // page). Mark it partial + close the tags so it isn't saved as if whole.
+    if (stopReason === "max_tokens") {
+      trackError("max_tokens_truncated", { chars: htmlAccumulated.length, pages: pageCount });
+      const t = htmlAccumulated.trim();
+      if (!t.includes("</html>")) htmlAccumulated = t + "\n</body></html>";
+      streamAborted = true;
+    }
+
     // Strip all scripts + event-handler attributes from AI-generated HTML,
     // then restore the Tailwind CDN script (see src/lib/sanitize.js).
     const generatedHtml = sanitizeBookletHtml(htmlAccumulated.trim());
@@ -428,16 +440,27 @@ export default function Create({ onSaved, remaining, isPro, active = true, bookl
       : `${f.childName} — ${f.goal}`;
     const title = streamAborted ? `${baseTitle} (חלקי)` : baseTitle;
 
-    const { data: inserted, error: insertErr } = await supabase.from("booklets").insert({
+    const bookletRow = {
       user_id: session.user.id, title,
       child_name: f.childName || null, grade: f.grade || null,
       world: mode === "exam" ? null : (effectiveWorld || null),
       goal: mode === "free" ? freeText.trim().substring(0, 200) : mode === "exam" ? examTopic : f.goal,
       level: f.level, html: generatedHtml,
-    }).select("id, share_token").single();
+    };
+    // Retry the save once on a transient failure before giving up — a ~90s
+    // generation shouldn't be lost to a momentary network/DB blip.
+    let inserted = null, insertErr = null;
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const res = await supabase.from("booklets").insert(bookletRow).select("id, share_token").single();
+      inserted = res.data; insertErr = res.error;
+      if (!insertErr) break;
+      if (attempt === 0) await new Promise((r) => setTimeout(r, 1200));
+    }
     if (insertErr) {
       // A save failure must NOT discard a ~90s generation — show the booklet so the
-      // user can still print / download it; only the cloud copy is missing.
+      // user can still print / download it, and stash it locally as a recovery
+      // buffer so closing the tab doesn't lose it entirely.
+      try { localStorage.setItem("beshvili_unsaved_booklet", JSON.stringify({ title, html: generatedHtml, at: Date.now() })); } catch { /* quota/full — ignore */ }
       trackError("db_insert_failed", { message: insertErr.message });
       track("booklet_completed", { booklet_id: null, pages: pageCount, mode, durationSec: Math.round((Date.now() - startedAt) / 1000), chars: htmlAccumulated.length, save_failed: true });
       setSaveWarning(true);

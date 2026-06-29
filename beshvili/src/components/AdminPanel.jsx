@@ -177,16 +177,21 @@ export default function AdminPanel() {
   useEffect(() => { loadStats(); }, []);
 
   const handleProposal = async (id, status, proposal = null) => {
-    await supabase.from("proposals").update({
-      status,
-      reviewed_at: new Date().toISOString(),
-    }).eq("id", id);
-    setProposals(prev => prev.filter(p => p.id !== id));
+    // For an approved WhatsApp action, open the window FIRST (inside the click
+    // gesture) so the popup blocker doesn't eat it.
     if (status === "approved" && proposal?.action_type === "whatsapp") {
       const msg   = encodeURIComponent(proposal.action_payload?.message ?? "");
       const phone = proposal.action_payload?.phone ?? "972509139137";
       window.open(`https://wa.me/${phone}?text=${msg}`, "_blank");
     }
+    const { error: err } = await supabase.from("proposals").update({
+      status,
+      reviewed_at: new Date().toISOString(),
+    }).eq("id", id);
+    // Only remove the card if the DB actually recorded it — otherwise it would
+    // silently reappear on the next load, looking like the action didn't stick.
+    if (err) { alert("לא הצלחנו לעדכן את ההצעה — נסי שוב"); return; }
+    setProposals(prev => prev.filter(p => p.id !== id));
   };
 
   const generateInsight = async () => {

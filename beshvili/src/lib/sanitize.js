@@ -58,11 +58,14 @@ export function sanitizeBookletHtml(h) {
         }
       } else if (name === "srcdoc") {
         el.removeAttribute(attr.name);
-      } else if (name === "style" && /(javascript|vbscript):|expression\s*\(/i.test(val)) {
-        el.setAttribute(
-          "style",
-          val.replace(/(?:javascript|vbscript):/gi, "").replace(/expression\s*\(/gi, "(")
-        );
+      } else if (name === "style" &&
+        // Test against a control-char-stripped copy so "java\tscript:" / "expression\t("
+        // can't slip past, the same trick browsers normalize away.
+        /(javascript|vbscript):|expression\s*\(/i.test(val.split("").filter((c) => c.charCodeAt(0) > 0x20 || c === " ").join(""))) {
+        // The obfuscated form can't be reliably surgically cleaned (the control
+        // chars defeat the replace), so drop the whole style — a style carrying
+        // javascript:/expression() is never legitimate booklet layout anyway.
+        el.removeAttribute(attr.name);
       }
     }
   });
