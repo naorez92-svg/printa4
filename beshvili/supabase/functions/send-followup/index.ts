@@ -54,6 +54,7 @@ Deno.serve(async (req) => {
   const cors = getCors(req);
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
 
+  try {
   const admin = createClient(
     Deno.env.get("SUPABASE_URL")!,
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
@@ -147,16 +148,15 @@ Deno.serve(async (req) => {
   let sent = 0;
   const errors: string[] = [];
 
-  // ── Blast: send to ALL users regardless of criteria ───────────────────────
+  // ── Blast: send to ALL users via Resend Batch API ─────────────────────────
+  // Sending one-by-one (104 sequential awaited fetches) exceeded the Edge
+  // Function's execution window and surfaced client-side as "Failed to send a
+  // request to the Edge Function". The batch endpoint sends up to 100 messages
+  // per call, so the whole blast is 1–2 fast requests instead of 104 slow ones.
   if (body.blast) {
-    for (const [userId, email] of Object.entries(emailById)) {
-      const profile = profileMap[userId];
-      if (profile?.plan === "admin") continue;
-      const name     = profile?.full_name ? esc(profile.full_name.split(" ")[0]) : null;
-      const greeting = name ? `שלום ${name}!` : "שלום!";
-      const subject  = "בשבילי — שדרגנו, חזרנו, ורוצים שתחזרי 📚";
-      const html = buildEmailHtml(greeting,
-        `<p style="color:#555;line-height:1.7;margin:0 0 16px;">
+    const subject = "בשבילי — שדרגנו, חזרנו, ורוצים שתחזרי 📚";
+    const buildBlastHtml = (greeting: string) => buildEmailHtml(greeting,
+      `<p style="color:#555;line-height:1.7;margin:0 0 16px;">
           אנחנו שמחים לבשר — <strong>בשבילי עוברת הרצאה</strong> ומגיעה למורות פרטיות יותר ויותר 🎉
         </p>
         <p style="color:#555;line-height:1.7;margin:0 0 16px;">
@@ -174,19 +174,37 @@ Deno.serve(async (req) => {
         <p style="color:#555;font-size:13px;text-align:center;margin:0;">
           מורות פרטיות חוסכות 3+ שעות הכנה בשבוע · 3 חוברות ראשונות חינם לגמרי
         </p>`,
-        "חזרי לנסות עכשיו ✨",
-        "https://beshvili.com"
-      );
-      const res = await fetch("https://api.resend.com/emails", {
-        method: "POST",
-        headers: { "Authorization": `Bearer ${resendKey}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ from: "בשבילי <hello@beshvili.com>", to: [email], subject, html }),
-      });
-      if (res.ok) sent++;
-      else errors.push(`${email}: ${await res.text()}`);
+      "חזרי לנסות עכשיו ✨",
+      "https://beshvili.com"
+    );
+
+    // Build one message per non-admin recipient.
+    const messages: { from: string; to: string[]; subject: string; html: string }[] = [];
+    for (const [userId, email] of Object.entries(emailById)) {
+      const prof = profileMap[userId];
+      if (prof?.plan === "admin") continue;
+      const name     = prof?.full_name ? esc(prof.full_name.split(" ")[0]) : null;
+      const greeting = name ? `שלום ${name}!` : "שלום!";
+      messages.push({ from: "בשבילי <hello@beshvili.com>", to: [email], subject, html: buildBlastHtml(greeting) });
+    }
+
+    // Resend batch endpoint accepts up to 100 messages per call.
+    for (let i = 0; i < messages.length; i += 100) {
+      const chunk = messages.slice(i, i + 100);
+      try {
+        const res = await fetch("https://api.resend.com/emails/batch", {
+          method: "POST",
+          headers: { "Authorization": `Bearer ${resendKey}`, "Content-Type": "application/json" },
+          body: JSON.stringify(chunk),
+        });
+        if (res.ok) sent += chunk.length;
+        else errors.push(`batch ${Math.floor(i / 100)}: ${(await res.text()).slice(0, 200)}`);
+      } catch (e) {
+        errors.push(`batch ${Math.floor(i / 100)}: ${String(e instanceof Error ? e.message : e)}`);
+      }
     }
     return new Response(JSON.stringify({
-      sent, errors, total: Object.keys(emailById).length,
+      sent, errors, total: messages.length,
       _debug: {
         auth_users_found: (authData?.users ?? []).length,
         list_users_error: authListErr?.message ?? null,
@@ -433,4 +451,11 @@ Deno.serve(async (req) => {
       wave2_skipped: dormantByUser === null,
     },
   }), { status: 200, headers: cors });
+  } catch (e) {
+    console.error("[send-followup] unhandled error:", e);
+    return new Response(
+      JSON.stringify({ error: "unhandled", detail: String(e instanceof Error ? e.message : e) }),
+      { status: 500, headers: cors }
+    );
+  }
 });
