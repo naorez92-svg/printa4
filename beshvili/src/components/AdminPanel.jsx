@@ -71,6 +71,9 @@ export default function AdminPanel() {
   const [blastResult, setBlastResult]           = useState("");
   const [selftesting, setSelftesting]           = useState(false);
   const [selftestResult, setSelftestResult]     = useState(null);
+  const [unsubEmail, setUnsubEmail]             = useState("");
+  const [unsubbing, setUnsubbing]               = useState(false);
+  const [unsubResult, setUnsubResult]           = useState("");
 
   useEffect(() => {
     (async () => {
@@ -173,6 +176,17 @@ export default function AdminPanel() {
     setSelftesting(false);
     if (err) setSelftestResult({ ok: false, error: err.message, steps: [] });
     else setSelftestResult(res);
+  };
+
+  const runUnsub = async () => {
+    const email = unsubEmail.trim();
+    if (!email) return;
+    setUnsubbing(true); setUnsubResult("");
+    const { data: res, error: err } = await supabase.functions.invoke("admin-unsubscribe", { body: { email } });
+    setUnsubbing(false);
+    if (err) setUnsubResult(`שגיאה: ${err.message}`);
+    else if (res?.ok) { setUnsubResult(`✓ ${res.email} הוסר/ה מרשימת התפוצה`); setUnsubEmail(""); }
+    else setUnsubResult(`⚠️ ${res?.error ?? "לא הצליח"}`);
   };
 
   if (loading) return <div className="text-center py-12 text-ink/40">טוען נתוני ניהול…</div>;
@@ -850,6 +864,32 @@ export default function AdminPanel() {
         </div>
       </div>
 
+      {/* Unsubscribe a user by email (honor opt-out requests) */}
+      <div className="bg-white rounded-2xl p-4 border border-ink/5 shadow-sm">
+        <h3 className="font-bold text-ink mb-1 text-sm">✉️ הסרה מרשימת תפוצה</h3>
+        <p className="text-[11px] text-ink/40 mb-3">הזן מייל של מי שביקש/ה להפסיק לקבל מיילים — היא לא תקבל יותר.</p>
+        <div className="flex gap-2">
+          <input
+            type="email"
+            dir="ltr"
+            value={unsubEmail}
+            onChange={(e) => setUnsubEmail(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter") runUnsub(); }}
+            placeholder="name@gmail.com"
+            className="flex-1 border border-ink/15 rounded-xl px-3 py-2 text-sm outline-none focus:border-magic text-left"
+          />
+          <button
+            onClick={runUnsub}
+            disabled={unsubbing || !unsubEmail.trim()}
+            className="flex-shrink-0 bg-ink text-white rounded-xl px-4 py-2 text-xs font-semibold disabled:opacity-40 hover:opacity-90 transition-opacity"
+          >
+            {unsubbing ? "מסיר…" : "הסר"}
+          </button>
+        </div>
+        {unsubResult && <p className={`text-xs mt-2 font-medium ${unsubResult.startsWith("✓") ? "text-grow" : "text-red-500"}`}>{unsubResult}</p>}
+      </div>
+
+      {/* Recent users */}
       <div className="bg-white rounded-2xl p-4 border border-ink/5 shadow-sm">
         <h3 className="font-bold text-ink mb-3 text-sm">משתמשים אחרונים ({data.recentUsers?.length})</h3>
         <div className="overflow-x-auto">
