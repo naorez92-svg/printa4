@@ -68,18 +68,26 @@ Deno.serve(async (req) => {
   const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
   const { data: recentEvents } = await admin
     .from("events")
-    .select("event_name")
-    .in("event_name", ["booklet_started", "booklet_error"])
+    .select("event, metadata")
+    .in("event", ["booklet_started", "booklet_error"])
     .gte("created_at", twoHoursAgo);
 
   if (recentEvents && recentEvents.length >= 5) {
-    const started   = recentEvents.filter(e => e.event_name === "booklet_started").length;
-    const errors    = recentEvents.filter(e => e.event_name === "booklet_error").length;
+    const started   = recentEvents.filter(e => e.event === "booklet_started").length;
+    const errors    = recentEvents.filter(e => e.event === "booklet_error").length;
     const errorRate = started > 0 ? Math.round((errors / started) * 100) : 0;
-    if (started >= 5 && errorRate > 50) {
+    // db_insert_failed is the signature of a trigger/RLS regression that blocks
+    // booklet saves (the 0024→0026 bug class). It should be ~zero in normal
+    // operation; any cluster means saves are silently failing for real users.
+    const insertFails = recentEvents.filter(
+      e => e.event === "booklet_error" && (e.metadata as Record<string, unknown> | null)?.type === "db_insert_failed"
+    ).length;
+    if (insertFails >= 3) {
+      fail("booklet_save_path", `${insertFails} db_insert_failed in last 2h — booklet saves are being rejected (check profiles triggers / RLS, migrations 0024–0027)`);
+    } else if (started >= 5 && errorRate > 50) {
       fail("stream_error_rate", `${errorRate}% error rate in last 2h — ${errors}/${started} generation attempts failed`);
     } else {
-      pass("stream_error_rate", `${errorRate}% (${errors}/${started})`);
+      pass("stream_error_rate", `${errorRate}% (${errors}/${started}) · insert_fails=${insertFails}`);
     }
   } else {
     pass("stream_error_rate", "insufficient data — less than 5 attempts in last 2h");
