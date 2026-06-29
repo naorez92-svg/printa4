@@ -180,8 +180,13 @@ export default function Preview({ html, onReset, shareToken, title, active = tru
     const link = shareToken
       ? `${window.location.origin}/b/${shareToken}`
       : window.location.origin;
-    const bookletPart = title ? `"${title}" ` : "";
-    const msg = encodeURIComponent(`יצרתי חוברת לימוד ${bookletPart}עם בשבילי AI 📚\n${link}`);
+    const bookletPart = title ? `「${title}」` : "חוברת לימוד";
+    const msg = encodeURIComponent(
+      `📚✨ הכנתי ${bookletPart} ב-בשבילי!\n` +
+      `מוכנה להדפסה ולשימוש 👇\n` +
+      `${link}\n\n` +
+      `אפשר ליצור חוברת מותאמת אישית לכל ילד — חינם, תוך דקה 🎯`
+    );
     window.open("https://wa.me/?text=" + msg, "_blank");
   };
 
