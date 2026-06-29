@@ -8,6 +8,72 @@ const daysSince = (iso) => {
   return Math.floor((Date.now() - new Date(iso).getTime()) / (1000 * 60 * 60 * 24));
 };
 
+// One enriched user row — shared by the recent-users table and email search.
+const renderUserRow = (u) => (
+  <tr key={u.id} className="border-b border-ink/5 last:border-0">
+    <td className="py-1.5 pr-1 text-ink/70 font-mono">{u.email}</td>
+    <td className="py-1.5 pr-1 text-ink/50">
+      {fmtDate(u.createdAt)}
+      <span className="block text-[9px] text-ink/35">
+        {new Date(u.createdAt).toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" })}
+      </span>
+    </td>
+    <td className="py-1.5 pr-1">
+      {(() => {
+        const days = daysSince(u.lastBookletAt);
+        if (days === null) return <span className="text-ink/25 text-xs">—</span>;
+        if (days === 0)    return <span className="text-grow text-xs font-medium">היום</span>;
+        if (days <= 3)    return <span className="text-brand text-xs">{days}י'</span>;
+        return <span className="text-red-400 text-xs font-medium">{days}י'</span>;
+      })()}
+    </td>
+    <td className="py-1.5 pr-1">
+      <span className={`font-bold ${
+        u.bookletCount === 0 ? "text-red-400" :
+        u.plan === "free" && u.bookletCount >= 3 ? "text-brand" :
+        "text-grow"
+      }`}>
+        {u.bookletCount}
+        {u.plan === "free" && u.bookletCount >= 3 ? " ⚡" : ""}
+      </span>
+      {/* 0 booklets: distinguish "tried & failed" from "never tried" */}
+      {u.bookletCount === 0 && (
+        (u.startedCount ?? 0) > 0
+          ? <span className="block text-[9px] text-red-500 font-medium" title={`${u.lastErrorType ? `שגיאה: ${u.lastErrorType}` : ""}${u.lastErrorBuild ? ` · v=${u.lastErrorBuild}` : ""}`}>
+              ✗ ניסתה {u.startedCount}× {u.lastErrorType && u.lastErrorType !== "quota" ? `(${u.lastErrorType})` : ""}
+              {u.lastErrorInapp && <span className="block text-[8px] text-magic">📱 דפדפן מוטמע (פייסבוק/אינסטגרם)</span>}
+              {u.lastErrorBuild && <span className="block text-[8px] text-ink/30">v={u.lastErrorBuild}</span>}
+            </span>
+          : <span className="block text-[9px] text-ink/25">לא ניסתה</span>
+      )}
+    </td>
+    <td className="py-1.5 pr-1">
+      <span className={`px-1.5 py-0.5 rounded text-xs ${
+        u.plan === "teacher" || u.plan === "pro" ? "bg-magic/10 text-magic" :
+        u.plan === "parent"  ? "bg-brand/10 text-brand" :
+        u.plan === "admin"   ? "bg-grow/10 text-grow"   :
+        "bg-canvas text-ink/40"
+      }`}>
+        {u.plan === "teacher" ? "מורה" : u.plan === "parent" ? "הורה" : u.plan}
+      </span>
+    </td>
+    <td className="py-1.5 pr-1 text-ink/30">{u.followupSent ? "✓" : "—"}</td>
+  </tr>
+);
+
+const USER_TABLE_HEAD = (
+  <thead>
+    <tr className="text-ink/40 border-b border-ink/5">
+      <th className="text-right pb-2 pr-1">מייל</th>
+      <th className="text-right pb-2 pr-1">הצטרף</th>
+      <th className="text-right pb-2 pr-1">יצירה אחרונה</th>
+      <th className="text-right pb-2 pr-1">חוברות</th>
+      <th className="text-right pb-2 pr-1">תוכנית</th>
+      <th className="text-right pb-2 pr-1">פולואפ</th>
+    </tr>
+  </thead>
+);
+
 // P&L constants
 const PLAN_PRICE          = { parent: 19, teacher: 59, pro: 30 };
 const COST_PER_BOOKLET_NIS = 0.65;
@@ -74,6 +140,9 @@ export default function AdminPanel() {
   const [unsubEmail, setUnsubEmail]             = useState("");
   const [unsubbing, setUnsubbing]               = useState(false);
   const [unsubResult, setUnsubResult]           = useState("");
+  const [searchQuery, setSearchQuery]           = useState("");
+  const [searchResults, setSearchResults]       = useState(null);
+  const [searching, setSearching]               = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -107,6 +176,17 @@ export default function AdminPanel() {
     });
     if (res?.insight) setInsight(res.insight);
     setInsightLoading(false);
+  };
+
+  const runSearch = async () => {
+    const q = searchQuery.trim();
+    if (q.length < 2) { setSearchResults([]); return; }
+    setSearching(true);
+    const { data: res, error: err } = await supabase.functions.invoke("admin-stats", {
+      body: { searchEmail: q },
+    });
+    setSearchResults(err ? [] : (res?.searchResults ?? []));
+    setSearching(false);
   };
 
   const regenerateProposals = async () => {
@@ -933,73 +1013,53 @@ export default function AdminPanel() {
         {unsubResult && <p className={`text-xs mt-2 font-medium ${unsubResult.startsWith("✓") ? "text-grow" : "text-red-500"}`}>{unsubResult}</p>}
       </div>
 
+      {/* User search — find ANY user by email (recent-users only shows newest 30) */}
+      <div className="bg-white rounded-2xl p-4 border border-ink/5 shadow-sm">
+        <h3 className="font-bold text-ink mb-1 text-sm">🔍 חיפוש משתמש לפי מייל</h3>
+        <p className="text-xs text-ink/40 mb-3">מצא כל משתמש (גם ותיק) — חוברות, פעילות אחרונה ושגיאות</p>
+        <div className="flex gap-2">
+          <input
+            type="email"
+            dir="ltr"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter") runSearch(); }}
+            placeholder="name@gmail.com"
+            className="flex-1 px-3 py-2 rounded-xl border border-ink/15 text-sm text-ink text-left placeholder-ink/30 focus:outline-none focus:border-magic"
+          />
+          <button
+            onClick={runSearch}
+            disabled={searching || searchQuery.trim().length < 2}
+            className="px-4 py-2 rounded-xl bg-magic text-white text-sm font-semibold disabled:opacity-40"
+          >
+            {searching ? "מחפש…" : "חפש"}
+          </button>
+        </div>
+        {data.userPoolCapped && (
+          <p className="text-[10px] text-amber-600 mt-2">⚠️ יש מעל 1000 משתמשים — החיפוש מכסה את 1000 הראשונים בלבד</p>
+        )}
+        {searchResults !== null && (
+          searchResults.length === 0 ? (
+            <p className="text-xs text-ink/40 mt-3">לא נמצאו משתמשים עם מייל כזה.</p>
+          ) : (
+            <div className="overflow-x-auto mt-3">
+              <table className="w-full text-xs">
+                {USER_TABLE_HEAD}
+                <tbody>{searchResults.map(renderUserRow)}</tbody>
+              </table>
+            </div>
+          )
+        )}
+      </div>
+
       {/* Recent users */}
       <div className="bg-white rounded-2xl p-4 border border-ink/5 shadow-sm">
         <h3 className="font-bold text-ink mb-3 text-sm">משתמשים אחרונים ({data.recentUsers?.length})</h3>
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
-            <thead>
-              <tr className="text-ink/40 border-b border-ink/5">
-                <th className="text-right pb-2 pr-1">מייל</th>
-                <th className="text-right pb-2 pr-1">הצטרף</th>
-                <th className="text-right pb-2 pr-1">יצירה אחרונה</th>
-                <th className="text-right pb-2 pr-1">חוברות</th>
-                <th className="text-right pb-2 pr-1">תוכנית</th>
-                <th className="text-right pb-2 pr-1">פולואפ</th>
-              </tr>
-            </thead>
+            {USER_TABLE_HEAD}
             <tbody>
-              {(data.recentUsers ?? []).map((u) => (
-                <tr key={u.id} className="border-b border-ink/5 last:border-0">
-                  <td className="py-1.5 pr-1 text-ink/70 font-mono">{u.email}</td>
-                  <td className="py-1.5 pr-1 text-ink/50">
-                    {fmtDate(u.createdAt)}
-                    <span className="block text-[9px] text-ink/35">
-                      {new Date(u.createdAt).toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" })}
-                    </span>
-                  </td>
-                  <td className="py-1.5 pr-1">
-                    {(() => {
-                      const days = daysSince(u.lastBookletAt);
-                      if (days === null) return <span className="text-ink/25 text-xs">—</span>;
-                      if (days === 0)    return <span className="text-grow text-xs font-medium">היום</span>;
-                      if (days <= 3)    return <span className="text-brand text-xs">{days}י'</span>;
-                      return <span className="text-red-400 text-xs font-medium">{days}י'</span>;
-                    })()}
-                  </td>
-                  <td className="py-1.5 pr-1">
-                    <span className={`font-bold ${
-                      u.bookletCount === 0 ? "text-red-400" :
-                      u.plan === "free" && u.bookletCount >= 3 ? "text-brand" :
-                      "text-grow"
-                    }`}>
-                      {u.bookletCount}
-                      {u.plan === "free" && u.bookletCount >= 3 ? " ⚡" : ""}
-                    </span>
-                    {/* 0 booklets: distinguish "tried & failed" from "never tried" */}
-                    {u.bookletCount === 0 && (
-                      (u.startedCount ?? 0) > 0
-                        ? <span className="block text-[9px] text-red-500 font-medium" title={`${u.lastErrorType ? `שגיאה: ${u.lastErrorType}` : ""}${u.lastErrorBuild ? ` · v=${u.lastErrorBuild}` : ""}`}>
-                            ✗ ניסתה {u.startedCount}× {u.lastErrorType && u.lastErrorType !== "quota" ? `(${u.lastErrorType})` : ""}
-                            {u.lastErrorInapp && <span className="block text-[8px] text-magic">📱 דפדפן מוטמע (פייסבוק/אינסטגרם)</span>}
-                            {u.lastErrorBuild && <span className="block text-[8px] text-ink/30">v={u.lastErrorBuild}</span>}
-                          </span>
-                        : <span className="block text-[9px] text-ink/25">לא ניסתה</span>
-                    )}
-                  </td>
-                  <td className="py-1.5 pr-1">
-                    <span className={`px-1.5 py-0.5 rounded text-xs ${
-                      u.plan === "teacher" || u.plan === "pro" ? "bg-magic/10 text-magic" :
-                      u.plan === "parent"  ? "bg-brand/10 text-brand" :
-                      u.plan === "admin"   ? "bg-grow/10 text-grow"   :
-                      "bg-canvas text-ink/40"
-                    }`}>
-                      {u.plan === "teacher" ? "מורה" : u.plan === "parent" ? "הורה" : u.plan}
-                    </span>
-                  </td>
-                  <td className="py-1.5 pr-1 text-ink/30">{u.followupSent ? "✓" : "—"}</td>
-                </tr>
-              ))}
+              {(data.recentUsers ?? []).map(renderUserRow)}
             </tbody>
           </table>
         </div>
