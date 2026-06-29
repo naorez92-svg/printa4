@@ -223,19 +223,38 @@ export default function Create({ onSaved, remaining, isPro, active = true, bookl
     } catch (e) {
       creatingRef.current = false;
       if (ctrl.signal.aborted) { setLoading(false); return; } // unmounted — don't show error
-      // The initial request never reached the server — common on flaky mobile
-      // connections and in-app browsers (WhatsApp/Instagram). Auto-retry once,
-      // keeping the spinner up, before surfacing an error.
+      // ROOT-CAUSE DIAGNOSTICS: capture WHAT actually failed instead of guessing.
+      // The "network" errors had no detail — record the real error, connectivity,
+      // and whether this is an in-app browser (WhatsApp/Instagram/etc.) whose
+      // webview commonly blocks streaming fetches.
+      const ua = navigator.userAgent || "";
+      const inApp = /FBAN|FBAV|Instagram|Line\/|WhatsApp|MicroMessenger|Snapchat|Pinterest|TikTok|musical_ly|; wv\)/i.test(ua);
+      const diag = {
+        msg: String(e?.message || e).slice(0, 160),
+        online: navigator.onLine,
+        inapp: inApp,
+        conn: navigator.connection?.effectiveType || null,
+        ua: ua.slice(0, 180),
+      };
+      // Auto-retry once for a genuinely transient blip (keep the spinner up).
       if (netRetryRef.current < 1) {
         netRetryRef.current++;
-        trackError("network_retrying");
+        trackError("network_retrying", diag);
         retryTimerRef.current = setTimeout(() => createRef.current?.(), 2000);
         return;
       }
       netRetryRef.current = 0;
       setLoading(false);
-      trackError("network");
-      setError("generic:לא הצלחנו להתחבר לשרת — בדקי את חיבור האינטרנט ונסי שוב 🙏");
+      // Self-describing error type → the admin panel badge tells us the root cause.
+      const type = !navigator.onLine ? "network_offline" : inApp ? "network_inapp" : "network";
+      trackError(type, diag);
+      setError(
+        inApp
+          ? "generic:נראה שנכנסת מתוך אפליקציה (וואטסאפ/אינסטגרם). כדי ליצור חוברת — פתחי את הדף בדפדפן רגיל (Chrome/Safari): לחצי על ⋮ ← \"פתח בדפדפן\" 🙏"
+          : !navigator.onLine
+          ? "generic:אין חיבור לאינטרנט כרגע — בדקי את הרשת ונסי שוב"
+          : "generic:לא הצלחנו להתחבר לשרת — בדקי את חיבור האינטרנט ונסי שוב 🙏",
+      );
       return;
     }
     netRetryRef.current = 0; // reached the server — reset the connectivity retry
