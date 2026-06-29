@@ -87,7 +87,12 @@ export default function PublicBooklet({ token }) {
       openExternal(`${window.location.href.split("#")[0]}${sep}print=1`);
       return;
     }
-    const blob = new Blob([booklet.html], { type: "text/html;charset=utf-8" });
+    // Inject A4 + exact-color print CSS so the recipient's PDF matches the
+    // owner's (without this the public page printed with margins and no colors).
+    const printHtml = booklet.html.includes("@page")
+      ? booklet.html
+      : booklet.html.replace("</head>", "<style>@page{size:A4;margin:0}*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}</style></head>");
+    const blob = new Blob([printHtml], { type: "text/html;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const w = window.open(url, "_blank");
     // On the auto path the popup may be blocked (no user gesture) — stay silent,
