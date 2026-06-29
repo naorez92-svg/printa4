@@ -16,7 +16,7 @@ export default function StudentHistory({ student, onBack, remaining, isPro }) {
   const fetchBooklets = () =>
     supabase
       .from("booklets")
-      .select("id, title, goal, world, level, created_at, html")
+      .select("id, title, goal, world, level, created_at, html, share_token")
       .eq("child_id", student.id)
       .order("created_at", { ascending: false })
       .then(({ data }) => { setBooklets(data || []); setLoading(false); });
@@ -33,7 +33,7 @@ export default function StudentHistory({ student, onBack, remaining, isPro }) {
         >
           ← חזרה ל{student.name}
         </button>
-        <Preview html={viewing.html} onReset={() => setViewing(null)} />
+        <Preview html={viewing.html} onReset={() => setViewing(null)} shareToken={viewing.share_token} bookletId={viewing.id} title={viewing.title} context="history" />
       </div>
     );
   }
