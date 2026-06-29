@@ -62,6 +62,7 @@ Deno.serve(async (req) => {
 
   const now = new Date();
   const weekAgo      = new Date(now.getTime() - 7  * 24 * 60 * 60 * 1000).toISOString();
+  const oneDayAgo    = new Date(now.getTime() - 1  * 24 * 60 * 60 * 1000).toISOString();
   const threeDaysAgo = new Date(now.getTime() - 3  * 24 * 60 * 60 * 1000).toISOString();
   const fourDaysAgo  = new Date(now.getTime() - 4  * 24 * 60 * 60 * 1000).toISOString();
   const fourteenDaysAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000).toISOString();
@@ -82,6 +83,7 @@ Deno.serve(async (req) => {
     { data: allBookletUserIds },
     { data: allBookletRows },
     { data: lifecycleEvents },
+    { count: profilesCount },
   ] = await Promise.all([
     admin.auth.admin.listUsers({ perPage: 1000 }),
     admin.from("booklets").select("*", { count: "exact", head: true }),
@@ -99,6 +101,9 @@ Deno.serve(async (req) => {
     admin.from("events").select("event, user_id, metadata, created_at")
       .in("event", ["booklet_started", "booklet_error"])
       .gte("created_at", fourteenDaysAgo).order("created_at", { ascending: false }).limit(8000),
+    // Accurate total-user count (one profile row per user) — listUsers caps at
+    // 1000, so the headline number must come from a COUNT, not the capped list.
+    admin.from("profiles").select("*", { count: "exact", head: true }),
   ]);
 
   const users = authData?.users ?? [];
@@ -288,9 +293,11 @@ Deno.serve(async (req) => {
   // with live ones. A user is "recent" if their latest error is < 3 days old.
   // recentCount ≈ 0 means the failures are historical (a deployed fix worked);
   // recentCount > 0 means it's still happening and needs digging.
+  // "Live" = a failure in the last 24h. Tighter than 3 days so the box reflects
+  // what's happening NOW and doesn't keep flagging pre-fix history as active.
   const isRecentFail = (u: { id: string }) => {
     const at = errorByUser[u.id]?.lastAt;
-    return at != null && at >= threeDaysAgo;
+    return at != null && at >= oneDayAgo;
   };
   const recentSilentFailUsers = silentFailUsers.filter(isRecentFail);
   const recentSilentFailBreakdown: Record<string, number> = {};
@@ -673,7 +680,7 @@ Deno.serve(async (req) => {
   }
 
   return new Response(JSON.stringify({
-    totalUsers: users.length,
+    totalUsers: profilesCount ?? users.length,
     usersThisWeek,
     usersToday,
     totalBooklets:     totalBooklets ?? 0,
