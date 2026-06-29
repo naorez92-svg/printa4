@@ -271,10 +271,21 @@ export default function JewishCreate({ onSaved, remaining, isPro, bookletCount =
     let wakeLock = null;
     try { wakeLock = await navigator.wakeLock?.request("screen"); } catch {}
 
+    // Stall guards — same rationale as Create.jsx: heartbeats keep a hung stream
+    // "alive", so bail out instead of letting the user wait minutes with no output.
+    const DEAD_CONN_MS     = 30000;
+    const CONTENT_STALL_MS = 60000;
+    let lastContentAt = Date.now();
     try {
       while (true) {
-        const { done, value } = await reader.read();
+        const readResult = await Promise.race([
+          reader.read(),
+          new Promise((res) => setTimeout(() => res("__dead__"), DEAD_CONN_MS)),
+        ]);
+        if (readResult === "__dead__") throw new Error("dead_connection");
+        const { done, value } = readResult;
         if (done) break;
+        const beforeLen = htmlAccumulated.length;
         buffer += decoder.decode(value, { stream: true });
         const lines = buffer.split("\n");
         buffer = lines.pop() ?? "";
@@ -297,6 +308,8 @@ export default function JewishCreate({ onSaved, remaining, isPro, bookletCount =
           } catch {}
           if (streamHadError) break;
         }
+        if (htmlAccumulated.length > beforeLen) lastContentAt = Date.now();
+        else if (Date.now() - lastContentAt > CONTENT_STALL_MS) throw new Error("content_stalled");
         if (streamHadError) break;
       }
     } catch (streamErr) {
