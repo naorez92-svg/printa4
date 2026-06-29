@@ -75,6 +75,10 @@ async function resolveUserId() {
   } catch { return null; }
 }
 
+// Build stamp (injected by Vite) — lets the admin panel tell stale-cached code
+// from the latest, which is otherwise invisible.
+const APP_VERSION = typeof __APP_VERSION__ !== "undefined" ? __APP_VERSION__ : "dev";
+
 // Core emitter. Fire-and-forget; never throws into the caller.
 export async function track(event, metadata = {}) {
   try {
@@ -83,7 +87,7 @@ export async function track(event, metadata = {}) {
       user_id: userId,                 // null → inserted via the anon RLS policy
       anonymous_id: getAnonId(),
       event,
-      metadata: { session_id: getSessionId(), ...metadata },
+      metadata: { session_id: getSessionId(), v: APP_VERSION, ...metadata },
     });
   } catch { /* analytics must never break the app */ }
 }
