@@ -8,9 +8,11 @@ import FeedbackWidget from "../components/FeedbackWidget";
 import AdminPanel from "../components/AdminPanel";
 import BrandingSettings from "../components/BrandingSettings";
 import JewishCreate from "../components/JewishCreate";
+import OnboardingModal from "../components/OnboardingModal";
 import { useProfile, FREE_LIMIT } from "../hooks/useProfile";
 import InstallPWA from "../components/InstallPWA";
 import Logo from "../components/Logo";
+import { track } from "../hooks/useEvents";
 
 const NAV = [
   ["create",   "✨", "צור חוברת"],
@@ -42,6 +44,14 @@ function QuotaBar({ loading, isPro, monthlyBookletCount, monthlyLimit, bookletCo
 export default function Dashboard() {
   const [tab, setTab]             = useState("create");
   const [showUpgrade, setShowUpgrade] = useState(false);
+  const [pendingStarter, setPendingStarter] = useState(null);
+  const [onboarded, setOnboarded] = useState(() => {
+    try { return !!localStorage.getItem("beshvili_onboarded"); } catch { return true; }
+  });
+  const finishOnboarding = () => {
+    try { localStorage.setItem("beshvili_onboarded", "1"); } catch {}
+    setOnboarded(true);
+  };
   const { profile, plan, bookletCount, monthlyBookletCount, monthlyLimit, remaining, isPro, isAdmin, loading, refresh } = useProfile();
 
   const prevBookletCountRef = useRef(null);
@@ -220,7 +230,8 @@ export default function Dashboard() {
 
           {/* Create stays mounted to preserve in-progress generation when switching tabs */}
           <div className={tab === "create" ? "" : "hidden"}>
-            <Create active={tab === "create"} onSaved={() => refresh()} remaining={remaining} isPro={isPro} bookletCount={bookletCount} onUpgrade={() => setShowUpgrade(true)} />
+            <Create active={tab === "create"} onSaved={() => refresh()} remaining={remaining} isPro={isPro} bookletCount={bookletCount} onUpgrade={() => setShowUpgrade(true)}
+              pendingStarter={pendingStarter} onStarterConsumed={() => setPendingStarter(null)} />
           </div>
           {tab === "jewish" && <JewishCreate onSaved={() => refresh()} remaining={remaining} isPro={isPro} bookletCount={bookletCount} onUpgrade={() => setShowUpgrade(true)} />}
           {tab === "students" && <Students onBookletSaved={() => { refresh(); setTab("history"); }} remaining={remaining} isPro={isPro} />}
@@ -244,6 +255,12 @@ export default function Dashboard() {
       </div>
 
       {showUpgrade && <UpgradeModal onClose={() => setShowUpgrade(false)} bookletCount={bookletCount} source="dashboard" />}
+      {!loading && !isPro && bookletCount === 0 && !onboarded && tab === "create" && (
+        <OnboardingModal
+          onPick={(s) => { setPendingStarter(s); finishOnboarding(); track("onboarding_starter_picked", { label: s.label }); }}
+          onSkip={() => { finishOnboarding(); track("onboarding_skipped", {}); }}
+        />
+      )}
       <FeedbackWidget />
       <InstallPWA variant="banner" />
     </div>

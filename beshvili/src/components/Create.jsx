@@ -67,7 +67,7 @@ const LOADING_MSGS = [
   "כמעט מוכן! עוד רגע...",
 ];
 
-export default function Create({ onSaved, remaining, isPro, active = true, bookletCount = 0, onUpgrade }) {
+export default function Create({ onSaved, remaining, isPro, active = true, bookletCount = 0, onUpgrade, pendingStarter = null, onStarterConsumed }) {
   const [showUpgrade, setShowUpgrade] = useState(false);
   const openUpgrade = onUpgrade ?? (() => setShowUpgrade(true));
   const [mode, setMode]           = useState(() => {
@@ -106,6 +106,7 @@ export default function Create({ onSaved, remaining, isPro, active = true, bookl
   const creatingRef   = useRef(false);   // prevent double-submit
   const streamAbortRef = useRef(null);   // cancel in-flight SSE on unmount
   const retryCountRef  = useRef(0);      // auto-retry: 0=fresh, 1=used first retry
+  const netRetryRef    = useRef(0);      // initial-connect auto-retry (flaky networks)
   const retryTimerRef  = useRef(null);   // pending retry setTimeout id
   const createRef      = useRef(null);   // stable pointer to latest create()
 
@@ -122,6 +123,22 @@ export default function Create({ onSaved, remaining, isPro, active = true, bookl
     streamAbortRef.current?.abort();
     clearTimeout(retryTimerRef.current);
   }, []);
+
+  // Onboarding starter: pre-fill the form so a first-timer's create button is
+  // already enabled — one tap to their first booklet.
+  useEffect(() => {
+    if (!pendingStarter) return;
+    setF(p => ({
+      ...p,
+      grade: pendingStarter.grade ?? p.grade,
+      world: pendingStarter.world ?? p.world,
+      goal:  pendingStarter.goal  ?? p.goal,
+      level: pendingStarter.level ?? p.level,
+    }));
+    if (pendingStarter.mode) { setMode(pendingStarter.mode); try { localStorage.setItem("beshvili_mode", pendingStarter.mode); } catch {} }
+    onStarterConsumed?.();
+    setTimeout(() => document.getElementById("create-submit-btn")?.scrollIntoView({ behavior: "smooth", block: "center" }), 120);
+  }, [pendingStarter]);
 
   // Fire once when the free-quota paywall screen renders
   useEffect(() => {
@@ -203,13 +220,24 @@ export default function Create({ onSaved, remaining, isPro, active = true, bookl
         body: JSON.stringify(body),
       });
     } catch (e) {
-      setLoading(false);
       creatingRef.current = false;
-      if (ctrl.signal.aborted) return; // unmounted — don't show error
+      if (ctrl.signal.aborted) { setLoading(false); return; } // unmounted — don't show error
+      // The initial request never reached the server — common on flaky mobile
+      // connections and in-app browsers (WhatsApp/Instagram). Auto-retry once,
+      // keeping the spinner up, before surfacing an error.
+      if (netRetryRef.current < 1) {
+        netRetryRef.current++;
+        trackError("network_retrying");
+        retryTimerRef.current = setTimeout(() => createRef.current?.(), 2000);
+        return;
+      }
+      netRetryRef.current = 0;
+      setLoading(false);
       trackError("network");
-      setError(`generic:שגיאת רשת — ${String(e)}`);
+      setError("generic:לא הצלחנו להתחבר לשרת — בדקי את חיבור האינטרנט ונסי שוב 🙏");
       return;
     }
+    netRetryRef.current = 0; // reached the server — reset the connectivity retry
 
     if (!resp.ok) {
       const rawBody = await resp.text().catch(() => "");
@@ -1057,7 +1085,7 @@ export default function Create({ onSaved, remaining, isPro, active = true, bookl
             🚀 שדרגי לפרו להמשיך
           </button>
         ) : (
-          <button onClick={create} disabled={!canSubmit}
+          <button id="create-submit-btn" onClick={create} disabled={!canSubmit}
             className="w-full bg-gradient-to-l from-brand to-magic text-white rounded-2xl py-4 px-6 font-display font-bold text-base disabled:opacity-40 hover:opacity-90 active:scale-[0.98] transition-all shadow-md">
             <div className="flex items-center justify-center gap-2">
               <span className="text-xl">{mode === "quick" ? "⚡" : mode === "exam" ? "📝" : "✨"}</span>
