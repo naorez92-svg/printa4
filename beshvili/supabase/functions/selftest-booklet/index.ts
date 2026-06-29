@@ -1,3 +1,5 @@
+// redeploy marker v2 — same stale/corrupt-deployment recovery as admin-stats:
+// the self-test was failing with "Failed to send a request" (no boot).
 import { createClient } from "jsr:@supabase/supabase-js@2";
 
 // Self-test: proves a NON-ADMIN user can create (save) a booklet end-to-end.
