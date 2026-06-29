@@ -150,11 +150,12 @@ export default function AdminPanel() {
     const { data: res, error: err } = await supabase.functions.invoke("admin-stats");
     if (err) {
       const isFetch = /failed to send a request/i.test(err.message || "");
-      // A bare fetch-failure (no response) is almost always a cold start right
-      // after a deploy — the function takes a few seconds to wake. Auto-retry a
-      // couple of times before bothering the admin, so the blip stays invisible.
-      if (isFetch && attempt < 2) {
-        await new Promise(r => setTimeout(r, 1800));
+      // A bare fetch-failure (no response) is almost always a cold boot right
+      // after a deploy — the function returns a CORS-less 503 for a few seconds
+      // while it wakes. Retry patiently (up to ~14s total) so the wake-up window
+      // is ridden out invisibly; a warm function answers on the first try.
+      if (isFetch && attempt < 4) {
+        await new Promise(r => setTimeout(r, 2000 + attempt * 1500));
         return loadStats(attempt + 1);
       }
       // Read the function's JSON error body (FunctionsHttpError carries the
