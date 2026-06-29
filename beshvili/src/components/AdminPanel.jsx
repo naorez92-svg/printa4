@@ -119,6 +119,7 @@ export default function AdminPanel() {
     if (res?.error) return `שגיאה: ${res.error}${res.detail ? ` — ${res.detail}` : ""}`;
     const dbg = res?._debug ?? {};
     const parts = [];
+    if (dbg.list_users_error) parts.push(`⚠️ שגיאת רישום משתמשים: ${dbg.list_users_error}`);
     if (dbg.auth_users_found != null) parts.push(`${dbg.auth_users_found} משתמשים במערכת`);
     if (dbg.profiles_found  != null) parts.push(`${dbg.profiles_found} פרופילים`);
     // Surface the first Resend send error so a domain/verification problem is visible
