@@ -154,7 +154,7 @@ export default function Login() {
       otp_expired: "הקישור פג תוקף — בקשי קישור חדש ולחצי עליו תוך כמה דקות 🙏",
       access_denied: "הכניסה בוטלה — נסי שוב",
     };
-    setError(map[errCode] || (errDesc ? decodeURIComponent(errDesc.replace(/\+/g, " ")) : "הכניסה נכשלה — נסי לבקש קישור חדש");
+    setError(map[errCode] || (errDesc ? decodeURIComponent(errDesc.replace(/\+/g, " ")) : "הכניסה נכשלה — נסי לבקש קישור חדש"));
     setStep("email");
     track("auth_redirect_error", { code: errCode });
     try { window.history.replaceState(null, "", window.location.pathname); } catch { /* ignore */ }
@@ -428,7 +428,7 @@ export default function Login() {
             <div className="space-y-5">
               {[
                 { icon: "🎯", title: "משימה חווייתית", desc: "לא תרגילים יבשים — סיפור שהילד רוצה לסיים. הוא לא מרגיש שהוא לומד — הוא חוקר, מציל, בונה.", color: "bg-magic/10" },
-                { icon: "⚽", title: "בעולם שהילד אוהב", desc: "חלל, כדורגל, גיימינג, בישול, פוקמון — הגדרה אחת ובשבילי בונה סביבה שמדברת אליו.", color: "bg-brand/10" },
+                { icon: "⚽", title: "בעולם שהילד אוהב", desc: "חלל, כדורגל, גיימינג, בישול, פוקימון — הגדרה אחת ובשבילי בונה סביבה שמדברת אליו.", color: "bg-brand/10" },
                 { icon: "🎨", title: "צבוע לפי תשובה", desc: "פעילויות יצירתיות שמגבירות מוטיבציה. הילד מצייר ופותר בו-זמנית — ועושה בדיקה עצמית.", color: "bg-amber-50" },
                 { icon: "📐", title: "מותאם בדיוק לרמה", desc: "בסיסי, בינוני, מתקדם — ה-AI כותב לרמה שציינת. אף פעם לא קל מדי, אף פעם לא קשה מדי.", color: "bg-grow/10" },
               ].map(({ icon, title, desc, color }) => (
@@ -511,7 +511,7 @@ export default function Login() {
             {[
               { num: "01", Icon: IconWrite, title: "בחרי תלמיד ונושא", desc: "שם, כיתה, העולם האהוב, יעד פדגוגי — או פשוט כתבי מה תרצי בחופשיות" },
               { num: "02", Icon: IconSpark, title: "AI יוצר תוך 60 שניות", desc: "חוברת עבודה מלאה עם תרגילים, עמודים ומפתח תשובות — הכל בעברית, מותאם לרמת הילד" },
-              { num: "03", Icon: IconPrint, title: "הדפיסי ומסרי", desc: "לחצי הדפס ← שמרי כ-PDF — קובץ A4 מוכן, כיתה של 30 ילדים תוך 3 דקות" },
+              { num: "03", Icon: IconPrint, title: "הדפסי ומסרי", desc: "לחצי הדפס ← שמרי כ-PDF — קובץ A4 מוכן, כיתה של 30 ילדים תוך 3 דקות" },
             ].map(({ num, Icon, title, desc }) => (
               <div key={num} className="relative bg-white rounded-2xl p-6 border border-ink/5 shadow-sm">
                 <div className="absolute -top-3 right-4 text-xs font-bold text-white bg-gradient-to-l from-brand to-magic rounded-full px-2.5 py-1">{num}</div>
@@ -555,7 +555,7 @@ export default function Login() {
               <span className="text-sm">✡️</span>
               <span className="text-xs font-semibold text-magic">חדש — מקצועות יהדות</span>
             </div>
-            <h2 className="text-2xl font-bold text-ink mb-2 font-display">חומרי יהדות לפי תכנית המפמ\"ר</h2>
+            <h2 className="text-2xl font-bold text-ink mb-2 font-display">חומרי יהדות לפי תכנית המפמ"ר</h2>
             <p className="text-ink/55 text-sm max-w-lg mx-auto leading-relaxed">
               מורות לחינוך דתי לאומי — עכשיו אפשר ליצור דפי עבודה, מבחנים וסיכומים בכל מקצועות היהדות,
               מותאמים לתכנית הלימודים הרשמית של משרד החינוך.
@@ -664,7 +664,7 @@ export default function Login() {
                         <ul className="space-y-1 text-ink/60 text-xs">
                           <li>✅ חוברת מעוצבת, מוכנה להדפסה</li>
                           <li>✅ יודע כיתות, רמות, ותכנית ישראלית</li>
-                          <li>✅ 3 שדות ← לחיצה ← מוכן</li>
+                          <li>✅ 3 שדות → לחיצה → מוכן</li>
                           <li>✅ ארכיון בענן לכל החוברות</li>
                           <li>✅ 60 שניות</li>
                         </ul>
