@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { sanitizeBookletHtml } from "../lib/sanitize";
 import { track } from "../hooks/useEvents";
+import { IS_INAPP, openExternal } from "../lib/inapp";
 
 const A4_PX = 794;
 const A4_H  = 1123; // A4 at 96dpi: 297mm × (96/25.4) ≈ 1123px
@@ -35,6 +36,15 @@ export default function PublicBooklet({ token }) {
     if (booklet) track("public_booklet_view", { token, title: booklet.title });
   }, [booklet, token]);
 
+  // Arrived from an in-app browser's "print" escape (?print=1) in a real
+  // browser — auto-open the print dialog so printing is one fewer tap.
+  useEffect(() => {
+    if (!booklet || IS_INAPP) return;
+    if (!new URLSearchParams(window.location.search).has("print")) return;
+    const t = setTimeout(() => openAndPrint("auto", true), 600);
+    return () => clearTimeout(t);
+  }, [booklet]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Fire public_booklet_not_found when the error/not-found path is reached.
   useEffect(() => {
     if (error) track("public_booklet_not_found", { token });
@@ -66,13 +76,23 @@ export default function PublicBooklet({ token }) {
     return () => window.removeEventListener("message", handler);
   }, []);
 
-  const openAndPrint = (location) => {
-    track("public_booklet_print", { token, location });
+  const openAndPrint = (location, auto = false) => {
+    track("public_booklet_print", { token, location, inapp: IS_INAPP });
     if (!booklet?.html) return;
+    // window.print() doesn't work in Facebook/Instagram in-app browsers — reopen
+    // this same public page in the real browser, where print works. The ?print=1
+    // flag makes it auto-open the print dialog on arrival.
+    if (IS_INAPP) {
+      const sep = window.location.href.includes("?") ? "&" : "?";
+      openExternal(`${window.location.href.split("#")[0]}${sep}print=1`);
+      return;
+    }
     const blob = new Blob([booklet.html], { type: "text/html;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const w = window.open(url, "_blank");
-    if (!w) { alert("אפשר חלונות קופצים בדפדפן"); URL.revokeObjectURL(url); return; }
+    // On the auto path the popup may be blocked (no user gesture) — stay silent,
+    // the visible print button still works. Only nag on an explicit click.
+    if (!w) { if (!auto) alert("אפשר חלונות קופצים בדפדפן"); URL.revokeObjectURL(url); return; }
     setTimeout(() => {
       try { w.focus(); w.print(); } catch {}
       setTimeout(() => URL.revokeObjectURL(url), 120000);

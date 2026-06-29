@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { track } from "../hooks/useEvents";
 import { supabase } from "../lib/supabase";
+import { IS_INAPP, openExternal } from "../lib/inapp";
 
 const A4_PX = 794;
 const A4_H  = 1123; // A4 at 96dpi: 297mm × (96/25.4) ≈ 1123px
@@ -79,8 +80,21 @@ export default function Preview({ html, onReset, shareToken, title, active = tru
     setTimeout(() => URL.revokeObjectURL(url), 120000);
   };
 
-  const handlePrint = useCallback(() => {
-    track("booklet_printed", { context, isMobile });
+  const handlePrint = useCallback(async () => {
+    track("booklet_printed", { context, isMobile, inapp: IS_INAPP });
+    // Inside Facebook/Instagram in-app browsers window.print() is a no-op — the
+    // print system isn't exposed. Escape to the real browser: open this booklet's
+    // public page (which has a working print button) in Chrome/Safari.
+    if (IS_INAPP) {
+      if (shareToken) {
+        await markPublic();
+        openExternal(`${window.location.origin}/b/${shareToken}?print=1`);
+      } else {
+        // No share link yet — at least get them into a real browser.
+        openExternal(window.location.origin);
+      }
+      return;
+    }
     const printHtml = getPrintHtml();
     const blob = new Blob([printHtml], { type: "text/html;charset=utf-8" });
     const url = URL.createObjectURL(blob);
@@ -90,7 +104,7 @@ export default function Preview({ html, onReset, shareToken, title, active = tru
       try { w.focus(); w.print(); } catch {}
       setTimeout(() => URL.revokeObjectURL(url), 120000);
     }, 1000);
-  }, [html]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [html, shareToken]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!active) return;
@@ -141,8 +155,8 @@ export default function Preview({ html, onReset, shareToken, title, active = tru
   // Flip the booklet to public the first time it's actually shared (fire-and-forget
   // so the share window opens inside the click gesture and isn't popup-blocked).
   const markPublic = () => {
-    if (!bookletId) return;
-    supabase.from("booklets").update({ is_public: true }).eq("id", bookletId)
+    if (!bookletId) return Promise.resolve();
+    return supabase.from("booklets").update({ is_public: true }).eq("id", bookletId)
       .then(({ error }) => { if (error) console.error("markPublic error:", error); });
   };
 
