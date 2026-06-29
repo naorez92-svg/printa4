@@ -139,7 +139,8 @@ Deno.serve(async (req) => {
   });
 
   // Auth emails
-  const { data: authData } = await admin.auth.admin.listUsers({ perPage: 1000 });
+  const { data: authData, error: authListErr } = await admin.auth.admin.listUsers({ perPage: 1000 });
+  if (authListErr) console.error("[send-followup] listUsers failed:", authListErr.message);
   const emailById: Record<string, string> = {};
   (authData?.users ?? []).forEach(u => { if (u.email) emailById[u.id] = u.email; });
 
@@ -186,7 +187,11 @@ Deno.serve(async (req) => {
     }
     return new Response(JSON.stringify({
       sent, errors, total: Object.keys(emailById).length,
-      _debug: { auth_users_found: (authData?.users ?? []).length },
+      _debug: {
+        auth_users_found: (authData?.users ?? []).length,
+        list_users_error: authListErr?.message ?? null,
+        resend_key_present: !!resendKey,
+      },
     }), { status: 200, headers: cors });
   }
 
@@ -423,6 +428,7 @@ Deno.serve(async (req) => {
     _debug: {
       profiles_found: (allProfiles ?? []).length,
       auth_users_found: (authData?.users ?? []).length,
+      list_users_error: authListErr?.message ?? null,
       booklets_found: (allBooklets ?? []).length,
       wave2_skipped: dormantByUser === null,
     },
