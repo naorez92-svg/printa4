@@ -41,12 +41,14 @@ Deno.serve(async (req) => {
   // Parse body for flags
   let shouldGenerateProposals = false;
   let shouldGenerateInsight = false;
+  let searchEmail = "";
   try {
     const text = await req.text();
     if (text) {
       const parsed = JSON.parse(text);
       shouldGenerateProposals = parsed.generateProposals === true;
       shouldGenerateInsight = parsed.generateInsight === true;
+      searchEmail = typeof parsed.searchEmail === "string" ? parsed.searchEmail.trim().toLowerCase() : "";
     }
   } catch {}
 
@@ -214,25 +216,45 @@ Deno.serve(async (req) => {
       createdAt: u.created_at,
     }));
 
+  // Shared mapper so recent-users and search return identical, enriched records.
+  const enrichUser = (u: { id: string; email?: string; created_at: string; last_sign_in_at?: string }) => ({
+    id: u.id,
+    email: u.email,
+    createdAt: u.created_at,
+    lastSignIn: u.last_sign_in_at,
+    bookletCount: bookletsByUser[u.id] ?? 0,
+    plan: profileMap[u.id]?.plan ?? "free",
+    name: profileMap[u.id]?.full_name,
+    followupSent: profileMap[u.id]?.followup_sent_at,
+    lastBookletAt: lastBookletByUser[u.id] ?? null,
+    startedCount: startedByUser[u.id] ?? 0,
+    errorCount:   errorByUser[u.id]?.count ?? 0,
+    lastErrorType: errorByUser[u.id]?.lastType ?? null,
+    lastErrorInapp: errorByUser[u.id]?.lastInapp ?? false,
+    lastErrorBuild: errorByUser[u.id]?.lastBuild ?? null,
+  });
+
   const recentUsers = users
     .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
     .slice(0, 30)
-    .map(u => ({
-      id: u.id,
-      email: u.email,
-      createdAt: u.created_at,
-      lastSignIn: u.last_sign_in_at,
-      bookletCount: bookletsByUser[u.id] ?? 0,
-      plan: profileMap[u.id]?.plan ?? "free",
-      name: profileMap[u.id]?.full_name,
-      followupSent: profileMap[u.id]?.followup_sent_at,
-      lastBookletAt: lastBookletByUser[u.id] ?? null,
-      startedCount: startedByUser[u.id] ?? 0,
-      errorCount:   errorByUser[u.id]?.count ?? 0,
-      lastErrorType: errorByUser[u.id]?.lastType ?? null,
-      lastErrorInapp: errorByUser[u.id]?.lastInapp ?? false,
-      lastErrorBuild: errorByUser[u.id]?.lastBuild ?? null,
-    }));
+    .map(enrichUser);
+
+  // ── Email search ──────────────────────────────────────────────────────────
+  // Find ANY user by (partial) email — recent-users only shows the newest 30
+  // signups, so an older-but-active user (or one who just hit an error) is
+  // otherwise invisible. Sorted by most-recent activity so the relevant row is on top.
+  let searchResults: ReturnType<typeof enrichUser>[] | null = null;
+  if (searchEmail) {
+    searchResults = users
+      .filter(u => (u.email ?? "").toLowerCase().includes(searchEmail))
+      .map(enrichUser)
+      .sort((a, b) => {
+        const la = a.lastBookletAt ?? a.lastSignIn ?? a.createdAt ?? "";
+        const lb = b.lastBookletAt ?? b.lastSignIn ?? b.createdAt ?? "";
+        return lb > la ? 1 : -1;
+      })
+      .slice(0, 25);
+  }
 
   // ── Silent-failure detector ───────────────────────────────────────────────
   // Users who pressed "create" (booklet_started) in the last 30d but have ZERO
@@ -626,6 +648,10 @@ Deno.serve(async (req) => {
     planBreakdown,
     topTopics,
     recentUsers,
+    searchResults,
+    // listUsers is fetched 1000-at-a-time; if we hit the cap, search may not
+    // cover the oldest users — surface that so the admin isn't misled.
+    userPoolCapped: users.length >= 1000,
     recentFeedback:     recentFeedback ?? [],
     recentLeads:        recentLeads ?? [],
     funnelStats,
