@@ -540,7 +540,11 @@ Deno.serve(async (req) => {
     // leaving htmlAccumulated empty on the client. For structured HTML generation with
     // a 260-line system prompt, thinking adds zero quality benefit — the instructions
     // are explicit and exhaustive. Disabling thinking means all max_tokens go to HTML.
-    const maxTokens = Math.min(64000, Math.max(20000, effPages * 6000));
+    // Right-size the budget to the page count. The old 20000-token FLOOR meant a
+    // 1-page request still had room to generate ~5 pages of content, so the model
+    // over-generated and a "1 page" booklet took ~185s. ~7000 tokens/page is
+    // generous for rich A4 content while letting small requests finish fast.
+    const maxTokens = Math.min(64000, Math.max(8000, effPages * 7000));
 
     // Rate-limit timestamp already stamped atomically above (step 3 CAS).
     const monthlyLimit = isAdmin ? -1 : isTeacher ? TEACHER_MONTHLY_LIMIT : isParent ? PARENT_MONTHLY_LIMIT : FREE_BOOKLET_LIMIT;
