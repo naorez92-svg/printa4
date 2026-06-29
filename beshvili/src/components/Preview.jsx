@@ -93,8 +93,10 @@ export default function Preview({ html, onReset, shareToken, title, active = tru
         if (IS_ANDROID) {
           // The intent:// navigation cancels in-flight requests — so AWAIT the
           // is_public flip before navigating, otherwise the new browser fetches
-          // the booklet before it's public and gets "not found".
-          await markPublic();
+          // the booklet before it's public and gets "not found". If the flip
+          // failed, don't send the user to a 404 — print here instead.
+          const pubErr = await markPublic();
+          if (pubErr) { alert("מכינים את הקישור… נסי שוב בעוד רגע 🙏"); return; }
           openExternal(target);
         } else {
           // iOS path only copies the link (no navigation), so nothing cancels the
