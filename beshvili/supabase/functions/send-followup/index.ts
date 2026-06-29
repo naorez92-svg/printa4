@@ -128,6 +128,34 @@ Deno.serve(async (req) => {
     }
   }
 
+  // Unsubscribe state (migration 0028). Separate query so the function keeps
+  // working if 0028 hasn't been applied yet — until then no links / no skipping.
+  const unsubByUser: Record<string, { off: boolean; token: string | null }> = {};
+  if (allIds.length > 0) {
+    const { data: uData, error: uErr } = await admin
+      .from("profiles").select("id, unsubscribed_at, unsubscribe_token").in("id", allIds);
+    if (!uErr && uData) {
+      uData.forEach((p: { id: string; unsubscribed_at: string | null; unsubscribe_token: string | null }) => {
+        unsubByUser[p.id] = { off: !!p.unsubscribed_at, token: p.unsubscribe_token };
+      });
+    }
+  }
+  const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
+  // Append a one-click unsubscribe link to the email footer (legal requirement).
+  const withUnsub = (html: string, userId: string): string => {
+    const tok = unsubByUser[userId]?.token;
+    if (!tok) return html;
+    const link = `<a href="${SUPABASE_URL}/functions/v1/unsubscribe?token=${tok}" style="color:#aaa;">הסרה מרשימת תפוצה</a>`;
+    return html.replace("צרי קשר</a>", `צרי קשר</a> · ${link}`);
+  };
+  const unsubHeaders = (userId: string): Record<string, string> => {
+    const tok = unsubByUser[userId]?.token;
+    return tok
+      ? { "List-Unsubscribe": `<${SUPABASE_URL}/functions/v1/unsubscribe?token=${tok}>`, "List-Unsubscribe-Post": "List-Unsubscribe=One-Click" }
+      : {};
+  };
+  const isUnsub = (userId: string): boolean => unsubByUser[userId]?.off === true;
+
   // Booklets: count + last created_at per user
   const { data: allBooklets } = await admin.from("booklets").select("user_id, created_at").in("user_id", allIds);
   const bookletsByUser: Record<string, number> = {};
@@ -190,13 +218,14 @@ Deno.serve(async (req) => {
     );
 
     // Build one message per non-admin recipient.
-    const messages: { from: string; to: string[]; subject: string; html: string }[] = [];
+    const messages: { from: string; to: string[]; subject: string; html: string; headers?: Record<string, string> }[] = [];
     for (const [userId, email] of Object.entries(emailById)) {
       const prof = profileMap[userId];
       if (prof?.plan === "admin") continue;
+      if (isUnsub(userId)) continue; // respect opt-out
       const name     = prof?.full_name ? esc(prof.full_name.split(" ")[0]) : null;
       const greeting = name ? `שלום ${name}!` : "שלום!";
-      messages.push({ from: "בשבילי <hello@beshvili.com>", to: [email], subject, html: buildBlastHtml(greeting) });
+      messages.push({ from: "בשבילי <hello@beshvili.com>", to: [email], subject, html: withUnsub(buildBlastHtml(greeting), userId), headers: unsubHeaders(userId) });
     }
 
     // Resend batch endpoint accepts up to 100 messages per call.
@@ -233,10 +262,11 @@ Deno.serve(async (req) => {
   async function sendEmail(userId: string, subject: string, html: string, markField: string) {
     const email = emailById[userId];
     if (!email) return;
+    if (isUnsub(userId)) return; // respect opt-out
     const res = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: { "Authorization": `Bearer ${resendKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ from: "בשבילי <hello@beshvili.com>", to: [email], subject, html }),
+      body: JSON.stringify({ from: "בשבילי <hello@beshvili.com>", to: [email], subject, html: withUnsub(html, userId), headers: unsubHeaders(userId) }),
     });
     if (res.ok) {
       await admin.from("profiles").update({ [markField]: now.toISOString() }).eq("id", userId);
