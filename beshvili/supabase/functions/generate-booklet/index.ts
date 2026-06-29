@@ -538,7 +538,15 @@ Deno.serve(async (req) => {
       : null;
 
     const activeSystem  = examMode ? EXAM_SYSTEM  : BOOKLET_SYSTEM;
-    const activeUserMsg = examMsg  ?? userMsg;
+    // Fast mode: the user opted for speed over depth. Tell the model to produce a
+    // lighter, more compact page (fewer/shorter items) and cap the budget tighter
+    // so it finishes in a fraction of the time (and costs less). Quality mode (default)
+    // is unchanged.
+    const fast = body.fast === true;
+    const fastNote = fast
+      ? "\n\n⚡ מצב מהיר: צור גרסה תמציתית וקומפקטית — פחות פריטים/שאלות לעמוד וניסוח קצר וענייני, בלי הרחבות. עדיין מלא וברור, אבל קצר. סיים מהר."
+      : "";
+    const activeUserMsg = (examMsg ?? userMsg) + fastNote;
 
     // ── 6. Generate (streaming — client receives SSE, sees HTML in real time) ──
     //
@@ -552,7 +560,9 @@ Deno.serve(async (req) => {
     // 1-page request still had room to generate ~5 pages of content, so the model
     // over-generated and a "1 page" booklet took ~185s. ~7000 tokens/page is
     // generous for rich A4 content while letting small requests finish fast.
-    const maxTokens = Math.min(64000, Math.max(8000, effPages * 7000));
+    const maxTokens = fast
+      ? Math.min(40000, Math.max(5000, effPages * 4000))   // fast: lighter page, ~half the output
+      : Math.min(64000, Math.max(8000, effPages * 7000));
 
     // Rate-limit timestamp already stamped atomically above (step 3 CAS).
     const monthlyLimit = isAdmin ? -1 : isTeacher ? TEACHER_MONTHLY_LIMIT : isParent ? PARENT_MONTHLY_LIMIT : FREE_BOOKLET_LIMIT;
