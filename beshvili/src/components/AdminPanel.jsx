@@ -115,8 +115,15 @@ export default function AdminPanel() {
 
   const fmtFollowupResult = (res, err, label) => {
     if (err) return `שגיאה: ${err.message}`;
-    const dbg = res?._debug;
-    const suffix = dbg ? ` · ${dbg.profiles_found} פרופילים נמצאו` : "";
+    // Function-level error (e.g. RESEND_API_KEY missing, profiles query failed)
+    if (res?.error) return `שגיאה: ${res.error}${res.detail ? ` — ${res.detail}` : ""}`;
+    const dbg = res?._debug ?? {};
+    const parts = [];
+    if (dbg.auth_users_found != null) parts.push(`${dbg.auth_users_found} משתמשים במערכת`);
+    if (dbg.profiles_found  != null) parts.push(`${dbg.profiles_found} פרופילים`);
+    // Surface the first Resend send error so a domain/verification problem is visible
+    if (res?.errors?.length) parts.push(`⚠️ ${res.errors.length} שגיאות שליחה — ${String(res.errors[0]).slice(0, 140)}`);
+    const suffix = parts.length ? ` · ${parts.join(" · ")}` : "";
     return `${label}${suffix}`;
   };
 
@@ -146,8 +153,7 @@ export default function AdminPanel() {
     setSendingBlast(true); setBlastResult("");
     const { data: res, error: err } = await supabase.functions.invoke("send-followup", { body: { blast: true } });
     setSendingBlast(false);
-    if (err) setBlastResult(`שגיאה: ${err.message}`);
-    else setBlastResult(`נשלחו ${res?.sent ?? 0} מיילים מתוך ${res?.total ?? 0}`);
+    setBlastResult(fmtFollowupResult(res, err, `נשלחו ${res?.sent ?? 0} מיילים מתוך ${res?.total ?? 0}`));
   };
 
   const triggerEmergencyBlast = async () => {
