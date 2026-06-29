@@ -195,6 +195,11 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Release the rate-limit slot on failure so a failed generation (or the
+    // client's 2s auto-retry) isn't rejected with a 60s lockout. Success keeps it.
+    const releaseLock = () =>
+      admin.from("profiles").update({ last_generation_at: null }).eq("id", user.id).then(() => {}, () => {});
+
     const body = await req.json();
     const clean = (val: unknown, max = MAX_FIELD_LEN): string =>
       String(val ?? "").trim().substring(0, max);
@@ -302,6 +307,7 @@ ${notes ? `הוראות נוספות מהמורה: ${esc(notes)}` : ""}
           if (r.ok) {
             const data = await r.json();
             const html = (data?.content ?? []).filter((b: { type: string }) => b.type === "text").map((b: { text: string }) => b.text).join("");
+            if (!html || !html.includes("<")) { await releaseLock(); return new Response(JSON.stringify({ error: "empty_html" }), { status: 502, headers: cors }); }
             return new Response(JSON.stringify({ html, remaining }), { status: 200, headers: cors });
           }
           if ((r.status === 529 || r.status === 503 || r.status === 429) && attempt < 3) {
@@ -310,10 +316,13 @@ ${notes ? `הוראות נוספות מהמורה: ${esc(notes)}` : ""}
             continue;
           }
           console.error(`[generate-jewish] no-stream Anthropic ${r.status}`);
+          await releaseLock();
           return new Response(JSON.stringify({ error: r.status === 529 || r.status === 503 ? "ai_overloaded" : "ai_error" }), { status: 503, headers: cors });
         }
+        await releaseLock();
         return new Response(JSON.stringify({ error: "ai_overloaded" }), { status: 503, headers: cors });
       } catch (e) {
+        await releaseLock();
         const code = e instanceof Error && e.name === "TimeoutError" ? "ai_timeout" : "internal_error";
         return new Response(JSON.stringify({ error: code }), { status: 500, headers: cors });
       }
@@ -367,6 +376,7 @@ ${notes ? `הוראות נוספות מהמורה: ${esc(notes)}` : ""}
               continue;
             }
             console.error(`[generate-jewish] Anthropic ${r.status}`);
+            releaseLock();
             await w.write(sseError(r.status === 529 || r.status === 503 || r.status === 429 ? "overloaded_error" : "api_error"));
             clearInterval(hb); await w.close(); return;
           } catch (fetchErr) {
@@ -378,7 +388,7 @@ ${notes ? `הוראות נוספות מהמורה: ${esc(notes)}` : ""}
             throw fetchErr;
           }
         }
-        if (!anthropicResp) { clearInterval(hb); await w.close(); return; }
+        if (!anthropicResp) { releaseLock(); clearInterval(hb); await w.close(); return; }
 
         const reader = anthropicResp.body!.getReader();
         while (true) {
@@ -391,6 +401,7 @@ ${notes ? `הוראות נוספות מהמורה: ${esc(notes)}` : ""}
       } catch (e) {
         clearInterval(hb);
         console.error("[generate-jewish] stream error:", String(e));
+        releaseLock();
         const type = e instanceof Error && e.name === "TimeoutError" ? "timeout_error" : "overloaded_error";
         try { await w.write(sseError(type)); } catch { /* writer already closed */ }
         try { await w.close(); } catch {}

@@ -38,7 +38,10 @@ export function sanitizeBookletHtml(h) {
       if (name.startsWith("on")) {
         el.removeAttribute(attr.name);                       // onclick/onerror/onload/…
       } else if (URL_ATTRS.has(name)) {
-        const scheme = val.toLowerCase();
+        // Browsers strip ASCII whitespace/control chars from URLs, so "java\tscript:"
+        // executes as "javascript:". Normalize the same way before the scheme check
+        // so that trick can't slip past.
+        const scheme = val.toLowerCase().split("").filter((c) => c.charCodeAt(0) > 0x20).join("");
         const bad =
           /^(javascript|vbscript):/.test(scheme) ||
           // data:/blob: are script/navigation sinks — allow only raster image data URIs.

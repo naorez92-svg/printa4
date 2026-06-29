@@ -443,6 +443,14 @@ Deno.serve(async (req) => {
       );
     }
 
+    // If generation fails below, the user must NOT stay rate-limited: the client
+    // auto-retries ~2s after a dropped stream, and a real user shouldn't wait 60s
+    // after a failure. Release the slot on every failure path (fire-and-forget for
+    // the streaming pump, awaited for no-stream returns). A SUCCESSFUL generation
+    // keeps the stamp, so the 1-per-60s limit still holds for the happy path.
+    const releaseLock = () =>
+      admin.from("profiles").update({ last_generation_at: null }).eq("id", user.id).then(() => {}, () => {});
+
     // ── 4. Parse + sanitize input ────────────────────────────────────────────
     const body = await req.json();
     const clean = (val: unknown, max = MAX_FIELD_LEN): string =>
@@ -575,6 +583,8 @@ Deno.serve(async (req) => {
           if (r.ok) {
             const data = await r.json();
             const html = (data?.content ?? []).filter((b: { type: string }) => b.type === "text").map((b: { text: string }) => b.text).join("");
+            // Guard against an empty/garbage body returning a "success" with no booklet.
+            if (!html || !html.includes("<")) { await releaseLock(); return new Response(JSON.stringify({ error: "empty_html" }), { status: 502, headers: cors }); }
             return new Response(JSON.stringify({ html, remaining }), { status: 200, headers: cors });
           }
           if ((r.status === 529 || r.status === 503 || r.status === 429) && attempt < 3) {
@@ -583,10 +593,13 @@ Deno.serve(async (req) => {
             continue;
           }
           console.error(`[generate-booklet] no-stream Anthropic ${r.status}`);
+          await releaseLock();
           return new Response(JSON.stringify({ error: r.status === 529 || r.status === 503 ? "ai_overloaded" : "ai_error" }), { status: 503, headers: cors });
         }
+        await releaseLock();
         return new Response(JSON.stringify({ error: "ai_overloaded" }), { status: 503, headers: cors });
       } catch (e) {
+        await releaseLock();
         const code = e instanceof Error && e.name === "TimeoutError" ? "ai_timeout" : "internal_error";
         return new Response(JSON.stringify({ error: code }), { status: 500, headers: cors });
       }
@@ -650,6 +663,7 @@ Deno.serve(async (req) => {
               continue;
             }
             console.error(`[generate-booklet] Anthropic ${r.status}`);
+            releaseLock();
             await w.write(sseError(r.status === 529 || r.status === 503 || r.status === 429 ? "overloaded_error" : "api_error"));
             clearInterval(hb); await w.close(); return;
           } catch (fetchErr) {
@@ -661,7 +675,7 @@ Deno.serve(async (req) => {
             throw fetchErr;
           }
         }
-        if (!anthropicResp) { clearInterval(hb); await w.close(); return; }
+        if (!anthropicResp) { releaseLock(); clearInterval(hb); await w.close(); return; }
 
         const reader = anthropicResp.body!.getReader();
         while (true) {
@@ -674,6 +688,7 @@ Deno.serve(async (req) => {
       } catch (e) {
         clearInterval(hb);
         console.error("[generate-booklet] stream error:", String(e));
+        releaseLock();
         const type = e instanceof Error && e.name === "TimeoutError" ? "timeout_error" : "overloaded_error";
         try { await w.write(sseError(type)); } catch { /* writer already closed */ }
         try { await w.close(); } catch {}
