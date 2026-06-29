@@ -275,7 +275,7 @@ export default function JewishCreate({ onSaved, remaining, isPro, bookletCount =
     // Stall guards — same rationale as Create.jsx: heartbeats keep a hung stream
     // "alive", so bail out instead of letting the user wait minutes with no output.
     const DEAD_CONN_MS     = 30000;
-    const CONTENT_STALL_MS = 60000;
+    const CONTENT_STALL_MS = 90000; // headroom for a slow first token under load (avoid false abort + double cost)
     let lastContentAt = Date.now();
     try {
       while (true) {
