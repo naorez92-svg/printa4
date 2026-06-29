@@ -239,6 +239,50 @@ export default function AdminPanel() {
   return (
     <div className="space-y-6">
 
+      {/* ── 🩺 System health (today) — "is generation working right now" ────── */}
+      {(() => {
+        const r = data.reliability ?? { startedToday: 0, completedToday: 0, errorsToday: 0, successRate: 0, errorsByType: [], versions: [] };
+        const hasIssue = r.startedToday >= 3 && r.successRate < 70;
+        return (
+          <div className={`rounded-2xl p-4 border-2 shadow-sm ${hasIssue ? "bg-red-50 border-red-300" : "bg-grow/5 border-grow/25"}`}>
+            <h3 className="font-bold text-ink text-sm mb-3">🩺 בריאות המערכת — היום</h3>
+            <div className="grid grid-cols-3 gap-2 mb-3">
+              <div className="text-center bg-white/70 rounded-xl p-2.5">
+                <div className={`text-2xl font-bold font-display ${!r.startedToday ? "text-ink/30" : r.successRate >= 70 ? "text-grow" : "text-red-500"}`}>{r.startedToday ? `${r.successRate}%` : "—"}</div>
+                <div className="text-[10px] text-ink/40 mt-0.5">אחוז הצלחה</div>
+              </div>
+              <div className="text-center bg-white/70 rounded-xl p-2.5">
+                <div className="text-2xl font-bold text-ink font-display">{r.completedToday}/{r.startedToday}</div>
+                <div className="text-[10px] text-ink/40 mt-0.5">נוצרו / ניסו</div>
+              </div>
+              <div className="text-center bg-white/70 rounded-xl p-2.5">
+                <div className={`text-2xl font-bold font-display ${r.errorsToday ? "text-red-500" : "text-grow"}`}>{r.errorsToday}</div>
+                <div className="text-[10px] text-ink/40 mt-0.5">כשלים</div>
+              </div>
+            </div>
+            {(r.errorsByType ?? []).length > 0 && (
+              <div className="mb-2">
+                <p className="text-[11px] font-semibold text-ink/50 mb-1">כשלים לפי סוג (📱 = דפדפן מוטמע):</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {r.errorsByType.map((e) => (
+                    <span key={e.type} className="text-[11px] bg-white border border-ink/10 rounded-full px-2 py-0.5 text-ink/70">
+                      {e.type}: <strong className="text-red-500">{e.count}</strong>{e.inapp > 0 ? ` 📱${e.inapp}` : ""}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+            {(r.versions ?? []).length > 1 && (
+              <p className="text-[10px] text-ink/40 leading-relaxed">
+                גרסאות פעילות היום: {r.versions.map((v) => `${v.v}(${v.count})`).join(" · ")} — אם יש כמה, חלק מהמשתמשים על <strong>קוד ישן מהמטמון</strong>.
+              </p>
+            )}
+            {!r.startedToday && <p className="text-[11px] text-ink/40">אף אחד עוד לא ניסה ליצור חוברת היום.</p>}
+          </div>
+        );
+      })()}
+
+      {/* ── AI strategic insight — one conclusion from all the data ──────── */}
       <div className={`rounded-2xl p-5 border-2 shadow-sm bg-gradient-to-bl ${insight ? `${im.ring} ${im.bg}` : "border-magic/20 from-magic/5 to-brand/5"}`}>
         <div className="flex items-center justify-between mb-2">
           <h3 className="font-bold text-ink text-sm flex items-center gap-2">

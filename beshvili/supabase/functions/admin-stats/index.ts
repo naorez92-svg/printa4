@@ -280,12 +280,19 @@ Deno.serve(async (req) => {
     paywallHits: 0,                                              // saw a paywall (any path)
     totalEvents: 0,
   };
+  // System reliability — TODAY only, so it answers "is generation working right now"
+  // (the 7-day error list above still carries the pre-fix db_insert_failed noise).
+  let reliability = {
+    startedToday: 0, completedToday: 0, errorsToday: 0, successRate: 0,
+    errorsByType: [] as { type: string; count: number; inapp: number }[],
+    versions:     [] as { v: string; count: number }[],
+  };
   try {
     // Explicit high limit so PostgREST's default ~1000-row cap doesn't silently
     // truncate (and undercount) once anonymous tracking ramps event volume.
     const { data: ev } = await admin
       .from("events")
-      .select("event, user_id, anonymous_id, metadata")
+      .select("event, user_id, anonymous_id, metadata, created_at")
       .gte("created_at", weekAgo)
       .order("created_at", { ascending: false })
       .limit(100000);
@@ -358,6 +365,33 @@ Deno.serve(async (req) => {
           .map(([type, count]) => ({ type, count }))
           .sort((a, b) => b.count - a.count),
         totalEvents: ev.length,
+      };
+
+      // ── TODAY reliability ────────────────────────────────────────────────
+      const today = ev.filter(e => (e.created_at as string) >= todayStart);
+      const startedToday   = today.filter(e => e.event === "booklet_started").length;
+      const completedToday = today.filter(e => e.event === "booklet_completed").length;
+      const errToday: Record<string, { count: number; inapp: number }> = {};
+      for (const e of today.filter(e => e.event === "booklet_error")) {
+        const m = (e.metadata ?? {}) as Record<string, unknown>;
+        const t = (m.type as string) ?? "unknown";
+        const cur = errToday[t] ?? { count: 0, inapp: 0 };
+        errToday[t] = { count: cur.count + 1, inapp: cur.inapp + (m.inapp === true ? 1 : 0) };
+      }
+      // Version spread among today's generation attempts (started/error) — reveals
+      // users stuck on stale cached code.
+      const verMap: Record<string, number> = {};
+      for (const e of today.filter(e => e.event === "booklet_started" || e.event === "booklet_error")) {
+        const v = (((e.metadata ?? {}) as Record<string, unknown>).v as string) ?? "?";
+        verMap[v] = (verMap[v] ?? 0) + 1;
+      }
+      reliability = {
+        startedToday,
+        completedToday,
+        errorsToday: today.filter(e => e.event === "booklet_error").length,
+        successRate: startedToday > 0 ? Math.round((completedToday / startedToday) * 100) : 0,
+        errorsByType: Object.entries(errToday).map(([type, x]) => ({ type, count: x.count, inapp: x.inapp })).sort((a, b) => b.count - a.count),
+        versions: Object.entries(verMap).map(([v, count]) => ({ v, count })).sort((a, b) => b.count - a.count).slice(0, 6),
       };
     }
   } catch { /* events table may not exist yet */ }
@@ -596,6 +630,7 @@ Deno.serve(async (req) => {
     recentLeads:        recentLeads ?? [],
     funnelStats,
     analytics,
+    reliability,
     insight,
     difficultyBreakdown,
     ratedBooklets,
