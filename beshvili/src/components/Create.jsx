@@ -1066,6 +1066,15 @@ export default function Create({ onSaved, remaining, isPro, active = true, bookl
             {canSubmit && <p className="text-white/50 text-xs font-normal mt-0.5">Ctrl+Enter</p>}
           </button>
         )}
+        {/* Tell first-timers exactly what's missing instead of a silently-disabled button */}
+        {!loading && !canSubmit && !(!isPro && remaining === 0) && (
+          <p className="text-center text-xs text-magic/70 mt-2 font-medium">
+            {mode === "free"  ? "👆 כתוב/כתבי מה ליצור כדי להמשיך"
+              : mode === "exam"  ? (!examSubject ? "👆 בחר/י מקצוע" : "👆 כתוב/כתבי את נושא המבחן")
+              : mode === "form"  ? (!f.childName.trim() ? "👆 מלא/י שם ילד/ה ומה לתרגל" : "👆 כתוב/כתבי מה לתרגל")
+              : "👆 בחר/י נושא למעלה או כתוב/כתבי מה לתרגל — ואז 'צור'"}
+          </p>
+        )}
       </div>
     </section>
     </>

@@ -582,6 +582,15 @@ export default function JewishCreate({ onSaved, remaining, isPro, bookletCount =
           `✨ צור ${OUTPUT_TYPES.find(o => o.id === outputType)?.label ?? "חומר"}`
         )}
       </button>
+      {/* Tell the user exactly what's missing instead of a silently-disabled button */}
+      {!canSubmit && !loading && (
+        <p className="text-center text-xs text-magic/70 mt-2 font-medium">
+          {!subject ? "👆 בחר/י מקצוע כדי להמשיך"
+            : !grade ? "👆 בחר/י כיתה כדי להמשיך"
+            : effectiveTopic.length <= 2 ? "👆 בחר/י נושא (או כתוב/כתבי נושא חופשי) כדי ליצור"
+            : ""}
+        </p>
+      )}
 
       {loading && loadingElapsed > 10 && (
         <p className="text-center text-xs text-ink/35">
