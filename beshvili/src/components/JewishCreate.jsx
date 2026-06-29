@@ -99,7 +99,10 @@ const LOADING_MSGS = [
 export default function JewishCreate({ onSaved, remaining, isPro, bookletCount = 0, onUpgrade }) {
   const [subject, setSubject] = useState("הלכה");
   const [grade,   setGrade]   = useState("ה");
-  const [topic,   setTopic]   = useState("");
+  // Default to the first curriculum topic so the "create" button is usable
+  // immediately — otherwise it sits disabled and looks broken until the user
+  // scrolls back up and notices they must pick a topic.
+  const [topic,   setTopic]   = useState(CURRICULUM["הלכה"]?.["ה"]?.[0] ?? "");
   const [customTopic, setCustomTopic] = useState("");
   const [outputType, setOutputType]   = useState("דף_עבודה");
   const [level,   setLevel]   = useState("medium");
@@ -126,9 +129,10 @@ export default function JewishCreate({ onSaved, remaining, isPro, bookletCount =
   // Auto-suggest topics for the selected subject+grade
   const suggestedTopics = (CURRICULUM[subject]?.[grade] ?? []);
 
-  // Reset topic when subject or grade changes
+  // When subject or grade changes, default to the first suggested topic (keeps
+  // the create button enabled); fall back to empty if that combo has no topics.
   useEffect(() => {
-    setTopic("");
+    setTopic(CURRICULUM[subject]?.[grade]?.[0] ?? "");
     setCustomTopic("");
   }, [subject, grade]);
 
