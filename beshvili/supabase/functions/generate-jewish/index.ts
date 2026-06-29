@@ -283,7 +283,10 @@ ${notes ? `הוראות נוספות מהמורה: ${esc(notes)}` : ""}
 קוד HTML גולמי בלבד, ללא הסברים.`;
 
     // ── 6. Call Anthropic (streaming) ─────────────────────────────────────────
-    const maxTokens = Math.min(48000, Math.max(12000, effPages * 8000));
+    // Right-size to page count — the old 12000-token floor let a 1-page request
+    // over-generate (model wrote far past one page, ~185s). ~7000 tokens/page is
+    // ample for rich content with sources while keeping small requests fast.
+    const maxTokens = Math.min(48000, Math.max(8000, effPages * 7000));
 
     const monthlyLimit = isAdmin ? -1 : isTeacher ? TEACHER_MONTHLY_LIMIT : isParent ? PARENT_MONTHLY_LIMIT : FREE_BOOKLET_LIMIT;
     const remaining = isAdmin ? -1 : monthlyLimit - (isPaid ? usedMonthly : usedTotal) - 1;
