@@ -6,6 +6,7 @@ import BookletRating from "./BookletRating";
 import UpgradeModal from "./UpgradeModal";
 import { FREE_LIMIT } from "../hooks/useProfile";
 import { track } from "../hooks/useEvents";
+import { IS_INAPP } from "../lib/inapp";
 
 const SUBJECTS = [
   ["חשבון", "➕"],
@@ -17,7 +18,7 @@ const SUBJECTS = [
   ["גאוגרפיה", "🗺️"],
 ];
 const WORLDS = ["כדורגל", "גיימינג", "חיות", "חלל", "בישול", "מוזיקה", "סוסים", "נינג'ה", "פוקימון", "מינקראפט"];
-const PAGE_OPTIONS = [3, 5, 7, 10];
+const PAGE_OPTIONS = [2, 5, 7, 10];
 const LOADING_MSGS = [
   "קורא את הבקשה שלך...",
   "מתכנן את מבנה החוברת...",
@@ -34,7 +35,7 @@ export default function QuickCreate({ student, onClose, onSaved, remaining, isPr
   const [subject, setSubject]       = useState(initialSubject);
   const [world, setWorld]           = useState(student.worlds?.[0] || initialWorld);
   const [specificGoal, setSpecificGoal] = useState("");
-  const [pageCount, setPageCount]   = useState(5);
+  const [pageCount, setPageCount]   = useState(isPro ? 5 : 2);
   const [loading, setLoading]       = useState(false);
   const [loadingMsgIdx, setLoadingMsgIdx] = useState(0);
   const [streamChars, setStreamChars] = useState(0);
@@ -96,6 +97,7 @@ export default function QuickCreate({ student, onClose, onSaved, remaining, isPr
       weaknesses: student.special_needs || "",
       ...(student.photo_url ? { childPhotoUrl: student.photo_url } : {}),
     };
+    if (IS_INAPP) body.noStream = true;   // WhatsApp/Instagram webviews can't read SSE
 
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) {
@@ -151,46 +153,93 @@ export default function QuickCreate({ student, onClose, onSaved, remaining, isPr
       return;
     }
 
-    const reader = resp.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = "";
     let htmlAccumulated = "";
-    let updateTimer = 0;
+    let streamHadError = false;
+    let streamErrorMsg = null;
 
-    try {
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split("\n");
-        buffer = lines.pop() ?? "";
-        for (const line of lines) {
-          if (!line.startsWith("data: ")) continue;
-          const raw = line.slice(6).trim();
-          if (!raw || raw === "[DONE]") continue;
-          try {
-            const ev = JSON.parse(raw);
-            if (ev.type === "content_block_delta" && ev.delta?.type === "text_delta") {
-              htmlAccumulated += ev.delta.text;
-              const now = Date.now();
-              if (now - updateTimer > 100) { setStreamChars(htmlAccumulated.length); updateTimer = now; }
-            }
-          } catch {}
-        }
-      }
-    } catch {
-      if (ctrl.signal.aborted) { creatingRef.current = false; return; } // unmounted/closed mid-stream
-      const partial = htmlAccumulated.trim();
-      if (partial.length > 8000 && (partial.includes("<!DOCTYPE") || partial.includes("<html"))) {
-        if (!partial.includes("</html>")) htmlAccumulated = partial + "\n</body></html>";
-        // Fall through to save the partial booklet
-      } else {
+    if (IS_INAPP) {
+      // In-app browser (WhatsApp/Instagram) can't read SSE — the server returns the
+      // whole booklet in one JSON instead (body.noStream above).
+      try {
+        const j = await resp.json();
+        htmlAccumulated = j?.html ?? "";
+      } catch {
+        if (ctrl.signal.aborted) { creatingRef.current = false; return; }
         setLoading(false);
         creatingRef.current = false;
-        trackError("stream_dropped");
-        setError("החיבור נקטע — נסה שנית, רצוי עם פחות עמודים");
+        trackError("nostream_parse_failed");
+        setError("לא הצלחנו לקבל את החוברת — נסי שוב 🙏");
         return;
       }
+    } else {
+      const reader = resp.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let updateTimer = 0;
+      // Stall guards: a hung Anthropic stream keeps the HTTP connection alive via the
+      // server's keep-alive heartbeats, so without these reader.read() can hang for
+      // minutes with zero progress. Bail out instead of spinning forever.
+      const DEAD_CONN_MS = 30000;     // no bytes at all (not even a heartbeat) → dead
+      const CONTENT_STALL_MS = 90000; // alive but zero new HTML → stalled
+      let lastContentAt = Date.now();
+      try {
+        while (true) {
+          const readResult = await Promise.race([
+            reader.read(),
+            new Promise((res) => setTimeout(() => res("__dead__"), DEAD_CONN_MS)),
+          ]);
+          if (readResult === "__dead__") throw new Error("dead_connection");
+          const { done, value } = readResult;
+          if (done) break;
+          const beforeLen = htmlAccumulated.length;
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split("\n");
+          buffer = lines.pop() ?? "";
+          for (const line of lines) {
+            if (!line.startsWith("data: ")) continue;
+            const raw = line.slice(6).trim();
+            if (!raw || raw === "[DONE]") continue;
+            try {
+              const ev = JSON.parse(raw);
+              if (ev.type === "content_block_delta" && ev.delta?.type === "text_delta") {
+                htmlAccumulated += ev.delta.text;
+                const now = Date.now();
+                if (now - updateTimer > 100) { setStreamChars(htmlAccumulated.length); updateTimer = now; }
+              } else if (ev.type === "error") {
+                streamHadError = true;
+                streamErrorMsg = ev.error?.type === "overloaded_error"
+                  ? "השרת עמוס כרגע — נסי שוב בעוד דקה 🙏"
+                  : "שגיאת AI — נסי שוב";
+              }
+            } catch {}
+            if (streamHadError) break;
+          }
+          if (htmlAccumulated.length > beforeLen) lastContentAt = Date.now();
+          else if (Date.now() - lastContentAt > CONTENT_STALL_MS) throw new Error("content_stalled");
+          if (streamHadError) break;
+        }
+      } catch {
+        if (ctrl.signal.aborted) { creatingRef.current = false; return; } // unmounted/closed mid-stream
+        const partial = htmlAccumulated.trim();
+        if (partial.length > 8000 && (partial.includes("<!DOCTYPE") || partial.includes("<html"))) {
+          if (!partial.includes("</html>")) htmlAccumulated = partial + "\n</body></html>";
+          // Fall through to save the partial booklet
+        } else {
+          setLoading(false);
+          creatingRef.current = false;
+          trackError("stream_dropped");
+          setError("החיבור נקטע — נסה שנית, רצוי עם פחות עמודים");
+          return;
+        }
+      }
+    }
+
+    if (streamHadError) {
+      setLoading(false);
+      creatingRef.current = false;
+      trackError("ai_stream_error");
+      setError(streamErrorMsg || "שגיאת AI — נסי שוב");
+      return;
     }
 
     setLoading(false);
@@ -331,7 +380,7 @@ export default function QuickCreate({ student, onClose, onSaved, remaining, isPr
           <p className="text-xs text-ink/40 mb-2 font-medium">כמות עמודים</p>
           <div className="flex gap-2">
             {PAGE_OPTIONS.map(n => {
-              const isLocked = !isPro && n > 5;
+              const isLocked = !isPro && n > 2;
               return (
                 <button
                   key={n}
@@ -355,7 +404,7 @@ export default function QuickCreate({ student, onClose, onSaved, remaining, isPr
               );
             })}
           </div>
-          {!isPro && <p className="text-[10px] text-ink/30 mt-1 text-center">7 ו-10 עמודים זמינים בתוכנית בתשלום</p>}
+          {!isPro && <p className="text-[10px] text-ink/30 mt-1 text-center">מעל 2 עמודים זמינים בתוכנית בתשלום</p>}
         </div>
 
         {/* Errors */}
