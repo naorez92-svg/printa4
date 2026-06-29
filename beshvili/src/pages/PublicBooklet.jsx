@@ -92,7 +92,7 @@ export default function PublicBooklet({ token }) {
     const w = window.open(url, "_blank");
     // On the auto path the popup may be blocked (no user gesture) — stay silent,
     // the visible print button still works. Only nag on an explicit click.
-    if (!w) { if (!auto) alert("אפשר חלונות קופצים בדפדפן"); URL.revokeObjectURL(url); return; }
+    if (!w) { if (!auto) alert("הדפדפן חסם את החלון הקופץ — אפשרי חלונות קופצים (pop-ups) בהגדרות הדפדפן ונסי שוב 🙏"); URL.revokeObjectURL(url); return; }
     setTimeout(() => {
       try { w.focus(); w.print(); } catch {}
       setTimeout(() => URL.revokeObjectURL(url), 120000);
