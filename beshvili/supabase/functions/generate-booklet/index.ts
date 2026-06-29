@@ -563,32 +563,54 @@ Deno.serve(async (req) => {
 
     (async () => {
       try {
-        const anthropicResp = await fetch("https://api.anthropic.com/v1/messages", {
-          method: "POST",
-          signal: AbortSignal.timeout(270_000), // 270s — headroom before Deno's 300s hard limit
-          headers: {
-            "content-type": "application/json",
-            "x-api-key": apiKey,
-            "anthropic-version": "2023-06-01",
-            "anthropic-beta": "prompt-caching-2024-07-31",
-          },
-          body: JSON.stringify({
-            model: "claude-sonnet-4-6",
-            max_tokens: maxTokens,
-            stream: true,
-            system: [{ type: "text", text: activeSystem, cache_control: { type: "ephemeral" } }],
-            messages: [{ role: "user", content: activeUserMsg }],
-          }),
+        const ANTHROPIC_BODY = JSON.stringify({
+          model: "claude-sonnet-4-6",
+          max_tokens: maxTokens,
+          stream: true,
+          system: [{ type: "text", text: activeSystem, cache_control: { type: "ephemeral" } }],
+          messages: [{ role: "user", content: activeUserMsg }],
         });
+        const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-        if (!anthropicResp.ok) {
-          const status = anthropicResp.status;
-          console.error(`[generate-booklet] Anthropic ${status}`);
-          await w.write(sseError(status === 529 || status === 503 ? "overloaded_error" : "api_error"));
-          clearInterval(hb);
-          await w.close();
-          return;
+        // Retry transient Anthropic overload (529/503/429) — this is the main
+        // source of "sometimes works, sometimes doesn't". The 8s heartbeats keep
+        // the client's connection alive through the short backoffs, so a retry is
+        // invisible to the user. A real 270s timeout is NOT retried (it already
+        // consumed the budget).
+        let anthropicResp: Response | null = null;
+        for (let attempt = 1; attempt <= 3; attempt++) {
+          try {
+            const r = await fetch("https://api.anthropic.com/v1/messages", {
+              method: "POST",
+              signal: AbortSignal.timeout(270_000), // headroom before Deno's 300s hard limit
+              headers: {
+                "content-type": "application/json",
+                "x-api-key": apiKey,
+                "anthropic-version": "2023-06-01",
+                "anthropic-beta": "prompt-caching-2024-07-31",
+              },
+              body: ANTHROPIC_BODY,
+            });
+            if (r.ok) { anthropicResp = r; break; }
+            if ((r.status === 529 || r.status === 503 || r.status === 429) && attempt < 3) {
+              console.warn(`[generate-booklet] Anthropic ${r.status}, retry ${attempt}`);
+              await r.body?.cancel().catch(() => {});
+              await sleep(1200 * attempt);
+              continue;
+            }
+            console.error(`[generate-booklet] Anthropic ${r.status}`);
+            await w.write(sseError(r.status === 529 || r.status === 503 || r.status === 429 ? "overloaded_error" : "api_error"));
+            clearInterval(hb); await w.close(); return;
+          } catch (fetchErr) {
+            if (attempt < 3 && !(fetchErr instanceof Error && fetchErr.name === "TimeoutError")) {
+              console.warn(`[generate-booklet] Anthropic fetch error, retry ${attempt}`);
+              await sleep(1200 * attempt);
+              continue;
+            }
+            throw fetchErr;
+          }
         }
+        if (!anthropicResp) { clearInterval(hb); await w.close(); return; }
 
         const reader = anthropicResp.body!.getReader();
         while (true) {

@@ -299,31 +299,51 @@ ${notes ? `הוראות נוספות מהמורה: ${esc(notes)}` : ""}
 
     (async () => {
       try {
-        const anthropicResp = await fetch("https://api.anthropic.com/v1/messages", {
-          method: "POST",
-          signal: AbortSignal.timeout(270_000),
-          headers: {
-            "content-type": "application/json",
-            "x-api-key": apiKey,
-            "anthropic-version": "2023-06-01",
-            "anthropic-beta": "prompt-caching-2024-07-31",
-          },
-          body: JSON.stringify({
-            model: "claude-sonnet-4-6",
-            max_tokens: maxTokens,
-            stream: true,
-            system: [{ type: "text", text: JEWISH_SYSTEM, cache_control: { type: "ephemeral" } }],
-            messages: [{ role: "user", content: userMsg }],
-          }),
+        const ANTHROPIC_BODY = JSON.stringify({
+          model: "claude-sonnet-4-6",
+          max_tokens: maxTokens,
+          stream: true,
+          system: [{ type: "text", text: JEWISH_SYSTEM, cache_control: { type: "ephemeral" } }],
+          messages: [{ role: "user", content: userMsg }],
         });
+        const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-        if (!anthropicResp.ok) {
-          console.error(`[generate-jewish] Anthropic ${anthropicResp.status}`);
-          await w.write(sseError(anthropicResp.status === 529 || anthropicResp.status === 503 ? "overloaded_error" : "api_error"));
-          clearInterval(hb);
-          await w.close();
-          return;
+        // Retry transient Anthropic overload (529/503/429) up to 3 attempts;
+        // heartbeats keep the client alive through the backoffs.
+        let anthropicResp: Response | null = null;
+        for (let attempt = 1; attempt <= 3; attempt++) {
+          try {
+            const r = await fetch("https://api.anthropic.com/v1/messages", {
+              method: "POST",
+              signal: AbortSignal.timeout(270_000),
+              headers: {
+                "content-type": "application/json",
+                "x-api-key": apiKey,
+                "anthropic-version": "2023-06-01",
+                "anthropic-beta": "prompt-caching-2024-07-31",
+              },
+              body: ANTHROPIC_BODY,
+            });
+            if (r.ok) { anthropicResp = r; break; }
+            if ((r.status === 529 || r.status === 503 || r.status === 429) && attempt < 3) {
+              console.warn(`[generate-jewish] Anthropic ${r.status}, retry ${attempt}`);
+              await r.body?.cancel().catch(() => {});
+              await sleep(1200 * attempt);
+              continue;
+            }
+            console.error(`[generate-jewish] Anthropic ${r.status}`);
+            await w.write(sseError(r.status === 529 || r.status === 503 || r.status === 429 ? "overloaded_error" : "api_error"));
+            clearInterval(hb); await w.close(); return;
+          } catch (fetchErr) {
+            if (attempt < 3 && !(fetchErr instanceof Error && fetchErr.name === "TimeoutError")) {
+              console.warn(`[generate-jewish] Anthropic fetch error, retry ${attempt}`);
+              await sleep(1200 * attempt);
+              continue;
+            }
+            throw fetchErr;
+          }
         }
+        if (!anthropicResp) { clearInterval(hb); await w.close(); return; }
 
         const reader = anthropicResp.body!.getReader();
         while (true) {
