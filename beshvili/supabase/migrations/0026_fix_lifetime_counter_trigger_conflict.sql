@@ -20,16 +20,21 @@
 --
 -- FIX
 -- ---
--- The increment trigger sets a transaction-local marker before its UPDATE; the
--- guard treats that marker as a trusted internal write and allows it. A normal
--- REST PATCH from a user cannot set this marker, so the anti-tampering protection
--- added in 0024 (users can't reset their own lifetime quota) stays fully intact.
+-- Distinguish a *nested* write (one trigger updating profiles from inside another
+-- trigger — i.e. the trusted lifetime-counter increment) from a *direct* user
+-- REST write, using pg_trigger_depth():
+--   * Direct user PATCH /profiles  → guard runs at trigger depth 1 → enforce.
+--   * Counter trigger's UPDATE     → guard runs nested at depth > 1 → allow.
+-- A user cannot reach depth > 1 on a profiles UPDATE through PostgREST (they can't
+-- invoke internal triggers), so the anti-tampering protection from 0024 (users
+-- cannot reset their own lifetime quota / rate-limit stamp) stays fully intact.
+-- This avoids a sticky transaction-local GUC, which would otherwise stay set for
+-- the remainder of the transaction and could whitelist a later same-tx write.
 
--- 1. Increment trigger flags its own write as trusted (transaction-local).
+-- 1. Increment trigger keeps its simple form (the UPDATE is what the guard must allow).
 create or replace function public.increment_booklet_lifetime_count()
 returns trigger language plpgsql security definer set search_path = public as $$
 begin
-  perform set_config('app.trusted_counter_write', 'on', true); -- local to this tx
   update public.profiles
      set total_booklets_created = total_booklets_created + 1
    where id = new.user_id;
@@ -37,7 +42,7 @@ begin
 end;
 $$;
 
--- 2. Guard allows the trusted internal write; still blocks direct user tampering.
+-- 2. Guard allows nested (trigger-originated) writes; still blocks direct user writes.
 create or replace function public.prevent_plan_self_update()
 returns trigger language plpgsql security definer
 set search_path = public as $$
@@ -49,9 +54,10 @@ begin
     return new;
   end if;
 
-  -- Trusted internal write from the lifetime-counter trigger → allowed.
-  -- Users cannot set this GUC through PostgREST, so quota tampering stays blocked.
-  if coalesce(current_setting('app.trusted_counter_write', true), '') = 'on' then
+  -- Nested write from another trigger (e.g. the lifetime-counter increment).
+  -- Users cannot reach depth > 1 on a profiles UPDATE via REST, so quota
+  -- tampering stays blocked while the internal counter update is permitted.
+  if pg_trigger_depth() > 1 then
     return new;
   end if;
 
