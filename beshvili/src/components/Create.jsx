@@ -334,7 +334,9 @@ export default function Create({ onSaved, remaining, isPro, active = true, bookl
     // minutes (we've seen 185s+) with zero progress. Bail out and let the catch
     // below auto-retry, instead of spinning forever.
     const DEAD_CONN_MS     = 30000; // no bytes at all (not even a heartbeat) → dead connection
-    const CONTENT_STALL_MS = 60000; // connection alive but zero new HTML → stalled generation
+    const CONTENT_STALL_MS = 90000; // alive but zero new HTML → stalled. 90s headroom so a slow
+                                    // first token under load isn't false-aborted (which would
+                                    // abandon a paid gen mid-flight and retry = double cost).
     let lastContentAt = Date.now();
     try {
       while (true) {

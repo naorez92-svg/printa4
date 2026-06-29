@@ -16,6 +16,7 @@ export default function PublicBooklet({ token }) {
   const [error, setError]     = useState(null);
   const [scale, setScale]     = useState(1);
   const [iframeHeight, setIframeHeight] = useState(A4_H);
+  const [printHint, setPrintHint] = useState(false); // arrived via ?print=1 — nudge to tap print
   const containerRef = useRef(null); // outer div — measures available width
   const iframeRef = useRef(null);
 
@@ -41,6 +42,9 @@ export default function PublicBooklet({ token }) {
   useEffect(() => {
     if (!booklet || IS_INAPP) return;
     if (!new URLSearchParams(window.location.search).has("print")) return;
+    // Show the nudge regardless — the auto-print popup is often blocked (no user
+    // gesture), so the visible 'הדפס' button is the reliable path.
+    setPrintHint(true);
     const t = setTimeout(() => openAndPrint("auto", true), 600);
     return () => clearTimeout(t);
   }, [booklet]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -186,9 +190,12 @@ export default function PublicBooklet({ token }) {
         </div>
 
 
+        {printHint && (
+          <p className="text-center text-sm text-grow font-semibold animate-pulse">👇 לחצי "הדפס / שמור PDF" כדי לשמור את החוברת</p>
+        )}
         <button
           onClick={() => openAndPrint("footer")}
-          className="w-full flex items-center justify-center gap-2 bg-gradient-to-l from-grow to-grow/80 text-white rounded-2xl p-4 font-display font-semibold text-base hover:opacity-90 transition-opacity shadow-md"
+          className={`w-full flex items-center justify-center gap-2 bg-gradient-to-l from-grow to-grow/80 text-white rounded-2xl p-4 font-display font-semibold text-base hover:opacity-90 transition-opacity shadow-md ${printHint ? "ring-4 ring-grow/30" : ""}`}
         >
           <span className="text-xl">🖨️</span>
           הדפס / שמור PDF
