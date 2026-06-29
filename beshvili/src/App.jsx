@@ -3,6 +3,7 @@ import { supabase } from "./lib/supabase";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import PublicBooklet from "./pages/PublicBooklet";
+import AccessibilityWidget from "./components/AccessibilityWidget";
 import { track, pageView, identify } from "./hooks/useEvents";
 
 // /b/:token — public booklet share page (no auth needed)
@@ -66,6 +67,10 @@ function AuthApp() {
 }
 
 export default function App() {
-  if (shareMatch) return <PublicBooklet token={shareMatch[1]} />;
-  return <AuthApp />;
+  return (
+    <>
+      {shareMatch ? <PublicBooklet token={shareMatch[1]} /> : <AuthApp />}
+      <AccessibilityWidget />
+    </>
+  );
 }
