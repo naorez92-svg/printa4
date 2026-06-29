@@ -197,8 +197,14 @@ Deno.serve(async (req) => {
           headers: { "Authorization": `Bearer ${resendKey}`, "Content-Type": "application/json" },
           body: JSON.stringify(chunk),
         });
-        if (res.ok) sent += chunk.length;
-        else errors.push(`batch ${Math.floor(i / 100)}: ${(await res.text()).slice(0, 200)}`);
+        if (res.ok) {
+          // Count messages Resend actually accepted (the data[] array), not the
+          // chunk size — a 200 can still drop individual addresses.
+          const out = await res.json().catch(() => null);
+          sent += Array.isArray(out?.data) ? out.data.length : chunk.length;
+        } else {
+          errors.push(`batch ${Math.floor(i / 100)}: ${(await res.text()).slice(0, 200)}`);
+        }
       } catch (e) {
         errors.push(`batch ${Math.floor(i / 100)}: ${String(e instanceof Error ? e.message : e)}`);
       }
@@ -287,7 +293,7 @@ Deno.serve(async (req) => {
           שמנו לב שלא יצרת חוברת עדיין — ייתכן שהיה עומס על האפליקציה בגלל גל כניסות גדול היום, ואנחנו מצטערים אם נתקעת.
         </p>
         <div style="background:#fff8e1;border-right:4px solid #F4A02C;border-radius:8px;padding:16px;margin:0 0 16px;text-align:right;">
-          <p style="margin:0 0 10px;color:#20184A;font-weight:bold;font-size:15px;">🚀 כך יוצרים חוברת ב-3 לחיצו—:">
+          <p style="margin:0 0 10px;color:#20184A;font-weight:bold;font-size:15px;">🚀 כך יוצרים חוברת ב-3 לחיצות:</p>
           <ol style="margin:0;padding-right:20px;color:#555;font-size:14px;line-height:2.2;">
             <li>לחצי על נושא (למשל <strong>"➕ כיתה ב — חיבור"</strong>) — הטופס יתמלא לבד</li>
             <li>בדקי שהכל נכון ושנו אם צריך</li>

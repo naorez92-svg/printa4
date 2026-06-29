@@ -1089,7 +1089,9 @@ export default function Create({ onSaved, remaining, isPro, active = true, bookl
           <p className="text-center text-xs text-magic/70 mt-2 font-medium">
             {mode === "free"  ? "👆 כתוב/כתבי מה ליצור כדי להמשיך"
               : mode === "exam"  ? (!examSubject ? "👆 בחר/י מקצוע" : "👆 כתוב/כתבי את נושא המבחן")
-              : mode === "form"  ? (!f.childName.trim() ? "👆 מלא/י שם ילד/ה ומה לתרגל" : "👆 כתוב/כתבי מה לתרגל")
+              : mode === "form"  ? (!f.childName.trim() && !f.goal.trim() ? "👆 מלא/י שם ילד/ה ומה לתרגל"
+                                    : !f.childName.trim() ? "👆 מלא/י שם ילד/ה"
+                                    : "👆 כתוב/כתבי מה לתרגל")
               : "👆 בחר/י נושא למעלה או כתוב/כתבי מה לתרגל — ואז 'צור'"}
           </p>
         )}
