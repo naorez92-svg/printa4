@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { track } from "../hooks/useEvents";
 import { supabase } from "../lib/supabase";
-import { IS_INAPP, openExternal } from "../lib/inapp";
+import { IS_INAPP, IS_ANDROID, openExternal } from "../lib/inapp";
 
 const A4_PX = 794;
 const A4_H  = 1123; // A4 at 96dpi: 297mm × (96/25.4) ≈ 1123px
@@ -80,17 +80,29 @@ export default function Preview({ html, onReset, shareToken, title, active = tru
     setTimeout(() => URL.revokeObjectURL(url), 120000);
   };
 
-  const handlePrint = useCallback(() => {
+  const handlePrint = useCallback(async () => {
     track("booklet_printed", { context, isMobile, inapp: IS_INAPP });
     // Inside Facebook/Instagram in-app browsers window.print() is a no-op — the
-    // print system isn't exposed. Escape to the real browser: open this booklet's
-    // public page (which has a working print button) in Chrome/Safari. markPublic
-    // is fire-and-forget (don't await) so the click's user-activation stays alive
-    // for openExternal's clipboard write on iOS — same pattern as shareWhatsApp.
+    // print system isn't exposed. Escape to the real browser by opening this
+    // booklet's public page (/b/:token) in Chrome/Safari, where print works.
+    // The public page serves the booklet only when is_public=true, so it must be
+    // flipped first.
     if (IS_INAPP) {
       if (shareToken) {
-        markPublic();
-        openExternal(`${window.location.origin}/b/${shareToken}?print=1`);
+        const target = `${window.location.origin}/b/${shareToken}?print=1`;
+        if (IS_ANDROID) {
+          // The intent:// navigation cancels in-flight requests — so AWAIT the
+          // is_public flip before navigating, otherwise the new browser fetches
+          // the booklet before it's public and gets "not found".
+          await markPublic();
+          openExternal(target);
+        } else {
+          // iOS path only copies the link (no navigation), so nothing cancels the
+          // update — keep it fire-and-forget so the clipboard write stays inside
+          // the click's user-activation.
+          markPublic();
+          openExternal(target);
+        }
       } else {
         // No share link yet — at least get them into a real browser.
         openExternal(window.location.origin);
