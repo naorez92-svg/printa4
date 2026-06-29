@@ -120,6 +120,25 @@ export default function Login() {
   const [subjectVisible, setSubjectVisible] = useState(true);
   const [openFaq, setOpenFaq] = useState(null);
 
+  // Magic-link / OAuth errors come back in the URL (hash or query). Without this
+  // the user lands silently with no idea why login failed. Read it once, show a
+  // Hebrew message, and strip the params so a refresh is clean.
+  useEffect(() => {
+    const hash = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+    const qs   = new URLSearchParams(window.location.search);
+    const errCode = hash.get("error_code") || hash.get("error") || qs.get("error_code") || qs.get("error");
+    const errDesc = hash.get("error_description") || qs.get("error_description") || "";
+    if (!errCode) return;
+    const map = {
+      otp_expired: "הקישור פג תוקף — בקשי קישור חדש ולחצי עליו תוך כמה דקות 🙏",
+      access_denied: "הכניסה בוטלה — נסי שוב",
+    };
+    setError(map[errCode] || (errDesc ? decodeURIComponent(errDesc.replace(/\+/g, " ")) : "הכניסה נכשלה — נסי לבקש קישור חדש"));
+    setStep("email");
+    track("auth_redirect_error", { code: errCode });
+    try { window.history.replaceState(null, "", window.location.pathname); } catch { /* ignore */ }
+  }, []);
+
   useEffect(() => {
     const t = setInterval(() => {
       setSubjectVisible(false);
@@ -185,7 +204,9 @@ export default function Login() {
     setHeroLoading(false);
     if (err) {
       const msg = err.message || "";
-      const alreadySent = /after \d+ second/i.test(msg) || /rate|security/i.test(msg);
+      // Only a genuine throttle (HTTP 429 / "after N seconds") means the link was
+      // already sent. Any OTHER error must surface, not be silently swallowed as "sent".
+      const alreadySent = err.status === 429 || /after \d+ second/i.test(msg);
       if (alreadySent) {
         setHeroSent(true);
       } else {
@@ -210,7 +231,9 @@ export default function Login() {
     setLoading(false);
     if (err) {
       const msg = err.message || "";
-      const alreadySent = /after \d+ second/i.test(msg) || /rate|security/i.test(msg);
+      // Only a genuine throttle (429 / "after N seconds") means the link is already
+      // out. Every other error must be shown, not hidden behind the verify screen.
+      const alreadySent = err.status === 429 || /after \d+ second/i.test(msg);
       if (alreadySent) {
         track("auth_email_rate_limited", {});
         setStep("verify");
