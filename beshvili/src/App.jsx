@@ -4,6 +4,7 @@ import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import PublicBooklet from "./pages/PublicBooklet";
 import AccessibilityWidget from "./components/AccessibilityWidget";
+import InAppBrowserBanner from "./components/InAppBrowserBanner";
 import { track, pageView, identify } from "./hooks/useEvents";
 
 // /b/:token — public booklet share page (no auth needed)
@@ -69,6 +70,7 @@ function AuthApp() {
 export default function App() {
   return (
     <>
+      <InAppBrowserBanner />
       {shareMatch ? <PublicBooklet token={shareMatch[1]} /> : <AuthApp />}
       <AccessibilityWidget />
     </>
