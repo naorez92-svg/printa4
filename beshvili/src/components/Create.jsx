@@ -279,9 +279,15 @@ export default function Create({ onSaved, remaining, isPro, active = true, bookl
       }
       if (code === "rate_limited") { const wait = errData?.wait ?? 60; trackError("rate_limited", { wait }); setError(`rate:${wait}`); return; }
       if (code === "ai_overloaded") { trackError("ai_overloaded"); setError("generic:השרת עמוס כרגע — נסי שוב בעוד דקה 🙏"); return; }
-      if (code === "ai_timeout")    { trackError("ai_timeout"); setError("generic:הייצור לקח יותר מדי זמן — נסי עם פחות עמודים"); return; }
+      if (code === "ai_timeout")    { trackError("ai_timeout", { inapp: useNoStream }); setError(useNoStream
+        ? "generic:הייצור ארוך מדי לדפדפן של פייסבוק — פתחי בדפדפן (הכפתור למעלה) או בחרי פחות עמודים 🙏"
+        : "generic:הייצור לקח יותר מדי זמן — נסי עם פחות עמודים"); return; }
+      if (code === "ai_error")      { trackError("ai_error"); setError("generic:השרת נתקל בבעיה רגעית — נסי שוב 🙏"); return; }
+      if (code === "internal_error"){ trackError("internal_error", { inapp: useNoStream }); setError(useNoStream
+        ? "generic:הייצור ארוך מדי לדפדפן של פייסבוק — פתחי בדפדפן (הכפתור למעלה) 🙏"
+        : "generic:שגיאה זמנית בשרת — נסי שוב 🙏"); return; }
       if (resp.status === 401)      { trackError("session_expired"); setError("generic:הסשן פג תוקף — רענן את הדף וכנסי מחדש"); return; }
-      trackError("server_error", { status: resp.status });
+      trackError("server_error", { status: resp.status, inapp: useNoStream });
       const detail = code || (rawBody.length < 80 ? rawBody : rawBody.substring(0, 60) + "…");
       setError(`generic:שגיאת שרת ${resp.status}${detail ? ` — ${detail}` : ""}`);
       return;

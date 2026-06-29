@@ -211,6 +211,8 @@ export default function JewishCreate({ onSaved, remaining, isPro, bookletCount =
       creatingRef.current = false;
       if (ctrl.signal.aborted) return;
       const inApp = /FBAN|FBAV|Instagram|Line\/|WhatsApp|MicroMessenger|; wv\)/i.test(navigator.userAgent || "");
+      // Instrument: capture network failures so the admin panel shows what broke.
+      track("jewish_error", { kind: "network", inapp: inApp, noStream: useNoStream, msg: String(e?.message ?? e).slice(0, 120) });
       setError(inApp
         ? "generic:כדי ליצור חומר, פתחי את הדף בדפדפן רגיל (Chrome/Safari) — לא מתוך אפליקציה כמו וואטסאפ/אינסטגרם 🙏"
         : `generic:שגיאת רשת — בדקי את החיבור ונסי שוב`);
@@ -224,12 +226,21 @@ export default function JewishCreate({ onSaved, remaining, isPro, bookletCount =
       const code = errData?.error;
       setLoading(false);
       creatingRef.current = false;
+      // Instrument: exact status + server code + whether the user was in-app, so
+      // "שגיאת שרת" reports become diagnosable in the admin panel.
+      track("jewish_error", { kind: "server", status: resp.status, code: code ?? null, inapp: useNoStream });
       if (code === "quota_exceeded") { const monthly = errData?.period === "monthly"; setError(monthly ? "quota_monthly" : "quota"); return; }
       if (code === "rate_limited") { setError(`rate:${errData?.wait ?? 60}`); return; }
       if (code === "ai_overloaded") { setError("generic:השרת עמוס כרגע — נסי שוב בעוד דקה 🙏"); return; }
-      if (code === "ai_timeout")    { setError("generic:הייצור לקח יותר מדי זמן — נסי עם פחות עמודים"); return; }
+      if (code === "ai_timeout")    { setError(useNoStream
+        ? "generic:הייצור ארוך מדי לדפדפן של פייסבוק — פתחי בדפדפן (הכפתור למעלה) או בחרי פחות עמודים 🙏"
+        : "generic:הייצור לקח יותר מדי זמן — נסי עם פחות עמודים"); return; }
+      if (code === "ai_error")      { setError("generic:השרת נתקל בבעיה רגעית — נסי שוב 🙏"); return; }
+      if (code === "internal_error"){ setError(useNoStream
+        ? "generic:הייצור ארוך מדי לדפדפן של פייסבוק — פתחי בדפדפן (הכפתור למעלה) 🙏"
+        : "generic:שגיאה זמנית בשרת — נסי שוב 🙏"); return; }
       if (resp.status === 401)      { setError("generic:הסשן פג תוקף — רענן את הדף"); return; }
-      setError(`generic:שגיאת שרת ${resp.status}`);
+      setError(`generic:שגיאת שרת ${resp.status} — נסי שוב 🙏`);
       return;
     }
 
@@ -246,7 +257,8 @@ export default function JewishCreate({ onSaved, remaining, isPro, bookletCount =
       } catch (e) {
         if (ctrl.signal.aborted) { creatingRef.current = false; return; }
         setLoading(false); creatingRef.current = false;
-        setError("generic:לא הצלחנו לקבל את החומר — נסי שוב 🙏");
+        track("jewish_error", { kind: "nostream_parse", inapp: true, msg: String(e?.message ?? e).slice(0, 120) });
+        setError("generic:לא הצלחנו לקבל את החומר — פתחי בדפדפן (הכפתור למעלה) ונסי שוב 🙏");
         return;
       }
     } else {
