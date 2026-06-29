@@ -186,6 +186,13 @@ export default function Create({ onSaved, remaining, isPro, active = true, bookl
 
     const quickText = `דף תרגיל מהיר${f.childName ? ` עבור ${f.childName.trim()}` : ""}${f.grade ? `, כיתה ${f.grade}` : ""}. נושא: ${f.goal.trim()}${effectiveWorld ? `, עולם תוכן: ${effectiveWorld}` : ""}. צור עמוד A4 אחד עם 8–12 תרגילים מגוונים ומהנים. ללא שער ורפלקציה. קוד HTML גולמי בלבד.`;
 
+    // In-app browsers (Facebook/Instagram/etc. webview) can't read an SSE stream —
+    // their fetch fails as "network". Detect them and request a single non-stream
+    // JSON response instead, so generation works without leaving the in-app browser.
+    const ua = navigator.userAgent || "";
+    const inApp = /FBAN|FBAV|Instagram|Line\/|WhatsApp|MicroMessenger|Snapchat|Pinterest|TikTok|musical_ly|; wv\)/i.test(ua);
+    const useNoStream = inApp;
+
     const body = mode === "free"
       ? { freeText: freeText.trim(), pageCount, withAnswerKey }
       : mode === "quick"
@@ -193,6 +200,7 @@ export default function Create({ onSaved, remaining, isPro, active = true, bookl
       : mode === "exam"
       ? { examMode: true, examGrade, examSubject, examTopic, noEmojis, pageCount, withAnswerKey }
       : { ...f, world: effectiveWorld, pageCount, withAnswerKey, ...(photoUrl ? { childPhotoUrl: photoUrl } : {}) };
+    if (useNoStream) body.noStream = true;
 
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) {
@@ -223,11 +231,7 @@ export default function Create({ onSaved, remaining, isPro, active = true, bookl
       creatingRef.current = false;
       if (ctrl.signal.aborted) { setLoading(false); return; } // unmounted — don't show error
       // ROOT-CAUSE DIAGNOSTICS: capture WHAT actually failed instead of guessing.
-      // The "network" errors had no detail — record the real error, connectivity,
-      // and whether this is an in-app browser (WhatsApp/Instagram/etc.) whose
-      // webview commonly blocks streaming fetches.
-      const ua = navigator.userAgent || "";
-      const inApp = /FBAN|FBAV|Instagram|Line\/|WhatsApp|MicroMessenger|Snapchat|Pinterest|TikTok|musical_ly|; wv\)/i.test(ua);
+      // (ua/inApp are computed once near the top of create().)
       const diag = {
         msg: String(e?.message || e).slice(0, 160),
         online: navigator.onLine,
@@ -288,16 +292,31 @@ export default function Create({ onSaved, remaining, isPro, active = true, bookl
       if ("wakeLock" in navigator) wakeLock = await navigator.wakeLock.request("screen");
     } catch {}
 
-    // Read SSE stream — Anthropic sends content_block_delta events with text chunks
-    const reader = resp.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = "";
     let htmlAccumulated = "";
-    let updateTimer = 0;
     let streamAborted = false;
     let streamHadError = false;
     let streamErrorMsg = null;
     let streamErrType = null;
+
+    if (useNoStream) {
+      // In-app browser path: the server returns the whole booklet in one JSON.
+      try {
+        const j = await resp.json();
+        htmlAccumulated = j?.html ?? "";
+      } catch (e) {
+        wakeLock?.release().catch(() => {});
+        if (ctrl.signal.aborted) { creatingRef.current = false; return; }
+        setLoading(false); creatingRef.current = false;
+        trackError("nostream_parse_failed", { msg: String(e).slice(0, 120) });
+        setError("generic:לא הצלחנו לקבל את החוברת — נסי שוב 🙏");
+        return;
+      }
+    } else {
+    // Read SSE stream — Anthropic sends content_block_delta events with text chunks
+    const reader = resp.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    let updateTimer = 0;
 
     try {
       while (true) {
@@ -363,6 +382,7 @@ export default function Create({ onSaved, remaining, isPro, active = true, bookl
         return;
       }
     }
+    } // end streaming branch
 
     wakeLock?.release().catch(() => {});
     setLoading(false);

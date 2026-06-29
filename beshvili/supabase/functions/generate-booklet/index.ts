@@ -459,6 +459,7 @@ Deno.serve(async (req) => {
     const maxPages = isTeacher ? TEACHER_MAX_PAGES : isParent ? PARENT_MAX_PAGES : FREE_MAX_PAGES;
     const pageCount = Math.min(maxPages, Math.max(1, Number.isInteger(body.pageCount) ? body.pageCount : 5));
     const withAnswerKey = body.withAnswerKey === true;
+    const noStream = body.noStream === true; // in-app browsers (FB/IG webview)
 
     // Exam-mode params
     const examMode   = body.examMode === true;
@@ -540,6 +541,46 @@ Deno.serve(async (req) => {
     // Rate-limit timestamp already stamped atomically above (step 3 CAS).
     const monthlyLimit = isAdmin ? -1 : isTeacher ? TEACHER_MONTHLY_LIMIT : isParent ? PARENT_MONTHLY_LIMIT : FREE_BOOKLET_LIMIT;
     const remaining = isAdmin ? -1 : monthlyLimit - (isPaid ? usedMonthly : usedTotal) - 1;
+
+    // ── 6.5 No-stream mode (in-app browsers: Facebook/Instagram webview) ───────
+    // Their webview can't read an SSE/streaming response, so the client's fetch
+    // fails as "network". Generate the whole booklet server-side and return it in
+    // ONE JSON response. Errors come back as non-200 + {error} so the client's
+    // existing HTTP-error handling (quota/overload/timeout) covers them.
+    if (noStream) {
+      const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+      try {
+        for (let attempt = 1; attempt <= 3; attempt++) {
+          const r = await fetch("https://api.anthropic.com/v1/messages", {
+            method: "POST",
+            signal: AbortSignal.timeout(270_000),
+            headers: { "content-type": "application/json", "x-api-key": apiKey, "anthropic-version": "2023-06-01", "anthropic-beta": "prompt-caching-2024-07-31" },
+            body: JSON.stringify({
+              model: "claude-sonnet-4-6",
+              max_tokens: maxTokens,
+              system: [{ type: "text", text: activeSystem, cache_control: { type: "ephemeral" } }],
+              messages: [{ role: "user", content: activeUserMsg }],
+            }),
+          });
+          if (r.ok) {
+            const data = await r.json();
+            const html = (data?.content ?? []).filter((b: { type: string }) => b.type === "text").map((b: { text: string }) => b.text).join("");
+            return new Response(JSON.stringify({ html, remaining }), { status: 200, headers: cors });
+          }
+          if ((r.status === 529 || r.status === 503 || r.status === 429) && attempt < 3) {
+            await r.body?.cancel().catch(() => {});
+            await sleep(1200 * attempt);
+            continue;
+          }
+          console.error(`[generate-booklet] no-stream Anthropic ${r.status}`);
+          return new Response(JSON.stringify({ error: r.status === 529 || r.status === 503 ? "ai_overloaded" : "ai_error" }), { status: 503, headers: cors });
+        }
+        return new Response(JSON.stringify({ error: "ai_overloaded" }), { status: 503, headers: cors });
+      } catch (e) {
+        const code = e instanceof Error && e.name === "TimeoutError" ? "ai_timeout" : "internal_error";
+        return new Response(JSON.stringify({ error: code }), { status: 500, headers: cors });
+      }
+    }
 
     // ── 7. Stream to client with keep-alive heartbeats ─────────────────────────
     // CRITICAL: we return the SSE stream IMMEDIATELY and call Anthropic *inside*
