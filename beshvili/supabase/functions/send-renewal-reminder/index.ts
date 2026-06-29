@@ -75,12 +75,26 @@ Deno.serve(async (req) => {
   const emailByUserId: Record<string, string> = {};
   (authData?.users ?? []).forEach(u => { if (u.email) emailByUserId[u.id] = u.email; });
 
+  // Unsubscribe state (migration 0028) — separate, graceful query.
+  const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
+  const unsubByUser: Record<string, { off: boolean; token: string | null }> = {};
+  {
+    const { data: uData, error: uErr } = await admin
+      .from("profiles").select("id, unsubscribed_at, unsubscribe_token").in("id", userIds);
+    if (!uErr && uData) uData.forEach((p: { id: string; unsubscribed_at: string | null; unsubscribe_token: string | null }) => {
+      unsubByUser[p.id] = { off: !!p.unsubscribed_at, token: p.unsubscribe_token };
+    });
+  }
+
   let sent = 0;
   const errors: string[] = [];
 
   for (const profile of pendingProfiles) {
     const email = emailByUserId[profile.id];
     if (!email) continue;
+    if (unsubByUser[profile.id]?.off) continue; // respect opt-out
+    const unsubTok  = unsubByUser[profile.id]?.token;
+    const unsubLink = unsubTok ? ` · <a href="${SUPABASE_URL}/functions/v1/unsubscribe?token=${unsubTok}" style="color:#aaa;">הסרה מרשימת תפוצה</a>` : "";
 
     const html = `
 <!DOCTYPE html>
@@ -109,7 +123,7 @@ Deno.serve(async (req) => {
       </a>
     </div>
     <p style="color:#aaa;font-size:11px;text-align:center;margin:0;">
-      בשבילי · <a href="mailto:naorez92@gmail.com" style="color:#aaa;">צרי קשר</a>
+      בשבילי · <a href="mailto:naorez92@gmail.com" style="color:#aaa;">צרי קשר</a>${unsubLink}
     </p>
   </div>
 </body>
@@ -126,6 +140,7 @@ Deno.serve(async (req) => {
         to: [email],
         subject: "חידוש המנוי שלך — 5 ימים נשארו 🚀",
         html,
+        ...(unsubTok ? { headers: { "List-Unsubscribe": `<${SUPABASE_URL}/functions/v1/unsubscribe?token=${unsubTok}>`, "List-Unsubscribe-Post": "List-Unsubscribe=One-Click" } } : {}),
       }),
     });
 
