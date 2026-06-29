@@ -169,9 +169,11 @@ export default function Preview({ html, onReset, shareToken, title, active = tru
   // Flip the booklet to public the first time it's actually shared (fire-and-forget
   // so the share window opens inside the click gesture and isn't popup-blocked).
   const markPublic = () => {
-    if (!bookletId) return Promise.resolve();
+    if (!bookletId) return Promise.resolve(null);
+    // Return the error (instead of swallowing it) so share/copy paths can warn the
+    // user rather than handing out a link that will 404.
     return supabase.from("booklets").update({ is_public: true }).eq("id", bookletId)
-      .then(({ error }) => { if (error) console.error("markPublic error:", error); });
+      .then(({ error }) => { if (error) console.error("markPublic error:", error); return error ?? null; });
   };
 
   const shareWhatsApp = () => {
@@ -193,8 +195,8 @@ export default function Preview({ html, onReset, shareToken, title, active = tru
   const copyShareLink = useCallback(async () => {
     if (!shareToken) return;
     track("share_link_copied", { context });
-    markPublic();
     const link = `${window.location.origin}/b/${shareToken}`;
+    // Copy first (stays in the user gesture), then confirm the booklet is public.
     try {
       await navigator.clipboard.writeText(link);
     } catch {
@@ -205,9 +207,16 @@ export default function Preview({ html, onReset, shareToken, title, active = tru
       document.execCommand("copy");
       document.body.removeChild(el);
     }
+    const pubErr = await markPublic();
+    if (pubErr) {
+      // The link won't open for the recipient if the publish failed — say so
+      // instead of letting the user hand out a dead link.
+      alert("הקישור הועתק, אך לא הצלחנו להפעיל אותו לשיתוף — נסי שוב כדי שהקישור יעבוד 🙏");
+      return;
+    }
     setCopied(true);
     setTimeout(() => setCopied(false), 2500);
-  }, [shareToken]);
+  }, [shareToken]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const downloadHtml = () => {
     track("booklet_html_downloaded", { context });
