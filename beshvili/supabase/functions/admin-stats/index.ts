@@ -113,15 +113,21 @@ Deno.serve(async (req) => {
   // (never tried). A 0-booklet user with startedCount > 0 generated something that
   // never reached the DB — a real failure worth investigating.
   const startedByUser: Record<string, number> = {};
-  const errorByUser:   Record<string, { count: number; lastType: string | null }> = {};
+  const errorByUser:   Record<string, { count: number; lastType: string | null; lastInapp: boolean; lastBuild: string | null }> = {};
   (lifecycleEvents ?? []).forEach((e: { event: string; user_id: string | null; metadata: Record<string, unknown> | null }) => {
     if (!e.user_id) return;
     if (e.event === "booklet_started") {
       startedByUser[e.user_id] = (startedByUser[e.user_id] ?? 0) + 1;
     } else if (e.event === "booklet_error") {
-      const prev = errorByUser[e.user_id] ?? { count: 0, lastType: null };
+      const prev = errorByUser[e.user_id] ?? { count: 0, lastType: null, lastInapp: false, lastBuild: null };
       // events come ordered newest-first, so the first error seen is the latest
-      errorByUser[e.user_id] = { count: prev.count + 1, lastType: prev.lastType ?? ((e.metadata?.type as string) ?? "unknown") };
+      const isLatest = prev.lastType === null;
+      errorByUser[e.user_id] = {
+        count: prev.count + 1,
+        lastType:  prev.lastType  ?? ((e.metadata?.type as string) ?? "unknown"),
+        lastInapp: isLatest ? (e.metadata?.inapp === true) : prev.lastInapp,
+        lastBuild: isLatest ? ((e.metadata?.v as string) ?? null) : prev.lastBuild,
+      };
     }
   });
 
@@ -224,6 +230,8 @@ Deno.serve(async (req) => {
       startedCount: startedByUser[u.id] ?? 0,
       errorCount:   errorByUser[u.id]?.count ?? 0,
       lastErrorType: errorByUser[u.id]?.lastType ?? null,
+      lastErrorInapp: errorByUser[u.id]?.lastInapp ?? false,
+      lastErrorBuild: errorByUser[u.id]?.lastBuild ?? null,
     }));
 
   // ── Silent-failure detector ───────────────────────────────────────────────

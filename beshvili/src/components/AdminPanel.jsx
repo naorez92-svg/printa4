@@ -956,8 +956,10 @@ export default function AdminPanel() {
                     {/* 0 booklets: distinguish "tried & failed" from "never tried" */}
                     {u.bookletCount === 0 && (
                       (u.startedCount ?? 0) > 0
-                        ? <span className="block text-[9px] text-red-500 font-medium" title={u.lastErrorType ? `שגיאה אחרונה: ${u.lastErrorType}` : ""}>
+                        ? <span className="block text-[9px] text-red-500 font-medium" title={`${u.lastErrorType ? `שגיאה: ${u.lastErrorType}` : ""}${u.lastErrorBuild ? ` · v=${u.lastErrorBuild}` : ""}`}>
                             ✗ ניסתה {u.startedCount}× {u.lastErrorType && u.lastErrorType !== "quota" ? `(${u.lastErrorType})` : ""}
+                            {u.lastErrorInapp && <span className="block text-[8px] text-magic">📱 דפדפן מוטמע (פייסבוק/אינסטגרם)</span>}
+                            {u.lastErrorBuild && <span className="block text-[8px] text-ink/30">v={u.lastErrorBuild}</span>}
                           </span>
                         : <span className="block text-[9px] text-ink/25">לא ניסתה</span>
                     )}
