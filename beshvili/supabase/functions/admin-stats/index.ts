@@ -61,6 +61,7 @@ Deno.serve(async (req) => {
   const weekAgo      = new Date(now.getTime() - 7  * 24 * 60 * 60 * 1000).toISOString();
   const threeDaysAgo = new Date(now.getTime() - 3  * 24 * 60 * 60 * 1000).toISOString();
   const fourDaysAgo  = new Date(now.getTime() - 4  * 24 * 60 * 60 * 1000).toISOString();
+  const fourteenDaysAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000).toISOString();
   const todayStart   = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
   const monthStart   = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
   const monthAgo     = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString();
@@ -89,10 +90,12 @@ Deno.serve(async (req) => {
     admin.from("leads").select("name, phone, created_at").order("created_at", { ascending: false }).limit(15),
     admin.from("booklets").select("user_id, created_at"),
     admin.from("booklets").select("user_id, title, world, goal, created_at, difficulty_feedback").order("created_at", { ascending: false }).limit(200),
-    // Booklet-lifecycle events (last 30d) — used to tell "tried & failed" from "never tried"
+    // Booklet-lifecycle events (last 14d) — used to tell "tried & failed" from
+    // "never tried". Capped low: scanning tens of thousands of rows on every
+    // admin load is what tipped a cold boot over the function time limit.
     admin.from("events").select("event, user_id, metadata, created_at")
       .in("event", ["booklet_started", "booklet_error"])
-      .gte("created_at", monthAgo).order("created_at", { ascending: false }).limit(50000),
+      .gte("created_at", fourteenDaysAgo).order("created_at", { ascending: false }).limit(8000),
   ]);
 
   const users = authData?.users ?? [];
@@ -336,14 +339,17 @@ Deno.serve(async (req) => {
     versions:     [] as { v: string; count: number }[],
   };
   try {
-    // Explicit high limit so PostgREST's default ~1000-row cap doesn't silently
-    // truncate (and undercount) once anonymous tracking ramps event volume.
+    // Capped at 12k rows: pulling 100k event rows into the function on every
+    // admin load was the heavy work that made a cold boot exceed the time limit
+    // and return the opaque "Failed to send a request". 12k comfortably covers a
+    // 7-day window at current scale; if volume ever exceeds it the funnel slightly
+    // undercounts, which is acceptable next to the panel not loading at all.
     const { data: ev } = await admin
       .from("events")
       .select("event, user_id, anonymous_id, metadata, created_at")
       .gte("created_at", weekAgo)
       .order("created_at", { ascending: false })
-      .limit(100000);
+      .limit(12000);
     if (ev) {
       const uniqUser = (name: string) =>
         new Set(ev.filter(e => e.event === name).map(e => e.user_id).filter(Boolean)).size;
