@@ -155,7 +155,7 @@ export default function AdminPanel() {
   };
 
   const triggerBlast = async () => {
-    if (!window.confirm("שלח מייל הכרזה לכל 104 המשתמשים? (ללא קריטריונים — לכולם)")) return;
+    if (!window.confirm(`שלח מייל הכרזה לכל ${data.totalUsers ?? ""} המשתמשים? (ללא קריטריונים — לכולם)`)) return;
     setSendingBlast(true); setBlastResult("");
     const { data: res, error: err } = await supabase.functions.invoke("send-followup", { body: { blast: true } });
     setSendingBlast(false);

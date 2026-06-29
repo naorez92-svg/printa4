@@ -75,16 +75,42 @@ Deno.serve(async (req) => {
     }
     steps.push("✓ התחברות כמשתמש הבדיקה");
 
-    // 3. Insert a booklet AS THE USER — the exact path that broke. Fires the full
-    //    trigger chain (quota + lifetime counter + prevent_plan_self_update guard)
-    //    with auth.uid() = the test user.
+    // 2.5 Generate a REAL booklet through the function (no-stream mode) — tests
+    //     the whole pipeline end-to-end: auth + quota + rate-limit + Anthropic +
+    //     the in-app no-stream path. This is the path real users actually hit.
+    let genHtml = "";
+    try {
+      const genResp = await fetch(`${url}/functions/v1/generate-booklet`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${signIn.session.access_token}`, "apikey": anonKey },
+        body: JSON.stringify({ freeText: "דף תרגול קצר בחיבור עד 20 לכיתה א", pageCount: 1, withAnswerKey: false, noStream: true }),
+      });
+      if (!genResp.ok) {
+        const eb = await genResp.json().catch(() => ({}));
+        await admin.auth.admin.deleteUser(testUserId);
+        return json({ ok: false, stage: "generate", error: (eb as { error?: string })?.error ?? `HTTP ${genResp.status}`, steps });
+      }
+      genHtml = ((await genResp.json()) as { html?: string })?.html ?? "";
+      if (!genHtml.includes("<")) {
+        await admin.auth.admin.deleteUser(testUserId);
+        return json({ ok: false, stage: "generate", error: "התקבל HTML ריק מהפונקציה", steps });
+      }
+      steps.push(`✓ יצירת חוברת אמיתית דרך הפונקציה (Anthropic) — ${genHtml.length.toLocaleString()} תווים`);
+    } catch (genErr) {
+      await admin.auth.admin.deleteUser(testUserId);
+      return json({ ok: false, stage: "generate", error: String(genErr instanceof Error ? genErr.message : genErr), steps });
+    }
+
+    // 3. Insert the generated booklet AS THE USER — the exact path that broke.
+    //    Fires the full trigger chain (quota + lifetime counter +
+    //    prevent_plan_self_update guard) with auth.uid() = the test user.
     const userClient = createClient(url, anonKey, {
       auth: { persistSession: false },
       global: { headers: { Authorization: `Bearer ${signIn.session.access_token}` } },
     });
     const { data: ins, error: insErr } = await userClient
       .from("booklets")
-      .insert({ user_id: testUserId, title: "🧪 self-test", goal: "self-test", level: "medium", html: "<p>self-test</p>" })
+      .insert({ user_id: testUserId, title: "🧪 self-test", goal: "self-test", level: "medium", html: genHtml })
       .select("id")
       .single();
 
