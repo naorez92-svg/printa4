@@ -76,7 +76,7 @@ export default function Preview({ html, onReset, shareToken, title, active = tru
     const blob = new Blob([printHtml], { type: "text/html;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const w = window.open(url, "_blank");
-    if (!w) { track("popup_blocked", { action: "newtab" }); alert("אפשרי חלונות קופצים בדפדפן"); URL.revokeObjectURL(url); return; }
+    if (!w) { track("popup_blocked", { action: "newtab" }); alert("הדפדפן חסם את החלון הקופץ — אפשרי חלונות קופצים (pop-ups) בהגדרות הדפדפן ונסי שוב 🙏"); URL.revokeObjectURL(url); return; }
     setTimeout(() => URL.revokeObjectURL(url), 120000);
   };
 
@@ -113,7 +113,7 @@ export default function Preview({ html, onReset, shareToken, title, active = tru
     const blob = new Blob([printHtml], { type: "text/html;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const w = window.open(url, "_blank");
-    if (!w) { track("popup_blocked", { action: "print" }); alert("אפשרי חלונות קופצים בדפדפן"); URL.revokeObjectURL(url); return; }
+    if (!w) { track("popup_blocked", { action: "print" }); alert("הדפדפן חסם את החלון הקופץ — אפשרי חלונות קופצים (pop-ups) בהגדרות הדפדפן ונסי שוב 🙏"); URL.revokeObjectURL(url); return; }
     setTimeout(() => {
       try { w.focus(); w.print(); } catch {}
       setTimeout(() => URL.revokeObjectURL(url), 120000);

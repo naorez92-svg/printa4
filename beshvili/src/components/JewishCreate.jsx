@@ -116,6 +116,9 @@ export default function JewishCreate({ onSaved, remaining, isPro, bookletCount =
   const [error,   setError]   = useState(null);
   const [rateCountdown, setRateCountdown] = useState(null);
   const [saveWarning, setSaveWarning] = useState(false);
+  const [shareToken, setShareToken] = useState(null);
+  const [bookletId, setBookletId]   = useState(null);
+  const [bookletTitle, setBookletTitle] = useState(null);
 
   const streamAbortRef = useRef(null);
   const creatingRef    = useRef(false);
@@ -321,20 +324,25 @@ export default function JewishCreate({ onSaved, remaining, isPro, bookletCount =
     const outputLabel = OUTPUT_TYPES.find(o => o.id === outputType)?.label ?? outputType;
     const title = `${subject} כיתה ${grade} — ${effectiveTopic.substring(0, 50)}${streamAborted ? " (חלקי)" : ""} (${outputLabel})`;
 
-    const { error: insertErr } = await supabase.from("booklets").insert({
+    setBookletTitle(title);
+    const { data: inserted, error: insertErr } = await supabase.from("booklets").insert({
       user_id: session.user.id,
       title,
       goal: effectiveTopic.substring(0, 200),
       world: subject,
       level,
       html: generatedHtml,
-    });
+    }).select("id, share_token").single();
 
     if (insertErr) {
       setSaveWarning(true);
       track("jewish_save_failed", { message: insertErr.message });
-    } else if (streamAborted) {
-      setSaveWarning(true);
+    } else {
+      // Capture id + share_token so Preview's print/share (incl. the in-app
+      // browser escape to a real browser) can reach this booklet.
+      setBookletId(inserted?.id ?? null);
+      setShareToken(inserted?.share_token ?? null);
+      if (streamAborted) setSaveWarning(true);
     }
 
     track("jewish_completed", { subject, grade, topic: effectiveTopic, outputType, level, pageCount });
@@ -351,13 +359,14 @@ export default function JewishCreate({ onSaved, remaining, isPro, bookletCount =
             ⚠️ החומר נוצר בהצלחה אך לא נשמר בענן — הדפיסו עכשיו לפני שסוגרים
           </div>
         )}
-        <Preview html={html} />
-        <button
-          onClick={() => { setHtml(null); setSaveWarning(false); setError(null); }}
-          className="mt-4 w-full py-2.5 rounded-xl border border-ink/15 text-sm text-ink/50 hover:text-ink/70 hover:border-ink/25 transition-all"
-        >
-          ← צור חומר נוסף
-        </button>
+        <Preview
+          html={html}
+          shareToken={shareToken}
+          bookletId={bookletId}
+          title={bookletTitle}
+          context="jewish"
+          onReset={() => { setHtml(null); setSaveWarning(false); setError(null); setShareToken(null); setBookletId(null); setBookletTitle(null); }}
+        />
       </div>
     );
   }
