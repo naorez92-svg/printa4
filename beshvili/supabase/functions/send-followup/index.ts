@@ -197,8 +197,14 @@ Deno.serve(async (req) => {
           headers: { "Authorization": `Bearer ${resendKey}`, "Content-Type": "application/json" },
           body: JSON.stringify(chunk),
         });
-        if (res.ok) sent += chunk.length;
-        else errors.push(`batch ${Math.floor(i / 100)}: ${(await res.text()).slice(0, 200)}`);
+        if (res.ok) {
+          // Count messages Resend actually accepted (the data[] array), not the
+          // chunk size — a 200 can still drop individual addresses.
+          const out = await res.json().catch(() => null);
+          sent += Array.isArray(out?.data) ? out.data.length : chunk.length;
+        } else {
+          errors.push(`batch ${Math.floor(i / 100)}: ${(await res.text()).slice(0, 200)}`);
+        }
       } catch (e) {
         errors.push(`batch ${Math.floor(i / 100)}: ${String(e instanceof Error ? e.message : e)}`);
       }

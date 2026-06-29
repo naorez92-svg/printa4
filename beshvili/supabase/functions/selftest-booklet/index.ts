@@ -46,6 +46,17 @@ Deno.serve(async (req) => {
   const steps: string[] = [];
   let testUserId: string | null = null;
   try {
+    // Best-effort sweep: remove any orphaned test users left by a prior run whose
+    // cleanup failed, so throwaway accounts can never accumulate over time.
+    try {
+      const { data: existing } = await admin.auth.admin.listUsers({ perPage: 200 });
+      for (const u of existing?.users ?? []) {
+        if (u.email?.startsWith("selftest.") && u.email.endsWith("@beshvili.com")) {
+          await admin.auth.admin.deleteUser(u.id).catch(() => {});
+        }
+      }
+    } catch { /* sweep is best-effort */ }
+
     const email    = `selftest.${Date.now()}@beshvili.com`;
     const password = `${crypto.randomUUID()}Aa1!`;
 
