@@ -106,6 +106,27 @@ const TESTIMONIALS = [
   },
 ];
 
+// Supabase auth errors arrive in English ("Failed to fetch", "Network request
+// failed", "Email rate limit exceeded"…). Israeli users must never see a raw
+// English string, so map the common cases to Hebrew. Network/connectivity
+// failures are the most frequent in the field (flaky mobile data, in-app
+// browsers) and are exactly what reads as a confusing "שגיאת שרת".
+function friendlyAuthError(err) {
+  const msg = (err && err.message) || "";
+  if (/failed to fetch|network ?request failed|networkerror|load failed|fetch/i.test(msg)) {
+    return "בעיית תקשורת — בדקי את החיבור לאינטרנט ונסי שוב 🙏";
+  }
+  if (/invalid|not a valid email|unable to validate email/i.test(msg)) {
+    return "כתובת המייל לא תקינה — בדקי שוב";
+  }
+  if (/rate limit|too many/i.test(msg)) {
+    return "נשלחו יותר מדי בקשות — המתיני רגע ונסי שוב";
+  }
+  // A Hebrew message from Supabase (rare) or any unknown case: show it as-is
+  // only if it has Hebrew chars, otherwise a safe Hebrew fallback.
+  return /[֐-׿]/.test(msg) ? msg : "שגיאה בשליחה — נסי שנית";
+}
+
 export default function Login() {
   useEffect(() => { window.scrollTo(0, 0); }, []);
   const [email, setEmail] = useState("");
@@ -187,7 +208,7 @@ export default function Login() {
     });
     if (err) {
       track("auth_google_error", { error: err.message });
-      setError(err.message || "שגיאה בכניסה עם Google");
+      setError(friendlyAuthError(err));
       setLoading(false);
     }
   };
@@ -211,7 +232,7 @@ export default function Login() {
         setHeroSent(true);
       } else {
         track("auth_email_error", { error: msg, location: "hero" });
-        setHeroError(msg || "שגיאה בשליחה — נסי שנית");
+        setHeroError(friendlyAuthError(err));
       }
     } else {
       track("auth_email_sent", { method: "magic_link", location: "hero" });
@@ -239,7 +260,7 @@ export default function Login() {
         setStep("verify");
       } else {
         track("auth_email_error", { error: msg });
-        setError(msg || "שגיאה בשליחה — נסה שנית");
+        setError(friendlyAuthError(err));
       }
     } else {
       track("auth_email_sent", { method: "magic_link" });
