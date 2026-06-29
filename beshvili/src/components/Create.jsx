@@ -324,10 +324,23 @@ export default function Create({ onSaved, remaining, isPro, active = true, bookl
     let buffer = "";
     let updateTimer = 0;
 
+    // Stall guards: a hung Anthropic stream still keeps the HTTP connection alive
+    // via the server's keep-alive heartbeats, so without these the user can wait
+    // minutes (we've seen 185s+) with zero progress. Bail out and let the catch
+    // below auto-retry, instead of spinning forever.
+    const DEAD_CONN_MS     = 30000; // no bytes at all (not even a heartbeat) → dead connection
+    const CONTENT_STALL_MS = 60000; // connection alive but zero new HTML → stalled generation
+    let lastContentAt = Date.now();
     try {
       while (true) {
-        const { done, value } = await reader.read();
+        const readResult = await Promise.race([
+          reader.read(),
+          new Promise((res) => setTimeout(() => res("__dead__"), DEAD_CONN_MS)),
+        ]);
+        if (readResult === "__dead__") throw new Error("dead_connection");
+        const { done, value } = readResult;
         if (done) break;
+        const beforeLen = htmlAccumulated.length;
         buffer += decoder.decode(value, { stream: true });
         const lines = buffer.split("\n");
         buffer = lines.pop() ?? "";
@@ -356,6 +369,10 @@ export default function Create({ onSaved, remaining, isPro, active = true, bookl
           } catch {}
           if (streamHadError) break;
         }
+        // Progress check: reset the stall clock when new HTML arrived; otherwise
+        // a long gap with only heartbeats means the generation is stuck.
+        if (htmlAccumulated.length > beforeLen) lastContentAt = Date.now();
+        else if (Date.now() - lastContentAt > CONTENT_STALL_MS) throw new Error("content_stalled");
         if (streamHadError) break;
       }
     } catch (streamErr) {
