@@ -21,6 +21,11 @@ Deno.serve(async (req) => {
   const cors = getCors(req);
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
 
+  // Wrap the whole handler: a throw without this returns a 500 with NO CORS
+  // headers, which the browser/supabase-js surfaces as the opaque "Failed to
+  // send a request to the Edge Function". Catching it returns a readable,
+  // CORS-enabled error the admin (and we) can actually diagnose.
+  try {
   const admin = createClient(
     Deno.env.get("SUPABASE_URL")!,
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
@@ -672,4 +677,11 @@ Deno.serve(async (req) => {
     silentFailures,
     proposals: pendingProposals,
   }), { headers: { ...cors, "content-type": "application/json" } });
+  } catch (e) {
+    console.error("admin-stats fatal:", e);
+    return new Response(
+      JSON.stringify({ error: "admin_stats_failed", detail: String(e instanceof Error ? e.message : e).slice(0, 300) }),
+      { status: 500, headers: { ...cors, "content-type": "application/json" } }
+    );
+  }
 });

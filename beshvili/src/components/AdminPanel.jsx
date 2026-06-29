@@ -144,17 +144,30 @@ export default function AdminPanel() {
   const [searchResults, setSearchResults]       = useState(null);
   const [searching, setSearching]               = useState(false);
 
-  useEffect(() => {
-    (async () => {
-      const { data: res, error: err } = await supabase.functions.invoke("admin-stats");
-      if (err) setError(err.message);
-      else {
-        setData(res);
-        setProposals(res?.proposals ?? []);
-      }
-      setLoading(false);
-    })();
-  }, []);
+  const loadStats = async () => {
+    setError("");
+    setLoading(true);
+    const { data: res, error: err } = await supabase.functions.invoke("admin-stats");
+    if (err) {
+      // Try to read the function's JSON error body (FunctionsHttpError carries
+      // the Response in .context); fall back to the raw message. A bare
+      // "Failed to send a request" usually means a cold start / timeout — say so.
+      let detail = "";
+      try { detail = (await err.context?.json?.())?.detail || ""; } catch { /* not JSON */ }
+      const isFetch = /failed to send a request/i.test(err.message || "");
+      setError(detail
+        ? `שגיאת שרת: ${detail}`
+        : isFetch
+          ? "השרת לא הגיב (ייתכן עומס רגעי או טעינה ראשונית) — נסי שוב 🔄"
+          : err.message);
+    } else {
+      setData(res);
+      setProposals(res?.proposals ?? []);
+    }
+    setLoading(false);
+  };
+
+  useEffect(() => { loadStats(); }, []);
 
   const handleProposal = async (id, status, proposal = null) => {
     await supabase.from("proposals").update({
@@ -270,7 +283,14 @@ export default function AdminPanel() {
   };
 
   if (loading) return <div className="text-center py-12 text-ink/40">טוען נתוני ניהול…</div>;
-  if (error)   return <div className="text-center py-12 text-red-500 text-sm">{error}</div>;
+  if (error)   return (
+    <div className="text-center py-12 space-y-4">
+      <p className="text-red-500 text-sm">{error}</p>
+      <button onClick={loadStats} className="px-5 py-2 rounded-xl bg-magic text-white text-sm font-semibold hover:opacity-90">
+        🔄 נסי שוב
+      </button>
+    </div>
+  );
   if (!data)   return null;
 
   // P&L
