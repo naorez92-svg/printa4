@@ -18,6 +18,11 @@ function AuthApp() {
     supabase.auth.getSession().then(({ data }) => {
       setSession(data.session);
       setLoading(false);
+    }).catch(() => {
+      // Never leave the user stuck on the loading spinner if the session lookup
+      // rejects (network blip / storage error) — fall through to the login screen.
+      setSession(null);
+      setLoading(false);
     });
     const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => {
       setSession(s);
