@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>בשבילי · חומרי יהדות מפמ"ר — דמו</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;600;700;800&family=Baloo+2:wght@600;700;800&family=Frank+Ruhl+Libre:wght@500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#20184A; --canvas:#F7F6FB; --brand:#F4A02C; --magic:#6C5CE7; --grow:#1FB58F; --gold:#d97706;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{height:100%;background:#0d0a1f;font-family:Assistant,sans-serif;overflow:hidden}
+  /* 9:16 stage, centered; fills the screen on a phone in portrait */
+  .stage{
+    position:relative; width:min(100vw,56.25vh); height:min(177.78vw,100vh);
+    margin:0 auto; overflow:hidden; background:linear-gradient(160deg,#211a4d 0%,#2d2466 55%,#1d1640 100%);
+    color:#fff;
+  }
+  .layer{position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:7% 8%; text-align:center; opacity:0}
+  /* every layer + element shares one 22s loop so they stay in sync */
+  .s1{animation:s1 22s infinite}
+  .s2{animation:s2 22s infinite}
+  .s5{animation:s5 22s infinite}
+  @keyframes s1{0%{opacity:0;transform:scale(1.05)}3%{opacity:1;transform:scale(1)}16%{opacity:1}20%{opacity:0}100%{opacity:0}}
+  @keyframes s2{0%{opacity:0}21%{opacity:0}24%{opacity:1}86%{opacity:1}90%{opacity:0}100%{opacity:0}}
+  @keyframes s5{0%{opacity:0}90%{opacity:0}93%{opacity:1}100%{opacity:1}}
+
+  /* ---------- Scene 1: hook ---------- */
+  .hook .pain{font-family:"Baloo 2";font-weight:800;font-size:8.5vmin;line-height:1.15;color:#fff}
+  .hook .sub{margin-top:3vh;font-size:4.6vmin;color:#cdc6f0;font-weight:600}
+  .hook .clock{font-size:14vmin;margin-bottom:3vh;animation:tick 1s steps(8) infinite}
+  @keyframes tick{0%{transform:rotate(-6deg)}50%{transform:rotate(6deg)}100%{transform:rotate(-6deg)}}
+
+  /* ---------- Scene 2: the app (phone screen) ---------- */
+  .app{background:var(--canvas);color:var(--ink);align-items:stretch;justify-content:flex-start;padding:0}
+  .topbar{background:var(--ink);color:#fff;display:flex;align-items:center;justify-content:space-between;padding:4.5vh 5% 2.5vh;}
+  .topbar .logo{font-family:"Baloo 2";font-weight:800;font-size:5.5vmin}
+  .topbar .logo b{color:var(--brand)}
+  .tabs{display:flex;gap:2.5%;padding:2vh 5%;background:var(--ink);color:#cdc6f0;font-size:3.4vmin;font-weight:600}
+  .tabs .tab{opacity:.5}
+  .tabs .tab.active{opacity:1;background:#fff;color:var(--magic);border-radius:99px;padding:.8vh 3.5vw;font-weight:800}
+  .form{padding:3vh 6%;display:flex;flex-direction:column;gap:2.4vh;text-align:right}
+  .lbl{font-size:3.2vmin;color:#7a749b;font-weight:700}
+  .chip{display:inline-block;border:2px solid #e6e3f2;background:#fff;border-radius:14px;padding:1.4vh 4vw;font-size:3.6vmin;font-weight:700;color:var(--ink)}
+  .chip.sel{border-color:var(--magic);background:rgba(108,92,231,.08);color:var(--magic)}
+  .row{display:flex;gap:2.5%;flex-wrap:wrap}
+  .input{border:2px solid #e6e3f2;background:#fff;border-radius:14px;padding:1.6vh 4vw;font-size:3.9vmin;color:var(--ink);min-height:6.5vh;font-weight:700;text-align:right;position:relative;overflow:hidden}
+  .typed{border-left:2px solid transparent}
+  .typed .caret{display:inline-block;width:2px;background:var(--magic);margin-right:2px;animation:caret .7s steps(1) infinite}
+  @keyframes caret{50%{opacity:0}}
+  /* typewriter reveal of the topic */
+  .typed .txt{display:inline-block;white-space:nowrap;overflow:hidden;vertical-align:bottom;width:0;animation:type 22s steps(30) infinite}
+  @keyframes type{0%{width:0}30%{width:0}40%{width:13ch}86%{width:13ch}90%{width:0}100%{width:0}}
+  .createBtn{margin:1.5vh 6% 0;background:linear-gradient(90deg,var(--magic),var(--brand));color:#fff;font-family:"Baloo 2";font-weight:800;font-size:5vmin;border-radius:20px;padding:2.4vh;text-align:center;box-shadow:0 10px 24px rgba(108,92,231,.35);animation:press 22s infinite}
+  @keyframes press{0%,46%{transform:scale(1)}48%{transform:scale(.95)}50%{transform:scale(1)}100%{transform:scale(1)}}
+
+  /* loading + booklet overlays inside the app */
+  .loading{position:absolute;inset:0;background:rgba(247,246,251,.96);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3vh;opacity:0;animation:loadFade 22s infinite}
+  @keyframes loadFade{0%,50%{opacity:0;visibility:hidden}52%{opacity:1;visibility:visible}58%{opacity:1}60%{opacity:0;visibility:hidden}100%{opacity:0;visibility:hidden}}
+  .spinner{width:16vmin;height:16vmin;border-radius:50%;border:1.4vmin solid rgba(108,92,231,.18);border-top-color:var(--magic);animation:spin 1s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .loading .lt{color:var(--magic);font-weight:800;font-size:4.4vmin}
+
+  .sheet{position:absolute;inset:0;background:var(--canvas);padding:3.5vh 5%;display:flex;flex-direction:column;gap:2vh;opacity:0;animation:sheetIn 22s infinite}
+  @keyframes sheetIn{0%,59%{opacity:0;transform:translateY(4vh)}62%{opacity:1;transform:translateY(0)}90%{opacity:1}93%{opacity:0}100%{opacity:0}}
+  .paper{background:#fff;border-radius:10px;box-shadow:0 14px 30px rgba(32,24,74,.18);padding:3vh 5%;flex:1;text-align:right;overflow:hidden}
+  .ph{background:linear-gradient(90deg,var(--magic),#5847d6);color:#fff;border-radius:8px;padding:1.6vh 4%;}
+  .ph h1{font-family:"Frank Ruhl Libre",serif;font-weight:700;font-size:4.4vmin}
+  .ph .meta{font-size:2.6vmin;opacity:.85;margin-top:.4vh}
+  .src{border-right:4px solid var(--gold);background:#fffbeb;border-radius:0 6px 6px 0;padding:1.4vh 3%;margin:2vh 0;font-family:"Frank Ruhl Libre",serif;font-size:3.5vmin;color:#3a2f1a;line-height:1.7}
+  .src .ref{display:block;font-family:Assistant;font-size:2.4vmin;color:#92400e;margin-top:.6vh}
+  .qline{height:0;overflow:hidden;border-bottom:1.5px dashed #e2dff0;margin-top:2.2vh;font-size:3.3vmin;color:var(--ink);font-weight:600;white-space:nowrap;animation:qreveal 22s infinite}
+  .q1{animation-name:q1}.q2{animation-name:q2}.q3{animation-name:q3}
+  @keyframes q1{0%,63%{height:0;opacity:0}66%{height:5vh;opacity:1}100%{height:5vh;opacity:1}}
+  @keyframes q2{0%,67%{height:0;opacity:0}70%{height:5vh;opacity:1}100%{height:5vh;opacity:1}}
+  @keyframes q3{0%,71%{height:0;opacity:0}74%{height:5vh;opacity:1}100%{height:5vh;opacity:1}}
+  .printbtn{margin-top:2vh;background:linear-gradient(90deg,var(--grow),#17a07e);color:#fff;font-family:"Baloo 2";font-weight:800;font-size:4.4vmin;border-radius:16px;padding:2vh;text-align:center;opacity:0;animation:printIn 22s infinite}
+  @keyframes printIn{0%,78%{opacity:0;transform:scale(.96)}81%{opacity:1;transform:scale(1)}90%{opacity:1}93%{opacity:0}100%{opacity:0}}
+
+  /* ---------- Scene 5: end card ---------- */
+  .end .blogo{font-family:"Baloo 2";font-weight:800;font-size:11vmin}
+  .end .blogo b{color:var(--brand)}
+  .end .tag{font-size:4.6vmin;color:#cdc6f0;font-weight:700;margin-top:2vh}
+  .end .url{margin-top:4vh;background:linear-gradient(90deg,var(--brand),var(--magic));color:#fff;font-weight:800;font-size:4.6vmin;border-radius:99px;padding:2vh 8vw}
+  .end .free{margin-top:2.5vh;font-size:3.6vmin;color:#9c95c4}
+
+  /* ---------- bottom caption + progress ---------- */
+  .cap{position:absolute;bottom:5.5vh;left:0;right:0;text-align:center;font-family:"Baloo 2";font-weight:700;font-size:4.4vmin;color:#fff;text-shadow:0 2px 8px rgba(0,0,0,.4);padding:0 8%}
+  .cap span{position:absolute;left:8%;right:8%;opacity:0}
+  .c1{animation:c1 22s infinite}.c2{animation:c2 22s infinite}.c3{animation:c3 22s infinite}.c4{animation:c4 22s infinite}
+  @keyframes c1{0%{opacity:0}4%{opacity:1}18%{opacity:1}21%{opacity:0}100%{opacity:0}}
+  @keyframes c2{0%,23%{opacity:0}26%{opacity:1}49%{opacity:1}52%{opacity:0}100%{opacity:0}}
+  @keyframes c3{0%,52%{opacity:0}55%{opacity:1}76%{opacity:1}79%{opacity:0}100%{opacity:0}}
+  @keyframes c4{0%,80%{opacity:0}83%{opacity:1}90%{opacity:1}93%{opacity:0}100%{opacity:0}}
+  .bar{position:absolute;top:0;left:0;height:.8vh;background:linear-gradient(90deg,var(--brand),var(--magic));animation:bar 22s linear infinite}
+  @keyframes bar{0%{width:0}100%{width:100%}}
+</style>
+</head>
+<body>
+  <div class="stage">
+    <div class="bar"></div>
+
+    <!-- Scene 1 — hook -->
+    <div class="layer s1 hook">
+      <div class="clock">⏳</div>
+      <div class="pain">הכנת חומר ביהדות<br>לפי המפמ"ר?</div>
+      <div class="sub">שעות של עבודה לכל שיעור.</div>
+    </div>
+
+    <!-- Scene 2 — the app -->
+    <div class="layer s2 app">
+      <div class="topbar"><span class="logo">בשבילי<b>·</b></span><span style="font-size:3.4vmin;opacity:.7">פרו ✓</span></div>
+      <div class="tabs"><span class="tab active">יהדות ✡️</span><span class="tab">צור חוברת ✨</span><span class="tab">תלמידים</span></div>
+      <div class="form">
+        <div><div class="lbl">מקצוע</div><div class="row" style="margin-top:1vh"><span class="chip sel">⚖️ הלכה</span><span class="chip">📖 תנ"ך</span><span class="chip">📜 משנה</span></div></div>
+        <div class="row"><div style="flex:1"><div class="lbl">כיתה</div><div class="row" style="margin-top:1vh"><span class="chip sel">ה</span><span class="chip">ו</span></div></div>
+          <div style="flex:1"><div class="lbl">סוג</div><div class="row" style="margin-top:1vh"><span class="chip sel">📄 דף עבודה</span></div></div></div>
+        <div><div class="lbl">נושא</div>
+          <div class="input typed" style="margin-top:1vh"><span class="txt">ברכות הנהנין</span><span class="caret">&nbsp;</span></div></div>
+      </div>
+      <div class="createBtn">✨ צור דף עבודה</div>
+
+      <!-- loading overlay -->
+      <div class="loading">
+        <div class="spinner"></div>
+        <div class="lt">מנסח שאלות ומקורות…</div>
+      </div>
+
+      <!-- generated booklet overlay -->
+      <div class="sheet">
+        <div class="paper">
+          <div class="ph"><h1>שַׁבָּת — בְּרָכוֹת הַנֶּהֱנִין</h1><div class="meta">דף עבודה · הלכה · כיתה ה'</div></div>
+          <div class="src">"בָּרוּךְ אַתָּה ה' אֱלֹהֵינוּ מֶלֶךְ הָעוֹלָם, שֶׁהַכֹּל נִהְיֶה בִּדְבָרוֹ"
+            <span class="ref">(ברכת שהכל)</span></div>
+          <div class="qline q1">1. אֵיזו ברכה מברכים על מים? ______</div>
+          <div class="qline q2">2. התאם כל מאכל לברכה המתאימה →</div>
+          <div class="qline q3">3. מתי מברכים "שהכל"? הסבר בקצרה.</div>
+          <div class="printbtn">🖨️ הדפס / שמור PDF</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Scene 5 — end card -->
+    <div class="layer s5 end">
+      <div class="blogo">בשבילי<b>·</b></div>
+      <div class="tag">חומרי יהדות חכמים — נאמנים למפמ"ר</div>
+      <div class="url">beshvili.com</div>
+      <div class="free">2 חוברות חינם · ללא כרטיס אשראי</div>
+    </div>
+
+    <!-- captions -->
+    <div class="cap">
+      <span class="c1">שעות הכנה לכל שיעור?</span>
+      <span class="c2">בוחרים מקצוע, כיתה ונושא — לפי המפמ"ר</span>
+      <span class="c3">מקורות מדויקים ומנוקדים · תוך דקה</span>
+      <span class="c4">מוכן להדפסה 🖨️</span>
+    </div>
+  </div>
+</body>
+</html>
