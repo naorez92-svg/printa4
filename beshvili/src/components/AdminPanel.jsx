@@ -420,40 +420,57 @@ export default function AdminPanel() {
 
       {/* ── Silent-failure detector — answers "do users fail or just not try?" ── */}
       {(() => {
-        const sf = data.silentFailures ?? { count: 0, errorBreakdown: [], users: [] };
-        // Real failures = error types that aren't the paywall working as intended.
-        const realErrors = (sf.errorBreakdown ?? []).filter(e => e.type !== "quota" && e.type !== "quota_monthly");
-        const realCount  = realErrors.reduce((s, e) => s + e.count, 0);
-        const hasProblem = realCount > 0;
+        const sf = data.silentFailures ?? { count: 0, recentCount: 0, errorBreakdown: [], recentErrorBreakdown: [], users: [] };
+        const notQuota = (e) => e.type !== "quota" && e.type !== "quota_monthly";
+        // All-time (30d) vs RECENT (last 3d). Recent is what tells us if a bug is
+        // still live; the 30d total carries pre-fix history and shouldn't alarm.
+        const realAll    = (sf.errorBreakdown ?? []).filter(notQuota);
+        const realRecent = (sf.recentErrorBreakdown ?? []).filter(notQuota);
+        const realCountAll    = realAll.reduce((s, e) => s + e.count, 0);
+        const realCountRecent = realRecent.reduce((s, e) => s + e.count, 0);
+        const liveProblem = realCountRecent > 0;
         return (
-          <div className={`rounded-2xl p-4 border-2 shadow-sm ${hasProblem ? "bg-red-50 border-red-300" : "bg-grow/5 border-grow/25"}`}>
-            <h3 className={`font-bold text-sm mb-1 ${hasProblem ? "text-red-700" : "text-grow"}`}>
-              {hasProblem ? "🔴 כשל שקט ביצירה — דורש בדיקה" : "🟢 אבחון: אין כשל שקט ביצירה"}
+          <div className={`rounded-2xl p-4 border-2 shadow-sm ${liveProblem ? "bg-red-50 border-red-300" : "bg-grow/5 border-grow/25"}`}>
+            <h3 className={`font-bold text-sm mb-1 ${liveProblem ? "text-red-700" : "text-grow"}`}>
+              {liveProblem ? "🔴 כשל שקט פעיל — דורש בדיקה עכשיו" : "🟢 אין כשל שקט פעיל (3 ימים אחרונים)"}
             </h3>
-            {sf.count === 0 ? (
-              <p className="text-xs text-ink/50">
-                אף משתמש לא לחץ "צור" ב-30 הימים האחרונים בלי לקבל חוברת. כלומר משתמשים עם 0 חוברות פשוט <strong>לא ניסו</strong> — זו נשירה רגילה של נרשמים, לא תקלה.
-              </p>
-            ) : hasProblem ? (
+
+            {liveProblem ? (
               <>
                 <p className="text-xs text-red-600 mb-2">
-                  <strong>{realCount}</strong> משתמשים לחצו "צור חוברת" אבל נשארו עם <strong>0 חוברות שמורות</strong> — היצירה נכשלה לפני השמירה. זו תקלה אמיתית, לא נשירה.
+                  <strong>{realCountRecent}</strong> משתמשים נכשלו ביצירה ב-<strong>3 הימים האחרונים</strong> (לחצו "צור" ונשארו עם 0 חוברות). זו תקלה חיה.
                 </p>
                 <div className="flex flex-wrap gap-1.5 mb-2">
-                  {realErrors.map(e => (
+                  {realRecent.map(e => (
                     <span key={e.type} className="text-[11px] bg-white border border-red-200 text-red-600 rounded-full px-2 py-0.5">
                       {e.type}: <strong>{e.count}</strong>
                     </span>
                   ))}
                 </div>
-                <p className="text-[10px] text-ink/40">
-                  ai_overloaded = השרת עמוס · stream_dropped = החיבור נקטע · db_insert_failed = השמירה ב-DB נכשלה · empty_html = לא חזר תוכן
-                </p>
               </>
             ) : (
-              <p className="text-xs text-ink/50">
-                {sf.count} משתמשים לחצו "צור" בלי חוברת שמורה — אבל כולם בגלל <strong>מכסה</strong> (ה-paywall עובד כשורה), לא תקלה טכנית.
+              <p className="text-xs text-grow/90 mb-2">
+                אף משתמש לא נכשל ביצירה ב-3 הימים האחרונים. {realCountAll > 0 && <>הכשלים שמופיעים למטה הם <strong>היסטוריים</strong> (מלפני התיקונים, בחלון 30 הימים) — לא קורים יותר.</>}
               </p>
+            )}
+
+            {realCountAll > 0 && (
+              <details className="mt-1">
+                <summary className="text-[11px] text-ink/45 cursor-pointer">היסטוריה (30 יום): {realCountAll} כשלים — לחצי לפירוט</summary>
+                <div className="flex flex-wrap gap-1.5 mt-2">
+                  {realAll.map(e => (
+                    <span key={e.type} className="text-[11px] bg-white border border-ink/15 text-ink/50 rounded-full px-2 py-0.5">
+                      {e.type}: <strong>{e.count}</strong>
+                    </span>
+                  ))}
+                </div>
+                <p className="text-[10px] text-ink/40 mt-2">
+                  ai_overloaded = השרת עמוס · stream_dropped = החיבור נקטע · db_insert_failed = השמירה ב-DB נכשלה · empty_html = לא חזר תוכן · network = רשת/דפדפן מוטמע
+                </p>
+              </details>
+            )}
+            {sf.count === 0 && (
+              <p className="text-xs text-ink/50">אף משתמש לא לחץ "צור" בלי לקבל חוברת ב-30 יום — משתמשים עם 0 חוברות פשוט לא ניסו.</p>
             )}
           </div>
         );
