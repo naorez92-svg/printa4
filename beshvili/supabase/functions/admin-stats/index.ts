@@ -120,13 +120,13 @@ Deno.serve(async (req) => {
   // (never tried). A 0-booklet user with startedCount > 0 generated something that
   // never reached the DB — a real failure worth investigating.
   const startedByUser: Record<string, number> = {};
-  const errorByUser:   Record<string, { count: number; lastType: string | null; lastInapp: boolean; lastBuild: string | null }> = {};
-  (lifecycleEvents ?? []).forEach((e: { event: string; user_id: string | null; metadata: Record<string, unknown> | null }) => {
+  const errorByUser:   Record<string, { count: number; lastType: string | null; lastInapp: boolean; lastBuild: string | null; lastAt: string | null }> = {};
+  (lifecycleEvents ?? []).forEach((e: { event: string; user_id: string | null; metadata: Record<string, unknown> | null; created_at: string }) => {
     if (!e.user_id) return;
     if (e.event === "booklet_started") {
       startedByUser[e.user_id] = (startedByUser[e.user_id] ?? 0) + 1;
     } else if (e.event === "booklet_error") {
-      const prev = errorByUser[e.user_id] ?? { count: 0, lastType: null, lastInapp: false, lastBuild: null };
+      const prev = errorByUser[e.user_id] ?? { count: 0, lastType: null, lastInapp: false, lastBuild: null, lastAt: null };
       // events come ordered newest-first, so the first error seen is the latest
       const isLatest = prev.lastType === null;
       errorByUser[e.user_id] = {
@@ -134,6 +134,7 @@ Deno.serve(async (req) => {
         lastType:  prev.lastType  ?? ((e.metadata?.type as string) ?? "unknown"),
         lastInapp: isLatest ? (e.metadata?.inapp === true) : prev.lastInapp,
         lastBuild: isLatest ? ((e.metadata?.v as string) ?? null) : prev.lastBuild,
+        lastAt:    prev.lastAt    ?? e.created_at,
       };
     }
   });
@@ -277,9 +278,27 @@ Deno.serve(async (req) => {
     const t = errorByUser[u.id]?.lastType ?? "no_error_logged";
     silentFailErrorBreakdown[t] = (silentFailErrorBreakdown[t] ?? 0) + 1;
   });
+  // RECENCY split — the 30-day window mixes failures from BEFORE a fix shipped
+  // with live ones. A user is "recent" if their latest error is < 3 days old.
+  // recentCount ≈ 0 means the failures are historical (a deployed fix worked);
+  // recentCount > 0 means it's still happening and needs digging.
+  const isRecentFail = (u: { id: string }) => {
+    const at = errorByUser[u.id]?.lastAt;
+    return at != null && at >= threeDaysAgo;
+  };
+  const recentSilentFailUsers = silentFailUsers.filter(isRecentFail);
+  const recentSilentFailBreakdown: Record<string, number> = {};
+  recentSilentFailUsers.forEach(u => {
+    const t = errorByUser[u.id]?.lastType ?? "no_error_logged";
+    recentSilentFailBreakdown[t] = (recentSilentFailBreakdown[t] ?? 0) + 1;
+  });
   const silentFailures = {
     count: silentFailUsers.length,
+    recentCount: recentSilentFailUsers.length,
     errorBreakdown: Object.entries(silentFailErrorBreakdown)
+      .map(([type, count]) => ({ type, count }))
+      .sort((a, b) => b.count - a.count),
+    recentErrorBreakdown: Object.entries(recentSilentFailBreakdown)
       .map(([type, count]) => ({ type, count }))
       .sort((a, b) => b.count - a.count),
     users: silentFailUsers
@@ -291,6 +310,8 @@ Deno.serve(async (req) => {
         startedCount: startedByUser[u.id] ?? 0,
         errorCount: errorByUser[u.id]?.count ?? 0,
         lastErrorType: errorByUser[u.id]?.lastType ?? null,
+        lastErrorAt: errorByUser[u.id]?.lastAt ?? null,
+        recent: isRecentFail(u),
         createdAt: u.created_at,
       })),
   };
