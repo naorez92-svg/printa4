@@ -30,11 +30,11 @@ const renderUserRow = (u) => (
     <td className="py-1.5 pr-1">
       <span className={`font-bold ${
         u.bookletCount === 0 ? "text-red-400" :
-        u.plan === "free" && u.bookletCount >= 3 ? "text-brand" :
+        u.plan === "free" && u.bookletCount >= 2 ? "text-brand" :
         "text-grow"
       }`}>
         {u.bookletCount}
-        {u.plan === "free" && u.bookletCount >= 3 ? " ⚡" : ""}
+        {u.plan === "free" && u.bookletCount >= 2 ? " ⚡" : ""}
       </span>
       {/* 0 booklets: distinguish "tried & failed" from "never tried" */}
       {u.bookletCount === 0 && (

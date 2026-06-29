@@ -215,7 +215,7 @@ Deno.serve(async (req) => {
     return plan !== "admin" && (bookletsByUser[u.id] ?? 0) >= 1;
   }).length;
   const retentionToSecond = users.filter(u => (bookletsByUser[u.id] ?? 0) >= 2).length;
-  const retentionToThird  = users.filter(u => (bookletsByUser[u.id] ?? 0) >= FREE_LIMIT_THRESHOLD).length;
+  const retentionToThird  = users.filter(u => (bookletsByUser[u.id] ?? 0) >= 3).length; // "habit" = 3+ (kept literal so it stays distinct from the 2+ free-limit metric)
 
   // Free users who hit the free limit — prime upgrade opportunities
   const freeAtLimitAllUsers = users.filter(u => {
