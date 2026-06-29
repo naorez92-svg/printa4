@@ -327,7 +327,7 @@ ${notes ? `הוראות נוספות מהמורה: ${esc(notes)}` : ""}
             const data = await r.json();
             const html = (data?.content ?? []).filter((b: { type: string }) => b.type === "text").map((b: { text: string }) => b.text).join("");
             if (!html || !html.includes("<")) { await releaseLock(); return new Response(JSON.stringify({ error: "empty_html" }), { status: 502, headers: cors }); }
-            return new Response(JSON.stringify({ html, remaining }), { status: 200, headers: cors });
+            return new Response(JSON.stringify({ html, remaining, pages: effPages, capped: pageCount > effPages }), { status: 200, headers: cors });
           }
           if ((r.status === 529 || r.status === 503 || r.status === 429) && attempt < 3) {
             await r.body?.cancel().catch(() => {});
