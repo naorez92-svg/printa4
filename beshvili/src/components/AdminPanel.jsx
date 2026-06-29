@@ -248,6 +248,47 @@ export default function AdminPanel() {
         )}
       </div>
 
+      {/* ── Silent-failure detector — answers "do users fail or just not try?" ── */}
+      {(() => {
+        const sf = data.silentFailures ?? { count: 0, errorBreakdown: [], users: [] };
+        // Real failures = error types that aren't the paywall working as intended.
+        const realErrors = (sf.errorBreakdown ?? []).filter(e => e.type !== "quota" && e.type !== "quota_monthly");
+        const realCount  = realErrors.reduce((s, e) => s + e.count, 0);
+        const hasProblem = realCount > 0;
+        return (
+          <div className={`rounded-2xl p-4 border-2 shadow-sm ${hasProblem ? "bg-red-50 border-red-300" : "bg-grow/5 border-grow/25"}`}>
+            <h3 className={`font-bold text-sm mb-1 ${hasProblem ? "text-red-700" : "text-grow"}`}>
+              {hasProblem ? "🔴 כשל שקט ביצירה — דורש בדיקה" : "🟢 אבחון: אין כשל שקט ביצירה"}
+            </h3>
+            {sf.count === 0 ? (
+              <p className="text-xs text-ink/50">
+                אף משתמש לא לחץ "צור" ב-30 הימים האחרונים בלי לקבל חוברת. כלומר משתמשים עם 0 חוברות פשוט <strong>לא ניסו</strong> — זו נשירה רגילה של נרשמים, לא תקלה.
+              </p>
+            ) : hasProblem ? (
+              <>
+                <p className="text-xs text-red-600 mb-2">
+                  <strong>{realCount}</strong> משתמשים לחצו "צור חוברת" אבל נשארו עם <strong>0 חוברות שמורות</strong> — היצירה נכשלה לפני השמירה. זו תקלה אמיתית, לא נשירה.
+                </p>
+                <div className="flex flex-wrap gap-1.5 mb-2">
+                  {realErrors.map(e => (
+                    <span key={e.type} className="text-[11px] bg-white border border-red-200 text-red-600 rounded-full px-2 py-0.5">
+                      {e.type}: <strong>{e.count}</strong>
+                    </span>
+                  ))}
+                </div>
+                <p className="text-[10px] text-ink/40">
+                  ai_overloaded = השרת עמוס · stream_dropped = החיבור נקטע · db_insert_failed = השמירה ב-DB נכשלה · empty_html = לא חזר תוכן
+                </p>
+              </>
+            ) : (
+              <p className="text-xs text-ink/50">
+                {sf.count} משתמשים לחצו "צור" בלי חוברת שמורה — אבל כולם בגלל <strong>מכסה</strong> (ה-paywall עובד כשורה), לא תקלה טכנית.
+              </p>
+            )}
+          </div>
+        );
+      })()}
+
       {/* Agent proposals */}
       {proposals.length > 0 ? (
         <div className="space-y-3">
@@ -813,6 +854,14 @@ export default function AdminPanel() {
                       {u.bookletCount}
                       {u.plan === "free" && u.bookletCount >= 3 ? " ⚡" : ""}
                     </span>
+                    {/* 0 booklets: distinguish "tried & failed" from "never tried" */}
+                    {u.bookletCount === 0 && (
+                      (u.startedCount ?? 0) > 0
+                        ? <span className="block text-[9px] text-red-500 font-medium" title={u.lastErrorType ? `שגיאה אחרונה: ${u.lastErrorType}` : ""}>
+                            ✗ ניסתה {u.startedCount}× {u.lastErrorType && u.lastErrorType !== "quota" ? `(${u.lastErrorType})` : ""}
+                          </span>
+                        : <span className="block text-[9px] text-ink/25">לא ניסתה</span>
+                    )}
                   </td>
                   <td className="py-1.5 pr-1">
                     <span className={`px-1.5 py-0.5 rounded text-xs ${
