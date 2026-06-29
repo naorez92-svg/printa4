@@ -69,6 +69,8 @@ export default function AdminPanel() {
   const [emergencyResult, setEmergencyResult]   = useState("");
   const [sendingBlast, setSendingBlast]         = useState(false);
   const [blastResult, setBlastResult]           = useState("");
+  const [selftesting, setSelftesting]           = useState(false);
+  const [selftestResult, setSelftestResult]     = useState(null);
 
   useEffect(() => {
     (async () => {
@@ -163,6 +165,14 @@ export default function AdminPanel() {
     const { data: res, error: err } = await supabase.functions.invoke("send-followup", { body: { emergency: true } });
     setSendingEmergency(false);
     setEmergencyResult(fmtFollowupResult(res, err, `נשלחו ${res?.sent ?? 0} מיילים מתוך ${res?.wave0e_candidates ?? 0} נרשמות היום`));
+  };
+
+  const runSelftest = async () => {
+    setSelftesting(true); setSelftestResult(null);
+    const { data: res, error: err } = await supabase.functions.invoke("selftest-booklet", { body: {} });
+    setSelftesting(false);
+    if (err) setSelftestResult({ ok: false, error: err.message, steps: [] });
+    else setSelftestResult(res);
   };
 
   if (loading) return <div className="text-center py-12 text-ink/40">טוען נתוני ניהול…</div>;
@@ -295,6 +305,44 @@ export default function AdminPanel() {
           </div>
         );
       })()}
+
+      {/* ── Self-test: prove a real (non-admin) user can save a booklet ───────── */}
+      <div className={`rounded-2xl p-4 border-2 shadow-sm ${
+        selftestResult == null ? "bg-magic/5 border-magic/25"
+        : selftestResult.ok ? "bg-grow/5 border-grow/30" : "bg-red-50 border-red-300"
+      }`}>
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <h3 className="font-bold text-ink text-sm">🧪 בדיקת יצירת חוברת (משתמש אמיתי)</h3>
+            <p className="text-[11px] text-ink/50 mt-0.5">
+              יוצר משתמש בדיקה לא-אדמין, מנסה לשמור חוברת דרך אותו מסלול שנכשל, ומוחק הכל אחריו.
+            </p>
+          </div>
+          <button
+            onClick={runSelftest}
+            disabled={selftesting}
+            className="flex-shrink-0 bg-magic text-white rounded-xl px-4 py-2 text-xs font-bold disabled:opacity-50 hover:opacity-90 transition-opacity"
+          >
+            {selftesting ? "בודק…" : "▶ הרץ בדיקה"}
+          </button>
+        </div>
+        {selftestResult && (
+          <div className="mt-3">
+            <p className={`text-sm font-bold ${selftestResult.ok ? "text-grow" : "text-red-600"}`}>
+              {selftestResult.ok
+                ? "🟢 התיקון מאומת — משתמש רגיל יכול ליצור חוברת והיא נשמרת!"
+                : `🔴 הבדיקה נכשלה${selftestResult.insert_error ? ` — ${selftestResult.insert_error}` : selftestResult.error ? ` — ${selftestResult.error}` : ""}`}
+            </p>
+            {(selftestResult.steps ?? []).length > 0 && (
+              <ul className="mt-2 space-y-0.5">
+                {selftestResult.steps.map((s, i) => (
+                  <li key={i} className="text-[11px] text-ink/60 font-mono">{s}</li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
+      </div>
 
       {/* Agent proposals */}
       {proposals.length > 0 ? (
@@ -842,7 +890,12 @@ export default function AdminPanel() {
               {(data.recentUsers ?? []).map((u) => (
                 <tr key={u.id} className="border-b border-ink/5 last:border-0">
                   <td className="py-1.5 pr-1 text-ink/70 font-mono">{u.email}</td>
-                  <td className="py-1.5 pr-1 text-ink/50">{fmtDate(u.createdAt)}</td>
+                  <td className="py-1.5 pr-1 text-ink/50">
+                    {fmtDate(u.createdAt)}
+                    <span className="block text-[9px] text-ink/35">
+                      {new Date(u.createdAt).toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" })}
+                    </span>
+                  </td>
                   <td className="py-1.5 pr-1">
                     {(() => {
                       const days = daysSince(u.lastBookletAt);
