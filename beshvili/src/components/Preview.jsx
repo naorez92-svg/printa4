@@ -80,14 +80,16 @@ export default function Preview({ html, onReset, shareToken, title, active = tru
     setTimeout(() => URL.revokeObjectURL(url), 120000);
   };
 
-  const handlePrint = useCallback(async () => {
+  const handlePrint = useCallback(() => {
     track("booklet_printed", { context, isMobile, inapp: IS_INAPP });
     // Inside Facebook/Instagram in-app browsers window.print() is a no-op — the
     // print system isn't exposed. Escape to the real browser: open this booklet's
-    // public page (which has a working print button) in Chrome/Safari.
+    // public page (which has a working print button) in Chrome/Safari. markPublic
+    // is fire-and-forget (don't await) so the click's user-activation stays alive
+    // for openExternal's clipboard write on iOS — same pattern as shareWhatsApp.
     if (IS_INAPP) {
       if (shareToken) {
-        await markPublic();
+        markPublic();
         openExternal(`${window.location.origin}/b/${shareToken}?print=1`);
       } else {
         // No share link yet — at least get them into a real browser.
