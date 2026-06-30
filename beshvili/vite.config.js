@@ -18,4 +18,17 @@ export default defineConfig({
   define: {
     __APP_VERSION__: JSON.stringify(BUILD),
   },
+  build: {
+    rollupOptions: {
+      output: {
+        // Split rarely-changing vendor code into its own cached chunks so a
+        // frequent app-code deploy doesn't bust the (large) react/supabase cache
+        // on repeat visits. Also keeps each chunk under the 500KB warning.
+        manualChunks: {
+          react: ["react", "react-dom"],
+          supabase: ["@supabase/supabase-js"],
+        },
+      },
+    },
+  },
 });

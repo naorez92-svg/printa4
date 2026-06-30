@@ -317,10 +317,10 @@ export default function AdminPanel() {
   const paidUsers    = revenueLines.reduce((s, r) => s + r.count, 0);
 
   const statCards = [
-    { label: "סהִּכ משתמשים",  value: data.totalUsers,         icon: "👥" },
+    { label: "סה״כ משתמשים",  value: data.totalUsers,         icon: "👥" },
     { label: "השבוע",          value: data.usersThisWeek,      icon: "📅" },
     { label: "היום",           value: data.usersToday,         icon: "⚡" },
-    { label: "סהִּכ חוברות",   value: data.totalBooklets,      icon: "📚" },
+    { label: "סה״כ חוברות",   value: data.totalBooklets,      icon: "📚" },
     { label: "חוברות השבוע",  value: data.bookletsThisWeek,   icon: "📊" },
     { label: "חוברות היום",   value: data.bookletsToday,      icon: "🔥" },
   ];
@@ -328,9 +328,13 @@ export default function AdminPanel() {
   const fs = data.funnelStats ?? { sessions: 0, started: 0, completed: 0, upgradeOpened: 0, ctaClicked: 0, leads: 0 };
   const convStart = fs.sessions > 0 ? Math.round((fs.started / fs.sessions) * 100) : 0;
   const convDone  = fs.started  > 0 ? Math.round((fs.completed / fs.started) * 100) : 0;
+  // Upgrade funnel: saw paywall → clicked pay → became a lead.
+  // Clamp to 100%: the modal also opens from non-completion paths (dashboard/quota),
+  // so upgradeOpened can exceed completed — a raw ratio would read >100%.
   const convCta  = fs.upgradeOpened > 0 ? Math.min(100, Math.round(((fs.ctaClicked ?? 0) / fs.upgradeOpened) * 100)) : 0;
   const convLead = fs.completed     > 0 ? Math.min(100, Math.round(((fs.upgradeOpened ?? 0) / fs.completed) * 100)) : 0;
 
+  // Full-funnel analytics (anonymous → signup → activation + virality + reliability)
   const an = data.analytics ?? {
     visitors: 0, signups: 0, logins: 0, activated: 0, emailSubmitted: 0, verifyView: 0,
     googleClicks: 0, shares: 0, publicViews: 0, prints: 0, pwaInstalls: 0, ratings: 0,
@@ -559,6 +563,7 @@ export default function AdminPanel() {
         </div>
       )}
 
+      {/* Funnel (last 7 days) */}
       <div className="bg-white rounded-2xl p-4 border border-ink/5 shadow-sm">
         <h3 className="font-bold text-ink mb-3 text-sm">📊 משפך 7 ימים אחרונים</h3>
         {fs.sessions === 0 && fs.started === 0 ? (
@@ -585,6 +590,7 @@ export default function AdminPanel() {
         )}
       </div>
 
+      {/* Upgrade funnel (last 7 days) — the conversion step that was previously invisible */}
       <div className="bg-white rounded-2xl p-4 border border-ink/5 shadow-sm">
         <h3 className="font-bold text-ink mb-3 text-sm">💰 משפך שדרוג — 7 ימים</h3>
         {(fs.upgradeOpened ?? 0) === 0 && (fs.ctaClicked ?? 0) === 0 && (fs.leads ?? 0) === 0 ? (
@@ -616,8 +622,10 @@ export default function AdminPanel() {
         )}
       </div>
 
+      {/* ── FULL FUNNEL ANALYTICS (last 7 days) ─────────────────────────── */}
       {an.totalEvents > 0 ? (
         <div className="space-y-4">
+          {/* Acquisition → activation */}
           <div className="bg-white rounded-2xl p-4 border border-ink/5 shadow-sm">
             <h3 className="font-bold text-ink mb-3 text-sm">🚀 משפך רכישה מלא — 7 ימים</h3>
             <div className="flex items-center gap-2">
@@ -640,7 +648,9 @@ export default function AdminPanel() {
             <p className="text-[10px] text-ink/30 mt-2 text-center">{an.totalEvents.toLocaleString("he-IL")} אירועים נמדדו · מבקר→הרשמה {convVisitSignup}% · הרשמה→חוברת {convSignupActive}%</p>
           </div>
 
+          {/* Traffic sources + virality/engagement side by side */}
           <div className="grid sm:grid-cols-2 gap-4">
+            {/* Traffic sources */}
             <div className="bg-white rounded-2xl p-4 border border-ink/5 shadow-sm">
               <h3 className="font-bold text-ink mb-3 text-sm">🌐 מקורות תנועה</h3>
               {(an.sources ?? []).length === 0 ? (
@@ -657,6 +667,7 @@ export default function AdminPanel() {
               )}
             </div>
 
+            {/* Virality + engagement */}
             <div className="bg-white rounded-2xl p-4 border border-ink/5 shadow-sm">
               <h3 className="font-bold text-ink mb-3 text-sm">📣 הפצה ומעורבות</h3>
               <div className="grid grid-cols-2 gap-2 text-center">
@@ -677,6 +688,7 @@ export default function AdminPanel() {
             </div>
           </div>
 
+          {/* Generation reliability — errors by type */}
           {errorTotal > 0 && (
             <div className="bg-white rounded-2xl p-4 border border-ink/5 shadow-sm">
               <h3 className="font-bold text-ink mb-3 text-sm">⚠️ תקלות ייצור — {errorTotal} ב-7 ימים</h3>
@@ -698,6 +710,7 @@ export default function AdminPanel() {
         </div>
       )}
 
+      {/* Quality signals */}
       {(data.ratedBooklets > 0 || data.churnRiskCount > 0) && (
         <div className="bg-white rounded-2xl p-4 border border-ink/5 shadow-sm">
           <h3 className="font-bold text-ink mb-3 text-sm">🎯 איכות ונטישה</h3>
@@ -737,6 +750,7 @@ export default function AdminPanel() {
         </div>
       )}
 
+      {/* Dormant users — created booklets but stopped: highest-value retention targets */}
       {(data.dormantCount ?? 0) > 0 && (
         <div className="bg-white rounded-2xl p-4 border border-amber-200 shadow-sm">
           <div className="flex items-center justify-between mb-2">
@@ -781,6 +795,7 @@ export default function AdminPanel() {
         </div>
       )}
 
+      {/* Stats grid */}
       <div className="grid grid-cols-3 gap-3">
         {statCards.map(({ label, value, icon }) => (
           <div key={label} className="bg-white rounded-2xl p-4 border border-ink/5 text-center shadow-sm">
@@ -791,6 +806,7 @@ export default function AdminPanel() {
         ))}
       </div>
 
+      {/* Retention funnel */}
       {data.totalNonAdminUsers > 0 && (
         <div className="bg-white rounded-2xl p-4 border border-ink/5 shadow-sm">
           <h3 className="font-bold text-ink mb-3 text-sm">🔄 שימור — מסלול המשתמש</h3>
@@ -816,6 +832,7 @@ export default function AdminPanel() {
         </div>
       )}
 
+      {/* Upgrade opportunities */}
       {(data.freeAtLimitCount ?? 0) > 0 && (
         <div className="bg-white rounded-2xl p-4 border border-brand/25 shadow-sm">
           <div className="flex items-center justify-between mb-2">
@@ -848,6 +865,7 @@ export default function AdminPanel() {
         </div>
       )}
 
+      {/* Economics / P&L */}
       <div className="bg-white rounded-2xl p-4 border border-ink/5 shadow-sm">
         <h3 className="font-bold text-ink mb-3 text-sm">💰 כלכלה — חודש נוכחי</h3>
         <div className="space-y-1.5 mb-3">
@@ -916,6 +934,7 @@ export default function AdminPanel() {
         )}
       </div>
 
+      {/* Plan breakdown + conversion rate */}
       <div className="bg-white rounded-2xl p-4 border border-ink/5 shadow-sm">
         <div className="flex items-center justify-between mb-3">
           <h3 className="font-bold text-ink text-sm">פילוח תוכניות</h3>
@@ -948,6 +967,7 @@ export default function AdminPanel() {
         )}
       </div>
 
+      {/* Popular topics */}
       {data.topTopics?.length > 0 && (
         <div className="bg-white rounded-2xl p-4 border border-ink/5 shadow-sm">
           <h3 className="font-bold text-ink mb-3 text-sm">נושאים פופולריים 🔥 (200 אחרונים)</h3>
@@ -1114,6 +1134,7 @@ export default function AdminPanel() {
         </div>
       </div>
 
+      {/* Recent feedback */}
       {data.recentFeedback?.length > 0 && (
         <div className="bg-white rounded-2xl p-4 border border-ink/5 shadow-sm">
           <h3 className="font-bold text-ink mb-3 text-sm">פידבקים אחרונים ({data.recentFeedback.length})</h3>
@@ -1128,6 +1149,7 @@ export default function AdminPanel() {
         </div>
       )}
 
+      {/* Recent leads */}
       {data.recentLeads?.length > 0 && (
         <div className="bg-white rounded-2xl p-4 border border-ink/5 shadow-sm">
           <h3 className="font-bold text-ink mb-3 text-sm">ליידים — בקשות שדרוג ({data.recentLeads.length})</h3>

@@ -10,6 +10,16 @@ h1, h2, h3 {
   @apply font-display;
 }
 
+/* Visible keyboard focus ring. Tailwind's base reset strips the native outline,
+   so keyboard/screen-reader users had no indication of which control is focused
+   (buttons, nav tabs, links, form fields). Restore it ONLY for keyboard
+   navigation via :focus-visible — mouse clicks won't show a ring. The 2px offset
+   keeps it readable on both the light canvas and the dark ink hero/sidebar. */
+:focus-visible {
+  outline: 2px solid #6C5CE7; /* magic */
+  outline-offset: 2px;
+}
+
 /* Hide scrollbar but keep scroll */
 .scrollbar-none { scrollbar-width: none; }
 .scrollbar-none::-webkit-scrollbar { display: none; }

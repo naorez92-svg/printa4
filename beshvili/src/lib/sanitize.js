@@ -1,5 +1,5 @@
 const TAILWIND_CDN = "https://cdn.tailwindcss.com";
-const FONTS_RE = /^\/\/fonts\.(googleapis|gstatic)\.com\//;
+const FONTS_RE = /^https:\/\/fonts\.(googleapis|gstatic)\.com\//;
 
 // Strip unsafe content from AI-generated HTML before storing, rendering, or
 // printing. This runs DOM-based (DOMParser) rather than regex: the browser's

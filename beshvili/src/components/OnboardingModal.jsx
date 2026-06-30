@@ -14,6 +14,13 @@ const STARTERS = [
 export default function OnboardingModal({ onPick, onSkip }) {
   useEffect(() => { track("onboarding_modal_shown", {}); }, []);
 
+  // Esc dismisses (same as "skip") for keyboard/screen-reader users.
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === "Escape") onSkip(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onSkip]);
+
   return (
     <div
       className="fixed inset-0 z-50 bg-ink/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-4"
@@ -23,10 +30,11 @@ export default function OnboardingModal({ onPick, onSkip }) {
       <div
         className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl animate-[fadeIn_0.2s_ease-out]"
         onClick={(e) => e.stopPropagation()}
+        role="dialog" aria-modal="true" aria-labelledby="onboarding-title"
       >
         <div className="text-center mb-5">
           <div className="text-4xl mb-2">🎁</div>
-          <h2 className="text-xl font-bold text-ink font-display">ברוכה הבאה לבשבילי!</h2>
+          <h2 id="onboarding-title" className="text-xl font-bold text-ink font-display">ברוכה הבאה לבשבילי!</h2>
           <p className="text-sm text-ink/60 mt-1.5 leading-relaxed">
             החוברת הראשונה שלך מוכנה ב-<strong className="text-magic">60 שניות</strong>.
             בחרי נושא להתחלה — אפשר לשנות הכל אחר כך:

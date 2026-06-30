@@ -1,18 +1,22 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, lazy, Suspense } from "react";
 import { supabase } from "../lib/supabase";
 import Create from "../components/Create";
 import History from "../components/History";
-import Students from "../components/Students";
 import UpgradeModal from "../components/UpgradeModal";
 import FeedbackWidget from "../components/FeedbackWidget";
-import AdminPanel from "../components/AdminPanel";
-import BrandingSettings from "../components/BrandingSettings";
-import JewishCreate from "../components/JewishCreate";
 import OnboardingModal from "../components/OnboardingModal";
 import { useProfile, FREE_LIMIT } from "../hooks/useProfile";
 import InstallPWA from "../components/InstallPWA";
 import Logo from "../components/Logo";
 import { track } from "../hooks/useEvents";
+
+// Tab-gated, on-demand chunks — only fetched when the user opens that tab.
+// AdminPanel (admin-only, ~64KB) and the create flows are the heaviest parts of
+// the app, and most users never open them, so they don't belong in the first load.
+const Students = lazy(() => import("../components/Students"));
+const AdminPanel = lazy(() => import("../components/AdminPanel"));
+const BrandingSettings = lazy(() => import("../components/BrandingSettings"));
+const JewishCreate = lazy(() => import("../components/JewishCreate"));
 
 const NAV = [
   ["create",   "✨", "צור חוברת"],
@@ -228,16 +232,20 @@ export default function Dashboard() {
             </div>
           )}
 
-          {/* Create stays mounted to preserve in-progress generation when switching tabs */}
+          {/* Create stays mounted (and OUTSIDE the Suspense boundary below) to
+              preserve in-progress generation when switching tabs — a sibling lazy
+              chunk suspending must never unmount it. */}
           <div className={tab === "create" ? "" : "hidden"}>
             <Create active={tab === "create"} onSaved={() => refresh()} remaining={remaining} isPro={isPro} bookletCount={bookletCount} onUpgrade={() => setShowUpgrade(true)}
               pendingStarter={pendingStarter} onStarterConsumed={() => setPendingStarter(null)} />
           </div>
-          {tab === "jewish" && <JewishCreate onSaved={() => refresh()} remaining={remaining} isPro={isPro} bookletCount={bookletCount} onUpgrade={() => setShowUpgrade(true)} />}
-          {tab === "students" && <Students onBookletSaved={() => { refresh(); setTab("history"); }} remaining={remaining} isPro={isPro} />}
           {tab === "history" && <History isPro={isPro} onUpgrade={() => setShowUpgrade(true)} />}
-          {tab === "branding" && isPro && <BrandingSettings profile={profile} onSaved={refresh} />}
-          {tab === "admin" && isAdmin && <AdminPanel />}
+          <Suspense fallback={<div className="py-12 text-center text-ink/40 text-sm">טוען…</div>}>
+            {tab === "jewish" && <JewishCreate onSaved={() => refresh()} remaining={remaining} isPro={isPro} bookletCount={bookletCount} onUpgrade={() => setShowUpgrade(true)} />}
+            {tab === "students" && <Students onBookletSaved={() => { refresh(); setTab("history"); }} remaining={remaining} isPro={isPro} bookletCount={bookletCount} />}
+            {tab === "branding" && isPro && <BrandingSettings profile={profile} onSaved={refresh} />}
+            {tab === "admin" && isAdmin && <AdminPanel />}
+          </Suspense>
         </main>
 
         <footer className="max-w-3xl mx-auto px-5 py-6 border-t border-ink/5 text-center text-xs text-ink/25 space-y-1">

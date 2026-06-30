@@ -101,6 +101,7 @@ export default function Create({ onSaved, remaining, isPro, active = true, bookl
   const [photoUrl, setPhotoUrl] = useState(null);
   const [photoUploading, setPhotoUploading] = useState(false);
   const photoInputRef = useRef(null);
+  const [showPhoto, setShowPhoto] = useState(false);
   const [recentTmpl, setRecentTmpl] = useState(null);
   const [showAllTemplates, setShowAllTemplates] = useState(false);  // collapse 14→6 by default
   const firstTimer = bookletCount === 0;
@@ -480,7 +481,7 @@ export default function Create({ onSaved, remaining, isPro, active = true, bookl
     setBookletTitle(title);
     setShowRating(true);
     setHtml(generatedHtml);
-    track("booklet_completed", { booklet_id: inserted?.id, pages: pageCount, mode, durationSec: Math.round((Date.now() - startedAt) / 1000), chars: htmlAccumulated.length, partial: streamAborted, withAnswerKey });
+    track("booklet_completed", { booklet_id: inserted?.id, pages: pageCount, mode, durationSec: Math.round((Date.now() - startedAt) / 1000), chars: htmlAccumulated.length, partial: streamAborted, withAnswerKey, booklet_index: bookletCount + 1 });
     onSaved?.();
 
     // Notify user if they switched away during generation
@@ -493,7 +494,7 @@ export default function Create({ onSaved, remaining, isPro, active = true, bookl
         });
       } catch {}
     }
-  }, [canSubmit, mode, freeText, f, pageCount, withAnswerKey, onSaved, photoUrl, examGrade, examSubject, examTopic, noEmojis, customWorld, fastMode]);
+  }, [canSubmit, mode, freeText, f, pageCount, withAnswerKey, onSaved, photoUrl, examGrade, examSubject, examTopic, noEmojis, customWorld, fastMode, bookletCount]);
   createRef.current = create; // keep stable pointer for auto-retry
 
   useEffect(() => {
@@ -798,6 +799,12 @@ export default function Create({ onSaved, remaining, isPro, active = true, bookl
         {/* Templates — show 6 by default, rest behind "עוד" toggle to reduce overload */}
         <div>
           <p className="text-xs text-ink/50 mb-2 font-semibold">👇 בחר נושא להתחיל — או מלא בעצמך למטה</p>
+          {bookletCount === 0 && !f.goal && (
+            <div className="flex items-center gap-2 bg-magic/6 border border-magic/15 rounded-xl px-3 py-2 mb-2 text-xs text-magic/80">
+              <span className="flex-shrink-0">☝️</span>
+              <span><strong>לחצי על נושא</strong> ← הטופס יתמלא אוטומטית. אחר כך רק "צור חוברת" ב-60 שניות</span>
+            </div>
+          )}
           <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
             {(showAllTemplates ? TEMPLATES : TEMPLATES.slice(0, 6)).map((t) => (
               <button key={t.label} onClick={() => applyTmpl(t)}
@@ -849,44 +856,55 @@ export default function Create({ onSaved, remaining, isPro, active = true, bookl
                 </div>
               </div>
             )}
-            <input id="inp-name" className="w-full border border-ink/20 rounded-xl p-3 outline-none focus:border-magic text-right bg-canvas/50" placeholder="שם הילד/ה *" value={f.childName} onChange={set("childName")} disabled={loading} />
-
-            {/* Child photo upload */}
-            <input type="file" ref={photoInputRef} accept="image/*" onChange={handlePhotoUpload} className="hidden" />
-            <div className="flex items-center gap-3">
-              <button
-                type="button"
-                aria-label="העלה תמונת פרופיל"
-                onClick={() => !loading && !photoUploading && photoInputRef.current?.click()}
-                disabled={loading || photoUploading}
-                className={`relative flex-shrink-0 w-12 h-12 rounded-full border-2 border-dashed overflow-hidden flex items-center justify-center transition-colors ${photoUrl ? "border-grow" : "border-magic/30 hover:border-magic/60"}`}
-              >
-                {photoUploading ? (
-                  <div className="w-4 h-4 border-2 border-magic border-t-transparent rounded-full animate-spin" />
-                ) : photoUrl ? (
-                  <img src={photoUrl} alt="" className="w-full h-full object-cover" />
-                ) : (
-                  <span className="text-lg">📷</span>
-                )}
-              </button>
-              <div className="flex-1 text-right">
-                {photoUploading ? (
-                  <p className="text-xs text-ink/50">טוען תמונה...</p>
-                ) : photoUrl ? (
-                  <div className="flex items-center justify-between">
-                    <button type="button" onClick={() => setPhotoUrl(null)} className="text-xs text-red-400 hover:text-red-600 transition-colors" disabled={loading}>הסר תמונה ×</button>
-                    <p className="text-xs text-grow font-medium">תמונה תופיע בשער ✓</p>
-                  </div>
-                ) : (
-                  <div>
-                    <p className="text-xs text-ink/50">תמונה לשער <span className="text-ink/30">(אופציונלי)</span></p>
-                    <p className="text-xs text-ink/30">תופיע כאיור עגול בשער החוברת</p>
-                  </div>
-                )}
-              </div>
+            <div className="grid grid-cols-2 gap-2">
+              <input id="inp-name" className="w-full border border-ink/20 rounded-xl p-3 outline-none focus:border-magic text-right bg-canvas/50" placeholder="שם הילד/ה *" value={f.childName} onChange={set("childName")} disabled={loading} />
+              <input className="w-full border border-ink/20 rounded-xl p-3 outline-none focus:border-magic text-right bg-canvas/50" placeholder="כיתה" value={f.grade} onChange={set("grade")} disabled={loading} />
             </div>
 
-            <input className="w-full border border-ink/20 rounded-xl p-3 outline-none focus:border-magic text-right bg-canvas/50" placeholder="גיל / כיתה" value={f.grade} onChange={set("grade")} disabled={loading} />
+            {/* Child photo upload — progressive disclosure */}
+            <input type="file" ref={photoInputRef} accept="image/*" onChange={handlePhotoUpload} className="hidden" />
+            {(!showPhoto && !photoUrl) ? (
+              <button
+                type="button"
+                onClick={() => setShowPhoto(true)}
+                className="text-xs text-ink/35 hover:text-magic transition-colors text-right w-full py-1"
+              >
+                📷 הוסף תמונה לשער (אופציונלי) +
+              </button>
+            ) : (
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  aria-label="העלה תמונת פרופיל"
+                  onClick={() => !loading && !photoUploading && photoInputRef.current?.click()}
+                  disabled={loading || photoUploading}
+                  className={`relative flex-shrink-0 w-12 h-12 rounded-full border-2 border-dashed overflow-hidden flex items-center justify-center transition-colors ${photoUrl ? "border-grow" : "border-magic/30 hover:border-magic/60"}`}
+                >
+                  {photoUploading ? (
+                    <div className="w-4 h-4 border-2 border-magic border-t-transparent rounded-full animate-spin" />
+                  ) : photoUrl ? (
+                    <img src={photoUrl} alt="" className="w-full h-full object-cover" />
+                  ) : (
+                    <span className="text-lg">📷</span>
+                  )}
+                </button>
+                <div className="flex-1 text-right">
+                  {photoUploading ? (
+                    <p className="text-xs text-ink/50">טוען תמונה...</p>
+                  ) : photoUrl ? (
+                    <div className="flex items-center justify-between">
+                      <button type="button" onClick={() => setPhotoUrl(null)} className="text-xs text-red-400 hover:text-red-600 transition-colors" disabled={loading}>הסר תמונה ×</button>
+                      <p className="text-xs text-grow font-medium">תמונה תופיע בשער ✓</p>
+                    </div>
+                  ) : (
+                    <div>
+                      <p className="text-xs text-ink/50">תמונה לשער <span className="text-ink/30">(אופציונלי)</span></p>
+                      <p className="text-xs text-ink/30">תופיע כאיור עגול בשער החוברת</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
             <div>
               <p className="text-xs text-ink/40 mb-1.5 font-medium">מה הילד/ה אוהב? (עולם התוכן)</p>
               <select className="w-full border border-ink/20 rounded-xl p-3 outline-none focus:border-magic bg-canvas/50 text-right" value={f.world} onChange={set("world")} disabled={loading}>
@@ -1123,7 +1141,7 @@ export default function Create({ onSaved, remaining, isPro, active = true, bookl
 
         {/* Generic error */}
         {error?.startsWith("generic:") && (
-          <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-red-600 text-sm">
+          <div role="alert" className="bg-red-50 border border-red-200 rounded-xl p-3 text-red-600 text-sm">
             {error.replace("generic:", "")}
           </div>
         )}
@@ -1140,8 +1158,9 @@ export default function Create({ onSaved, remaining, isPro, active = true, bookl
               </div>
             </div>
 
-            {/* Context-aware title */}
-            <div className="text-center">
+            {/* Context-aware title — announced to screen readers so blind users
+                aren't left in silence through the 60–90s generation. */}
+            <div className="text-center" role="status" aria-live="polite">
               <p className="font-display font-bold text-ink text-lg">
                 {mode === "exam"
                   ? `📝 מכין מבחן ${examSubject}${examGrade ? ` — ${examGrade}` : ""}`

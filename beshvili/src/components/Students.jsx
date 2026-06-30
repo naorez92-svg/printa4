@@ -183,7 +183,7 @@ function StudentCard({ student, onQuickCreate, onEdit, onHistory, onDelete }) {
   );
 }
 
-export default function Students({ onBookletSaved, remaining, isPro }) {
+export default function Students({ onBookletSaved, remaining, isPro, bookletCount = 0 }) {
   const [students, setStudents]   = useState([]);
   const [loading, setLoading]     = useState(true);
   const [loadError, setLoadError] = useState(null);
@@ -310,6 +310,7 @@ export default function Students({ onBookletSaved, remaining, isPro }) {
         onSaved={() => { setQuickCreate(null); onBookletSaved?.(); }}
         remaining={remaining}
         isPro={isPro}
+        bookletCount={bookletCount}
       />
     );
   }

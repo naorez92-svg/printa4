@@ -1,14 +1,31 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, lazy, Suspense } from "react";
 import { supabase } from "./lib/supabase";
-import Login from "./pages/Login";
-import Dashboard from "./pages/Dashboard";
-import PublicBooklet from "./pages/PublicBooklet";
 import AccessibilityWidget from "./components/AccessibilityWidget";
 import InAppBrowserBanner from "./components/InAppBrowserBanner";
 import { track, pageView, identify } from "./hooks/useEvents";
 
+// Route-level code splitting: Login (marketing + auth), Dashboard (the entire
+// authed app — Create/Jewish/Students/Admin/…), and PublicBooklet load on demand.
+// A logged-out visitor no longer downloads the Dashboard tree; a /b/:token visitor
+// downloads neither Login nor Dashboard. Cuts the landing first-paint bundle ~40%.
+const Login = lazy(() => import("./pages/Login"));
+const Dashboard = lazy(() => import("./pages/Dashboard"));
+const PublicBooklet = lazy(() => import("./pages/PublicBooklet"));
+
 // /b/:token — public booklet share page (no auth needed)
 const shareMatch = window.location.pathname.match(/^\/b\/([0-9a-f-]{36})$/i);
+
+// Full-screen loading spinner — reused for the session check AND the lazy-chunk
+// fetch so there's no second, differently-styled flash between the two.
+const PageSpinner = (
+  <div className="min-h-screen bg-canvas flex items-center justify-center" dir="rtl">
+    <div className="flex gap-1">
+      {[0, 1, 2].map((i) => (
+        <div key={i} className="w-2.5 h-2.5 rounded-full bg-magic animate-bounce" style={{ animationDelay: `${i * 0.15}s` }} />
+      ))}
+    </div>
+  </div>
+);
 
 function AuthApp() {
   const [session, setSession] = useState(null);
@@ -60,23 +77,41 @@ function AuthApp() {
     pageView(session ? "app" : "landing");
   }, [loading]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  if (loading) return (
-    <div className="min-h-screen bg-canvas flex items-center justify-center" dir="rtl">
-      <div className="flex gap-1">
-        {[0,1,2].map(i => (
-          <div key={i} className="w-2.5 h-2.5 rounded-full bg-magic animate-bounce" style={{ animationDelay: `${i * 0.15}s` }} />
-        ))}
-      </div>
-    </div>
+  // Active-day signal: fire once per calendar day per device for a logged-in user.
+  // session_start is deduped per browser tab, so it can't measure "came back on a
+  // later day" — the literal definition of a returning user (the cohort we need to
+  // understand the 1→2 booklet drop-off). The localStorage date-gate makes this
+  // idempotent even though `session` changes identity on every token refresh.
+  useEffect(() => {
+    if (loading || !session?.user) return;
+    try {
+      const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+      if (localStorage.getItem("beshvili_active_day") !== today) {
+        localStorage.setItem("beshvili_active_day", today);
+        track("app_day_active", {});
+      }
+    } catch { /* storage blocked — skip */ }
+  }, [loading, session]);
+
+  if (loading) return PageSpinner;
+  return (
+    <Suspense fallback={PageSpinner}>
+      {session ? <Dashboard /> : <Login />}
+    </Suspense>
   );
-  return session ? <Dashboard /> : <Login />;
 }
 
 export default function App() {
   return (
     <>
       <InAppBrowserBanner />
-      {shareMatch ? <PublicBooklet token={shareMatch[1]} /> : <AuthApp />}
+      {shareMatch ? (
+        <Suspense fallback={PageSpinner}>
+          <PublicBooklet token={shareMatch[1]} />
+        </Suspense>
+      ) : (
+        <AuthApp />
+      )}
       <AccessibilityWidget />
     </>
   );
