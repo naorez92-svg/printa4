@@ -1,5 +1,7 @@
-// redeploy marker v2 — same stale/corrupt-deployment recovery as admin-stats:
-// the self-test was failing with "Failed to send a request" (no boot).
+// redeploy marker v3 — function went stale again ("Failed to send a request to
+// the Edge Function" = client fetch never got a response = no boot). CORS + code
+// verified clean, so this is the stale/corrupt-deployment failure mode again;
+// bumping the marker forces a fresh deploy of this (and all) functions.
 import { createClient } from "jsr:@supabase/supabase-js@2";
 
 // Self-test: proves a NON-ADMIN user can create (save) a booklet end-to-end.
