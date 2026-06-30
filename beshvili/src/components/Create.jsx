@@ -494,7 +494,7 @@ export default function Create({ onSaved, remaining, isPro, active = true, bookl
         });
       } catch {}
     }
-  }, [canSubmit, mode, freeText, f, pageCount, withAnswerKey, onSaved, photoUrl, examGrade, examSubject, examTopic, noEmojis, customWorld, fastMode]);
+  }, [canSubmit, mode, freeText, f, pageCount, withAnswerKey, onSaved, photoUrl, examGrade, examSubject, examTopic, noEmojis, customWorld, fastMode, bookletCount]);
   createRef.current = create; // keep stable pointer for auto-retry
 
   useEffect(() => {

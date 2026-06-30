@@ -281,7 +281,7 @@ export default function QuickCreate({ student, onClose, onSaved, remaining, isPr
     setHtml(finalHtml);
     track("booklet_completed", { booklet_id: inserted?.id, pages: pageCount, mode: "student_quick", child_id: student?.id, booklet_index: bookletCount + 1 });
     onSaved?.();
-  }, [canSubmit, student, subject, world, specificGoal, pageCount, onSaved]);
+  }, [canSubmit, student, subject, world, specificGoal, pageCount, onSaved, bookletCount]);
 
   if (html) {
     return (
