@@ -15,6 +15,11 @@ jobs:
       - uses: supabase/setup-cli@v1
         with:
           version: latest
+          # Authenticate the "resolve latest CLI release" GitHub API call. Without a
+          # token it uses the 60/hour unauthenticated limit shared across runners and
+          # fails with "rate limit exceeded" — which silently blocked every Edge
+          # Function deploy (functions went stale). GITHUB_TOKEN is auto-provided.
+          github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Deploy Edge Functions
         run: |
@@ -83,6 +88,11 @@ jobs:
       - uses: supabase/setup-cli@v1
         with:
           version: latest
+          # Authenticate the "resolve latest CLI release" GitHub API call. Without a
+          # token it uses the 60/hour unauthenticated limit shared across runners and
+          # fails with "rate limit exceeded" — which silently blocked every Edge
+          # Function deploy (functions went stale). GITHUB_TOKEN is auto-provided.
+          github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Link project
         run: supabase link --project-ref gywpdzkvkdisonuzhsib
