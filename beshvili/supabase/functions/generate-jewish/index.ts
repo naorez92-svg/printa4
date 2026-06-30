@@ -133,8 +133,12 @@ const JEWISH_SYSTEM = `אתה מומחה פדגוגי בחינוך יהודי ד
 • מקורות תמיד בפורמט: (ספר/מסכת פרק:פסוק/משנה) — מיד אחרי כל ציטוט
 • עברית תקנית ומכובדת — ללא סלנג, ללא אימוג'ים מיותרים
 • כפתור הדפסה class="no-print" בראש הדף בלבד
-• Footer (בעמוד האחרון בלבד): <p style="position:absolute;bottom:4mm;left:0;right:0;text-align:center;font-size:7px;color:#d1d5db;margin:0">נוצר עם beshvili.com</p>
-• כל עמוד מלא בתוכן — אסור להשאיר עמוד ריק או חלקי`;
+• Footer + QR (בעמוד האחרון בלבד, ממורכז בתחתית) — בדיוק כך:
+<div style="position:absolute;bottom:4mm;left:0;right:0;text-align:center;margin:0">
+  <img src="https://api.qrserver.com/v1/create-qr-code/?size=120x120&margin=0&data=https%3A%2F%2Fwww.beshvili.com" width="48" height="48" alt="" style="display:inline-block">
+  <p style="font-size:7px;color:#d1d5db;margin:1px 0 0">נוצר עם beshvili.com</p>
+</div>
+• כל עמוד מלא בתוכן — אסור להשאיר עמוד ריק או חלקי! אם נשאר מקום — הוסף עוד תוכן עד שהעמוד מלא. לעולם אל תסיים בעמוד ריק או חצי-ריק`;
 
 Deno.serve(async (req) => {
   const cors = getCors(req);
