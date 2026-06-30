@@ -171,6 +171,7 @@ Badge תרגיל — עם letter-spacing (לא rounded-full סתם!):
   <div style="border-bottom:1.5px solid #cbd5e1;margin:3px 0 7px;height:26px;background:linear-gradient(180deg,transparent 80%,#f8fafc 100%)"></div>
 
 • אימוג'ים לתמיכה חזותית (מקסימום 3 בשורה — יותר נראה עמוס)
+• גיוון פריסה — אל תחזור על אותו מבנה (תיבה+קו) בכל סעיף! שלב מבנים שונים: 2 עמודות זו-לצד-זו, רשת כרטיסים, בלוק רחב צבעוני בולט, ותיבת טיפ/ציטוט בצד. כל עמוד צריך להרגיש מעט שונה ויזואלית — כמו מגזין, לא כמו טופס.
 
 === מבנה עמודים (כמות מצויינת בבקשה — חובה לעמוד בה בדיוק!) ===
 עמוד 1 — שער + קובץ משימה:
@@ -235,7 +236,7 @@ Badge תרגיל — עם letter-spacing (לא rounded-full סתם!):
 === פלט (חשוב מאוד!) ===
 • קוד HTML גולמי בלבד — החל מ-<!DOCTYPE html> עד </html>
 • ללא \`\`\`html, ללא הסברים, ללא שום טקסט לפני או אחרי
-• כל עמוד חייב להיות מלא בתוכן — אסור בתכלית האיסור להשאיר עמוד ריק או חלקי!
+• כל עמוד חייב להיות מלא בתוכן — אסור בתכלית האיסור להשאיר עמוד ריק או חלקי! חלק את התוכן באופן שווה כך שכל העמודים מלאים. אם נשאר מקום בעמוד — הוסף עוד תרגיל/חידה/בעיה מילולית עד שהוא מלא. לעולם אל תסיים חוברת בעמוד ריק או חצי-ריק.
 • כפתור הדפסה ממוסגר עם class="no-print" בראש הדף
 • עברית תקינה, מלאה ועשירה
 • כל העמודים (לפי הכמות שנדרשה) בקובץ HTML אחד
@@ -254,10 +255,13 @@ Badge תרגיל — עם letter-spacing (לא rounded-full סתם!):
   green→from-emerald-600 to-teal-500   | orange→from-orange-500 to-amber-400
   pink→from-pink-600 to-rose-500
 
-=== ייחוס (חובה!) ===
-• אם teacher_name סופק — הפוטר של כל עמוד כולל כבר beshvili.com (ראה למעלה)
-• אם teacher_name לא סופק — הוסף בתחתית עמוד אחרון בלבד:
-<p style="position:absolute;bottom:6mm;left:0;right:0;text-align:center;font-size:8px;color:#ccc;margin:0;">נוצר בחינם עם beshvili.com ✨</p>`;
+=== ייחוס + QR (חובה!) ===
+• אם teacher_name סופק — הפוטר של כל עמוד כולל כבר beshvili.com (ראה למעלה). אל תוסיף QR — החוברת ממותגת למורה.
+• אם teacher_name לא סופק — הוסף בעמוד האחרון בלבד, ממורכז בתחתית, את הבלוק הבא בדיוק (QR שמוביל ל-beshvili.com — כך כל חוברת מודפסת מזמינה מורים נוספים):
+<div style="position:absolute;bottom:5mm;left:0;right:0;text-align:center;margin:0">
+  <img src="https://api.qrserver.com/v1/create-qr-code/?size=120x120&margin=0&data=https%3A%2F%2Fwww.beshvili.com" width="54" height="54" alt="" style="display:inline-block">
+  <p style="font-size:7.5px;color:#bbb;margin:2px 0 0">סרקו ליצירת חוברת משלכם ✨ beshvili.com</p>
+</div>`;
 
 const EXAM_SYSTEM = `אתה "יוצר מבחנים של חני" — מומחה פדגוגי ומעצב מסמכים לבתי ספר בישראל.
 מטרתך: לייצר קוד HTML מלא למבחנים רשמיים לילדים בכיתות ג-ו, חסכוניים בדיו, מוכנים להדפסה בפורמט A4.
@@ -466,7 +470,9 @@ Deno.serve(async (req) => {
 
     const maxPages = isTeacher ? TEACHER_MAX_PAGES : isParent ? PARENT_MAX_PAGES : FREE_MAX_PAGES;
     const pageCount = Math.min(maxPages, Math.max(1, Number.isInteger(body.pageCount) ? body.pageCount : 5));
-    const withAnswerKey = body.withAnswerKey === true;
+    // Answer key defaults ON for teachers (they grade) unless explicitly disabled;
+    // parents/free still opt in.
+    const withAnswerKey = body.withAnswerKey === true || (isTeacher && body.withAnswerKey !== false);
     const noStream = body.noStream === true; // in-app browsers (FB/IG webview)
     // No-stream holds ONE request open for the whole generation, bounded by the
     // platform wall-clock limit — cap the size so it reliably finishes. Each
