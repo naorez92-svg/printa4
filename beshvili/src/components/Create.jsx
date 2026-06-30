@@ -67,6 +67,16 @@ const LOADING_MSGS = [
   "כמעט מוכן! עוד רגע...",
 ];
 
+// A4 @ 96dpi — same constants Preview.jsx uses, so the live-build preview below
+// scales identically to the final booklet view. Used ONLY for the loading preview;
+// does NOT touch the generation engine.
+const A4_PX = 794;
+const A4_H  = 1123;
+// Count A4 pages emitted so far in the streamed HTML — each page div carries one
+// `height:296mm`. Drives the live page-by-page progress. Display only; if a future
+// engine changes the dimension this just returns 0 and the char bar takes over.
+const countPages = (html) => (html.match(/296mm/g) || []).length;
+
 export default function Create({ onSaved, remaining, isPro, active = true, bookletCount = 0, onUpgrade, pendingStarter = null, onStarterConsumed }) {
   const [showUpgrade, setShowUpgrade] = useState(false);
   const openUpgrade = onUpgrade ?? (() => setShowUpgrade(true));
@@ -86,6 +96,7 @@ export default function Create({ onSaved, remaining, isPro, active = true, bookl
   const [loading, setLoading]     = useState(false);
   const [loadingMsgIdx, setLoadingMsgIdx] = useState(0);
   const [streamChars, setStreamChars] = useState(0);
+  const [previewHtml, setPreviewHtml] = useState(""); // live booklet-in-progress (display only)
   const [loadingElapsed, setLoadingElapsed] = useState(0);
   const [html, setHtml]           = useState(null);
   const [bookletId, setBookletId] = useState(null);
@@ -115,7 +126,7 @@ export default function Create({ onSaved, remaining, isPro, active = true, bookl
 
   // Rotate loading messages every 3.5 s while generating; tick elapsed seconds
   useEffect(() => {
-    if (!loading) { setLoadingMsgIdx(0); setStreamChars(0); setLoadingElapsed(0); return; }
+    if (!loading) { setLoadingMsgIdx(0); setStreamChars(0); setLoadingElapsed(0); setPreviewHtml(""); return; }
     const msgId = setInterval(() => setLoadingMsgIdx(i => (i + 1) % LOADING_MSGS.length), 3500);
     const secId = setInterval(() => setLoadingElapsed(s => s + 1), 1000);
     return () => { clearInterval(msgId); clearInterval(secId); };
@@ -177,6 +188,7 @@ export default function Create({ onSaved, remaining, isPro, active = true, bookl
     const startedAt = Date.now();   // true generation duration (not the stale loadingElapsed closure)
     setLoading(true);
     setHtml(null);
+    setPreviewHtml("");
     setError(null);
     const effectiveWorld = f.world === "אחר" ? customWorld.trim() || "נושא חופשי" : f.world;
     const trackError = (type, extra = {}) => track("booklet_error", { type, mode, pageCount, ...extra });
@@ -329,6 +341,7 @@ export default function Create({ onSaved, remaining, isPro, active = true, bookl
     const decoder = new TextDecoder();
     let buffer = "";
     let updateTimer = 0;
+    let previewTimer = 0; // throttles the live-build iframe (heavier than the char counter)
 
     // Stall guards: a hung Anthropic stream still keeps the HTTP connection alive
     // via the server's keep-alive heartbeats, so without these the user can wait
@@ -365,6 +378,13 @@ export default function Create({ onSaved, remaining, isPro, active = true, bookl
               if (now - updateTimer > 100) {
                 setStreamChars(htmlAccumulated.length);
                 updateTimer = now;
+              }
+              // Live build preview: snapshot the HTML-so-far at a gentle cadence.
+              // Each update re-renders the sandboxed iframe, so keep it ~2s to read
+              // as a calm refresh (not a strobe) while still feeling live.
+              if (now - previewTimer > 2000) {
+                setPreviewHtml(htmlAccumulated);
+                previewTimer = now;
               }
             } else if (ev.type === "message_delta" && ev.delta?.stop_reason) {
               stopReason = ev.delta.stop_reason;
@@ -1149,14 +1169,51 @@ export default function Create({ onSaved, remaining, isPro, active = true, bookl
         {/* Submit / loading */}
         {loading ? (
           <div className="py-10 space-y-5">
-            {/* Animated creation orb */}
-            <div className="flex justify-center">
-              <div className="relative w-20 h-20">
-                <div className="absolute inset-0 rounded-full border-4 border-magic/20 border-t-magic animate-spin" />
-                <div className="absolute inset-2 rounded-full border-2 border-brand/20 border-b-brand animate-spin" style={{ animationDuration: "1.5s", animationDirection: "reverse" }} />
-                <div className="absolute inset-0 flex items-center justify-center text-3xl">✨</div>
+            {/* Live build preview — the child/parent watches their booklet take
+                shape page by page instead of staring at a spinner. Display only:
+                same A4 constants + sandboxed srcDoc as the final Preview, so it
+                scales identically. Touches NOTHING in the generation engine.
+                Shows the orb until the <style>/<head> has streamed (first seconds),
+                then swaps to the live page that's currently being written. */}
+            {(previewHtml.includes("</style>") || previewHtml.includes("</head>")) ? (
+              <div className="flex justify-center">
+                <div
+                  dir="ltr"
+                  className="relative rounded-2xl overflow-hidden border border-ink/10 shadow-lg bg-white"
+                  style={{ width: 300, height: Math.round(A4_H * (300 / A4_PX)) }}
+                >
+                  <iframe
+                    title="תצוגה חיה של החוברת"
+                    srcDoc={previewHtml}
+                    sandbox="allow-scripts"
+                    style={{
+                      width: `${A4_PX}px`,
+                      height: `${(mode === "quick" ? 1 : pageCount) * A4_H}px`,
+                      transform: `scale(${300 / A4_PX}) translateY(-${Math.max(0, Math.min((mode === "quick" ? 1 : pageCount) - 1, countPages(previewHtml) - 1)) * A4_H}px)`,
+                      transformOrigin: "top left",
+                      border: "none",
+                      display: "block",
+                      position: "absolute",
+                      top: 0,
+                      left: 0,
+                      transition: "transform 0.7s ease",
+                    }}
+                  />
+                  <div className="absolute top-2 right-2 bg-magic/90 text-white text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 pointer-events-none">
+                    <span className="w-1.5 h-1.5 bg-white rounded-full animate-pulse" /> חי
+                  </div>
+                  <div className="absolute inset-x-0 bottom-0 h-8 bg-gradient-to-t from-white to-transparent pointer-events-none" />
+                </div>
               </div>
-            </div>
+            ) : (
+              <div className="flex justify-center">
+                <div className="relative w-20 h-20">
+                  <div className="absolute inset-0 rounded-full border-4 border-magic/20 border-t-magic animate-spin" />
+                  <div className="absolute inset-2 rounded-full border-2 border-brand/20 border-b-brand animate-spin" style={{ animationDuration: "1.5s", animationDirection: "reverse" }} />
+                  <div className="absolute inset-0 flex items-center justify-center text-3xl">✨</div>
+                </div>
+              </div>
+            )}
 
             {/* Context-aware title — announced to screen readers so blind users
                 aren't left in silence through the 60–90s generation. */}
@@ -1170,6 +1227,26 @@ export default function Create({ onSaved, remaining, isPro, active = true, bookl
               </p>
               <p className="text-ink/55 text-sm mt-1">{LOADING_MSGS[loadingMsgIdx]}</p>
             </div>
+
+            {/* Page-by-page progress — concrete, honest feedback from the actual
+                streamed pages (not a fabricated timer). Hidden for single-page modes. */}
+            {(mode === "quick" ? 1 : pageCount) > 1 && (
+              <div className="space-y-1.5">
+                <div className="flex justify-center gap-1.5">
+                  {Array.from({ length: pageCount }).map((_, i) => (
+                    <div
+                      key={i}
+                      className={`h-1.5 rounded-full transition-all duration-500 ${i < countPages(previewHtml) ? "bg-gradient-to-l from-magic to-grow w-7" : "bg-ink/10 w-4"}`}
+                    />
+                  ))}
+                </div>
+                {countPages(previewHtml) > 0 && (
+                  <p className="text-center text-xs text-ink/45">
+                    בונה עמוד {Math.min(pageCount, countPages(previewHtml))} מתוך {pageCount} ✍️
+                  </p>
+                )}
+              </div>
+            )}
 
             {/* Progress bar + stats */}
             <div className="space-y-1.5">
