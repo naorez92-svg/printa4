@@ -1,0 +1,290 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>בשבילי · תוכנית שיווק מקצועית</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&family=Assistant:wght@400;600;700;800&display=swap&subset=hebrew" rel="stylesheet" />
+<style>
+  :root{
+    --ink:#20184A; --canvas:#F7F6FB; --brand:#F4A02C; --magic:#6C5CE7; --grow:#1FB58F;
+    --card:#fff; --line:#e9e6f5; --muted:#6b6685;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;font-family:'Assistant',sans-serif;color:var(--ink);background:var(--canvas);line-height:1.7}
+  h1,h2,h3,.display{font-family:'Baloo 2',cursive}
+  a{color:var(--magic)}
+  .wrap{max-width:1000px;margin:0 auto;padding:0 20px}
+
+  /* Header */
+  header.hero{background:linear-gradient(135deg,var(--ink),var(--magic));color:#fff;padding:54px 0 60px;position:relative;overflow:hidden}
+  header.hero::after{content:"";position:absolute;left:-60px;top:-60px;width:260px;height:260px;background:var(--brand);opacity:.25;border-radius:50%;filter:blur(10px)}
+  .badge{display:inline-block;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.3);padding:5px 14px;border-radius:999px;font-weight:700;font-size:14px;margin-bottom:14px}
+  header.hero h1{font-size:clamp(30px,6vw,46px);margin:.1em 0 .2em;font-weight:800;line-height:1.15}
+  header.hero p{font-size:clamp(16px,2.4vw,20px);max-width:680px;opacity:.95;margin:0}
+  .hero-meta{margin-top:22px;display:flex;flex-wrap:wrap;gap:10px}
+  .hero-meta span{background:rgba(255,255,255,.12);padding:6px 13px;border-radius:10px;font-size:14px;font-weight:600}
+
+  /* Nav */
+  nav.toc{position:sticky;top:0;z-index:20;background:rgba(247,246,251,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+  nav.toc .wrap{display:flex;gap:6px;overflow-x:auto;padding:10px 20px;-webkit-overflow-scrolling:touch}
+  nav.toc a{white-space:nowrap;text-decoration:none;color:var(--ink);font-weight:700;font-size:14px;padding:7px 13px;border-radius:9px;border:1px solid transparent}
+  nav.toc a:hover{background:#fff;border-color:var(--line)}
+
+  section{padding:38px 0;border-bottom:1px solid var(--line)}
+  .kicker{color:var(--magic);font-weight:800;letter-spacing:.04em;font-size:13px;text-transform:uppercase;margin:0 0 6px}
+  h2{font-size:clamp(24px,4vw,32px);margin:.1em 0 .5em}
+  h3{font-size:20px;margin:1.2em 0 .4em}
+  p{margin:.5em 0}
+  .lead{font-size:18px;color:#332b5c}
+
+  .grid{display:grid;gap:16px}
+  .g2{grid-template-columns:repeat(2,1fr)}
+  .g3{grid-template-columns:repeat(3,1fr)}
+  @media(max-width:740px){.g2,.g3{grid-template-columns:1fr}}
+
+  .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:20px;box-shadow:0 2px 10px rgba(32,24,74,.04)}
+  .card h3{margin-top:0}
+  .pill{display:inline-block;font-size:12px;font-weight:800;padding:3px 10px;border-radius:999px;color:#fff}
+  .t1{background:var(--grow)} .t2{background:var(--brand)} .t3{background:var(--magic)}
+  .num{display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:50%;background:var(--magic);color:#fff;font-weight:800;font-family:'Baloo 2';flex:none}
+
+  table{width:100%;border-collapse:collapse;font-size:15px;background:#fff;border-radius:14px;overflow:hidden;border:1px solid var(--line)}
+  th,td{padding:11px 12px;text-align:right;border-bottom:1px solid var(--line)}
+  th{background:var(--ink);color:#fff;font-family:'Baloo 2';font-weight:700;font-size:14px}
+  tr:last-child td{border-bottom:none}
+  .score{font-weight:800;color:var(--ink)}
+  .bar{height:8px;border-radius:5px;background:var(--line);overflow:hidden;min-width:60px}
+  .bar i{display:block;height:100%;background:linear-gradient(90deg,var(--grow),var(--brand))}
+
+  .phase{display:flex;gap:16px;align-items:flex-start;margin:0 0 6px}
+  .phase .line{flex:none;display:flex;flex-direction:column;align-items:center}
+  .phase .dot{width:18px;height:18px;border-radius:50%;background:var(--brand);border:3px solid #fff;box-shadow:0 0 0 2px var(--brand)}
+  .phase .rod{width:3px;flex:1;background:var(--line);margin:4px 0}
+  .phase:last-child .rod{display:none}
+
+  .callout{border-right:5px solid var(--brand);background:#fff8ef;padding:14px 18px;border-radius:0 12px 12px 0;margin:14px 0}
+  .danger{border-right-color:#e2483d;background:#fdecea}
+  .win{border-right-color:var(--grow);background:#eafaf4}
+  .star{border-right-color:var(--magic);background:#f1effc}
+
+  ul.clean{list-style:none;padding:0;margin:.4em 0}
+  ul.clean li{padding:6px 0 6px 0;padding-right:26px;position:relative}
+  ul.clean li::before{content:"";position:absolute;right:4px;top:14px;width:9px;height:9px;border-radius:50%;background:var(--grow)}
+  ul.check li::before{content:"✓";background:none;color:var(--grow);font-weight:900;top:6px;right:0;width:auto;height:auto}
+
+  .kpi{display:flex;flex-direction:column;gap:2px;background:#fff;border:1px solid var(--line);border-radius:14px;padding:16px;text-align:center}
+  .kpi b{font-family:'Baloo 2';font-size:28px;color:var(--magic)}
+  .kpi span{font-size:13px;color:var(--muted);font-weight:600}
+
+  .tag{display:inline-block;background:#efeafd;color:var(--magic);font-weight:700;font-size:12px;padding:3px 9px;border-radius:7px;margin:2px 0}
+  footer{padding:30px 0 50px;text-align:center;color:var(--muted);font-size:14px}
+  .q{background:#fff;border:1px dashed var(--magic);border-radius:12px;padding:12px 16px;margin:8px 0;font-weight:600}
+  @media print{nav.toc{display:none}section{break-inside:avoid}}
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="wrap">
+    <span class="badge">תוכנית שיווק · גרסה 1.0 · יוני 2026</span>
+    <h1>בשבילי — תוכנית שיווק מקצועית</h1>
+    <p>מפת דרכים מדורגת לצמיחה: ממדידה ועד ויראליות. בנויה לצמיחה אורגנית מובלת-מוצר (Product-Led), עם מסלול ברור לפרסום ממומן ברגע שחשבון המודעות ישוחרר.</p>
+    <div class="hero-meta">
+      <span>🎯 קהל: מורות פרטיות · מחנכות · חמ"ד</span>
+      <span>💸 תקציב התחלתי: 0 ₪</span>
+      <span>📊 הכל נמדד דרך הפיקסל</span>
+    </div>
+  </div>
+</header>
+
+<nav class="toc">
+  <div class="wrap">
+    <a href="#summary">תקציר</a>
+    <a href="#model">מודל הצמיחה</a>
+    <a href="#rank">מדרג ערוצים</a>
+    <a href="#roadmap">תוכנית בשלבים</a>
+    <a href="#outbox">מחוץ לקופסא</a>
+    <a href="#metrics">מדדים ויעדים</a>
+    <a href="#roles">תפקידים</a>
+    <a href="#blocker">החסם הנוכחי</a>
+  </div>
+</nav>
+
+<!-- 1 -->
+<section id="summary">
+  <div class="wrap">
+    <p class="kicker">01 · איפה אנחנו</p>
+    <h2>תקציר מנהלים</h2>
+    <p class="lead">בשבילי הוא מוצר עם <b>כאב חד וברור</b> (מורות מבזבזות שעות על הכנת חומרים) ו<b>פתרון "וואו" מיידי</b> (חוברת אישית מודפסת תוך דקה). זה בדיוק הפרופיל שבו צמיחה מובלת-מוצר עובדת הכי טוב: המשתמשת חווה ערך לפני שהיא משלמת.</p>
+    <div class="grid g3" style="margin-top:18px">
+      <div class="card"><h3>✅ מה כבר עומד</h3><ul class="clean check">
+        <li>מוצר חי ועובד (חינם: 2 חוברות)</li>
+        <li>פיקסל מטא + מדידת funnel מלאה</li>
+        <li>מסלול ייעודי לחמ"ד</li>
+        <li>הוכחה חברתית (4.9★, 500+ חוברות)</li>
+      </ul></div>
+      <div class="card"><h3>🎯 האסטרטגיה ב-3 שורות</h3><ul class="clean">
+        <li><b>שלב 1:</b> להצית אורגני — קבוצות, וואטסאפ, תוכן</li>
+        <li><b>שלב 2:</b> לבנות לולאות ויראליות שעובדות לבד</li>
+        <li><b>שלב 3:</b> לתדלק בממומן ברגע שהחשבון ישוחרר</li>
+      </ul></div>
+      <div class="card"><h3>⛔ החסם להיום</h3><ul class="clean">
+        <li>חשבון המודעות <b>בתהליך בדיקה</b> מול מטא (ר' פרק אחרון)</li>
+        <li>→ פרסום ממומן ימתין עד לסיום הבדיקה</li>
+        <li>→ <b>לכן מתחילים אורגני</b> — שלא צריך חשבון מודעות בכלל</li>
+      </ul></div>
+    </div>
+    <div class="callout star"><b>העיקרון המנחה:</b> לא מתקדמים לשלב הבא עד שהשלב הנוכחי <b>נמדד ועובד</b>. כל ערוץ מקבל יעד מספרי, ואנחנו מכבים מה שלא עובד ומכפילים את מה שכן.</div>
+  </div>
+</section>
+
+<!-- 2 -->
+<section id="model">
+  <div class="wrap">
+    <p class="kicker">02 · המנוע</p>
+    <h2>מודל הצמיחה — חמשת השלבים של המשתמשת</h2>
+    <p class="lead">כל שיווק שנעשה חייב להזיז את אחד מחמשת המספרים האלה (מודל AARRR — "מדדי הפיראט"). זו השפה המשותפת שלנו ושל הפיקסל.</p>
+    <div class="grid g2" style="margin-top:16px">
+      <div class="card"><span class="num">1</span> <b style="font-size:18px"> רכישה (Acquisition)</b><p>איך מגלים אותנו: קבוצות פייסבוק, וואטסאפ, חיפוש בגוגל, וה-QR על החוברת המודפסת.</p><span class="tag">מדד: כניסות חדשות לאתר</span></div>
+      <div class="card" style="border-color:var(--brand)"><span class="num" style="background:var(--brand)">2</span> <b style="font-size:18px"> הפעלה (Activation) ⭐</b><p>רגע ה"וואו" = <b>החוברת הראשונה שמודפסת</b>. זה המדד הכי חשוב בכל המודל.</p><span class="tag">מדד: % נרשמות שיצרו חוברת</span></div>
+      <div class="card"><span class="num">3</span> <b style="font-size:18px"> שימור (Retention)</b><p>חוזרת בשבוע הבא לחוברת הבאה. כאן נמצאת "נטישת 1→2 חוברות" שכבר זוהתה בקוד.</p><span class="tag">מדד: חזרה ביום 7 / שבוע 2</span></div>
+      <div class="card"><span class="num">4</span> <b style="font-size:18px"> הפניה (Referral)</b><p>מורה מספרת למורה. הערוץ הזול והאמין ביותר — 90% מההפניות עוברות בוואטסאפ.</p><span class="tag">מדד: הזמנות שנשלחו / מומשו</span></div>
+      <div class="card"><span class="num">5</span> <b style="font-size:18px"> הכנסה (Revenue)</b><p>מעבר מחינם ל-Pro (כרגע דרך וואטסאפ). נטפל בזה אחרי שיש זרם משתמשות יציב.</p><span class="tag">מדד: שדרוגים / המרה לפרו</span></div>
+      <div class="card win"><b style="font-size:18px">💡 התובנה המקצועית</b><p>רוב הסטארטאפים שורפים כסף על <b>רכישה</b> בזמן שהדליפה האמיתית היא ב<b>הפעלה ושימור</b>. אצלכם כבר זוהתה נטישת 1→2 חוברות — <b>תיקון ההפעלה שווה יותר מכל מודעה</b>. זו עדיפות שלב 1.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- 3 -->
+<section id="rank">
+  <div class="wrap">
+    <p class="kicker">03 · המדרג</p>
+    <h2>מדרג הערוצים — מה לעשות קודם</h2>
+    <p class="lead">כל ערוץ קיבל ציון <b>ICE</b>: השפעה × ביטחון × קלות (1–10). ככה יודעים במה להשקיע <b>עכשיו</b> ומה לדחות. ממוין מהגבוה לנמוך.</p>
+    <table style="margin-top:14px">
+      <thead><tr><th>דירוג</th><th>ערוץ</th><th>שלב</th><th>השפעה</th><th>קלות</th><th>ציון ICE</th></tr></thead>
+      <tbody>
+        <tr><td>🥇</td><td><b>קבוצות פייסבוק של מורות</b><br><small>פוסטים מבוססי-ערך, "מעניין" בתגובות</small></td><td><span class="pill t1">עכשיו</span></td><td>גבוהה</td><td>גבוהה</td><td><div class="bar"><i style="width:95%"></i></div><span class="score">9.3</span></td></tr>
+        <tr><td>🥈</td><td><b>לולאת החוברת המודפסת</b><br><small>QR + מיתוג על כל חוברת חינמית</small></td><td><span class="pill t1">עכשיו</span></td><td>גבוהה</td><td>בינונית</td><td><div class="bar"><i style="width:90%"></i></div><span class="score">9.0</span></td></tr>
+        <tr><td>🥉</td><td><b>וואטסאפ / הפניה דו-צדדית</b><br><small>"הזמיני מורה — שתיכן מרוויחות"</small></td><td><span class="pill t1">עכשיו</span></td><td>גבוהה</td><td>בינונית</td><td><div class="bar"><i style="width:87%"></i></div><span class="score">8.7</span></td></tr>
+        <tr><td>4</td><td><b>תיקון הפעלה ושימור במוצר</b><br><small>אונבורדינג, מייל/וואטסאפ "החוברת ה-2"</small></td><td><span class="pill t1">עכשיו</span></td><td>גבוהה מאוד</td><td>בינונית</td><td><div class="bar"><i style="width:85%"></i></div><span class="score">8.5</span></td></tr>
+        <tr><td>5</td><td><b>מגנטים: חבילות חוברת חינם</b><br><small>"חבילת חזרה למבחן", "דפי חנוכה"</small></td><td><span class="pill t2">בקרוב</span></td><td>בינונית</td><td>גבוהה</td><td><div class="bar"><i style="width:78%"></i></div><span class="score">7.8</span></td></tr>
+        <tr><td>6</td><td><b>מיקרו-משפיעניות (מורות באינסטה/טיקטוק)</b></td><td><span class="pill t2">בקרוב</span></td><td>גבוהה</td><td>נמוכה</td><td><div class="bar"><i style="width:74%"></i></div><span class="score">7.4</span></td></tr>
+        <tr><td>7</td><td><b>קבוצות טלגרם של מורים</b><br><small>תת-מנוצל בישראל מול פייסבוק</small></td><td><span class="pill t2">בקרוב</span></td><td>בינונית</td><td>גבוהה</td><td><div class="bar"><i style="width:70%"></i></div><span class="score">7.0</span></td></tr>
+        <tr><td>8</td><td><b>SEO תוכניתי (דפי נחיתה לחיפושים)</b><br><small>"דף עבודה חשבון כיתה ד להדפסה"</small></td><td><span class="pill t3">בהמשך</span></td><td>גבוהה</td><td>נמוכה</td><td><div class="bar"><i style="width:66%"></i></div><span class="score">6.6</span></td></tr>
+        <tr><td>9</td><td><b>פרסום ממומן במטא</b><br><small>חסום עד שחרור החשבון</small></td><td><span class="pill t3">בהמשך</span></td><td>גבוהה</td><td>חסום כעת</td><td><div class="bar"><i style="width:55%"></i></div><span class="score">5.5*</span></td></tr>
+      </tbody>
+    </table>
+    <p style="font-size:13px;color:var(--muted)">* הציון של הממומן נמוך כרגע <b>רק בגלל החסם</b>. ברגע שהחשבון ישוחרר והפיקסל יצבור נתונים — הוא יקפוץ לטופ 3.</p>
+  </div>
+</section>
+
+<!-- 4 -->
+<section id="roadmap">
+  <div class="wrap">
+    <p class="kicker">04 · הביצוע</p>
+    <h2>תוכנית בשלבים — 90 יום</h2>
+    <div style="margin-top:16px">
+      <div class="phase"><div class="line"><div class="dot" style="background:var(--grow)"></div><div class="rod"></div></div>
+        <div class="card" style="flex:1"><span class="pill t1">הושלם ✓</span><h3 style="margin:.3em 0">שלב 0 · תשתית מדידה</h3>
+        <ul class="clean check"><li>פיקסל מטא מותקן ומחובר לאירועי ה-funnel</li><li>תיקון CSP שאיפשר לפיקסל לירות</li><li>מדידת אנונימי→נרשם→פעיל קיימת</li></ul></div></div>
+
+      <div class="phase"><div class="line"><div class="dot"></div><div class="rod"></div></div>
+        <div class="card" style="flex:1"><span class="pill t1">ימים 1–30</span><h3 style="margin:.3em 0">שלב 1 · הצתה אורגנית + תיקון הפעלה</h3>
+        <ul class="clean"><li><b>קבוצות:</b> הצטרפות ל-15 קבוצות, פוסט יומי מבוסס-ערך (ערכת הפוסטים מוכנה)</li><li><b>וואטסאפ:</b> פנייה אישית ל-30 מורות מהמעגל הקרוב</li><li><b>הפעלה:</b> זיהוי למה נרשמות לא יוצרות חוברת ראשונה — ותיקון האונבורדינג</li><li><b>שימור:</b> תזכורת אוטומטית ("מוכנה לחוברת הבאה?") כדי לשבור את נטישת 1→2</li></ul>
+        <div class="callout win" style="margin:10px 0 0"><b>יעד שלב 1:</b> 100 נרשמות · 60%+ הפעלה · 0 ₪</div></div></div>
+
+      <div class="phase"><div class="line"><div class="dot"></div><div class="rod"></div></div>
+        <div class="card" style="flex:1"><span class="pill t2">ימים 30–60</span><h3 style="margin:.3em 0">שלב 2 · לולאות ויראליות</h3>
+        <ul class="clean"><li><b>לולאת החוברת המודפסת:</b> פוטר ממותג + QR בתחתית כל חוברת חינמית</li><li><b>הפניה דו-צדדית:</b> כפתור "הזמיני מורה" → שתיכן מקבלות חוברת/חודש פרו</li><li><b>מגנטים:</b> חבילות חוברת חינמיות לפי עונה כפתיון בקבוצות</li><li><b>"פלאש-מוב":</b> 5–10 מורות-משפיעניות מפרסמות באותו יום עם האשטאג #בשבילי</li></ul>
+        <div class="callout win" style="margin:10px 0 0"><b>יעד שלב 2:</b> מקדם ויראלי (k) > 0.4 · 400 נרשמות מצטבר</div></div></div>
+
+      <div class="phase"><div class="line"><div class="dot"></div><div class="rod"></div></div>
+        <div class="card" style="flex:1"><span class="pill t3">ימים 60–90</span><h3 style="margin:.3em 0">שלב 3 · סקייל ממומן (אחרי שחרור החשבון)</h3>
+        <ul class="clean"><li>ערעור על חסימת מטא הוגש והחשבון שוחרר (ר' פרק אחרון)</li><li>קמפיין ראשון בתקציב נמוך (40–60 ₪/יום), אופטימיזציה ל<b>הפעלה</b> ולא להרשמה</li><li>קהל Lookalike מתוך הנרשמות שכבר נאספו בפיקסל</li><li>רימרקטינג למבקרות שלא נרשמו</li></ul>
+        <div class="callout win" style="margin:10px 0 0"><b>יעד שלב 3:</b> CAC < ערך לקוחה · ערוץ ממומן רווחי וניתן להגדלה</div></div></div>
+
+      <div class="phase"><div class="line"><div class="dot"></div></div>
+        <div class="card" style="flex:1"><span class="pill t3">מתמשך</span><h3 style="margin:.3em 0">שלב 4 · שימור והכנסה</h3>
+        <ul class="clean"><li>אוטומציית "מסע לקוחה" (אימייל/וואטסאפ לפי שלב)</li><li>אופטימיזציית המרה לפרו (תמחור, חסם 2 החוברות)</li><li>מנוע תוכן גולשים (UGC): "קיר החוברות" של מורות</li></ul></div></div>
+    </div>
+  </div>
+</section>
+
+<!-- 5 -->
+<section id="outbox">
+  <div class="wrap">
+    <p class="kicker">05 · היתרון הלא-הוגן</p>
+    <h2>רעיונות מחוץ לקופסא 🎯</h2>
+    <p class="lead">דברים שמתחרים לא עושים — וכמה דברים מעולם הפרסום ששווים זהב למוצר כמו שלכם.</p>
+    <div class="grid g2" style="margin-top:16px">
+      <div class="card star"><h3>🖨️ לולאת החוברת המודפסת</h3><p>כל חוברת חינמית מודפסת עם <b>פוטר זעיר + QR: "נוצר בחינם ב-בשבילי"</b>. מורה מדפיסה ל-28 ילדים → <b>28 בתים</b> רואים את זה. הכיתות הופכות לשלטי חוצות. עלות: 0. אפקט: מצטבר ואינסופי. <b>זו לולאת הצמיחה הכי טבעית למוצר הדפסה — וכמעט אף אחד לא חושב עליה.</b></p></div>
+      <div class="card star"><h3>🔁 הפניה דו-צדדית בוואטסאפ</h3><p>"הזמיני מורה — ושתיכן מקבלות חוברת/חודש פרו חינם." מחקרים: <b>90% מההפניות</b> עוברות בוואטסאפ/SMS, ותגמול דו-צדדי ממיר הכי טוב. זה מנוע הצמיחה הזול ביותר שקיים.</p></div>
+      <div class="card"><h3>🎁 מגנטים עונתיים</h3><p>במקום "תירשמי" — <b>תני ערך חינם קודם</b>: "חבילת חזרה למבחן", "10 דפי חנוכה", "ערכת תחילת שנה". מורה מורידה, אוהבת, נרשמת. טקטיקת גרילה מוכחת: חלוקת מוצר דיגיטלי חינם בקהילות נישה.</p></div>
+      <div class="card"><h3>📅 לוח שנה בית-ספרי</h3><p>לרכוב על העונות: <b>ספטמבר</b> (תחילת שנה = השיא), תקופות מבחנים, <b>חנוכה/פסח</b>, סוף שנה. קמפיין ממוקד לכל אירוע. עיתוי הוא חצי מהשיווק.</p></div>
+      <div class="card"><h3>📣 "פלאש-מוב" של מורות-משפיעניות</h3><p>לגייס 5–10 מורות עם קהל באינסטגרם/טיקטוק שיפרסמו <b>באותו יום</b> עם האשטאג אחיד. גל מתואם יוצר תחושת "כולן מדברות על זה".</p></div>
+      <div class="card"><h3>📨 טלגרם — הזירה השקטה</h3><p>ערוצי וקבוצות מורים בטלגרם <b>תת-מנוצלים בישראל</b> מול פייסבוק. פחות רעש, יותר חשיפה לכל הודעה.</p></div>
+      <div class="card"><h3>🔎 SEO תוכניתי</h3><p>לייצר דפי נחיתה לחיפושי-זנב-ארוך בעברית: "דף עבודה חשבון כיתה ד להדפסה". כל חוברת-דוגמה הופכת לדף שגוגל מאנדקס — תנועה חינמית שמצטברת לנצח.</p></div>
+      <div class="card"><h3>🤝 שותפויות עם מנהלות קבוצות</h3><p>למנהלת קבוצת מורות גדולה יש כוח חלוקה אדיר. שיתוף פעולה (פרו חינם / עמלה) תמורת פוסט מוצמד = גישה למאות מורות בבת אחת.</p></div>
+      <div class="card"><h3>👪 ערוץ ההורים</h3><p>הורים הם ICP שני. קבוצות וואטסאפ של ועדי הורים = חוברות אישיות לפי תחומי העניין של הילד. אותו מוצר, קהל כפול.</p></div>
+      <div class="card"><h3>🎓 סדנה חינמית (וובינר)</h3><p>"איך מכינים חומרי הוראה אישיים ב-AI" — סדנת זום חינמית לקבוצות מורות. בונה אמון, ממצב אתכם כמומחים, וממירה ברכות.</p></div>
+    </div>
+    <div class="callout"><b>דבר אחד מעולם הפרסום ששווה לדעת:</b> ערוץ אורגני מנצח לא נמדד ב"כמה לייקים" אלא ב<b>עלות לרכישה (CAC)</b> ו<b>מקדם ויראלי (k)</b>. אם כל משתמשת מביאה בממוצע יותר ממשתמשת אחת (k>1) — הצמיחה <b>מעריכית בלי לשלם שקל</b>. כל הרעיונות למעלה נבחרו כי הם מגדילים את k.</div>
+  </div>
+</section>
+
+<!-- 6 -->
+<section id="metrics">
+  <div class="wrap">
+    <p class="kicker">06 · איך יודעים שזה עובד</p>
+    <h2>מדדים ויעדים</h2>
+    <p class="lead">הכל מתחבר לפיקסל ולמערכת האירועים הקיימת. אם מדד לא זז — מכבים את הערוץ.</p>
+    <div class="grid g3" style="margin:16px 0">
+      <div class="kpi"><b>60%+</b><span>שיעור הפעלה<br>(נרשמת → חוברת ראשונה)</span></div>
+      <div class="kpi"><b>40%+</b><span>שימור שבוע 2<br>(חזרה לחוברת שנייה)</span></div>
+      <div class="kpi"><b>k > 0.4</b><span>מקדם ויראלי<br>(הזמנות לכל משתמשת)</span></div>
+      <div class="kpi"><b>100→400</b><span>נרשמות<br>(שלב 1 → שלב 2)</span></div>
+      <div class="kpi"><b>0 ₪</b><span>עלות רכישה<br>(שלבים 1–2, אורגני)</span></div>
+      <div class="kpi"><b>5%+</b><span>המרה לפרו<br>(יעד התחלתי)</span></div>
+    </div>
+    <div class="callout star"><b>טקס שבועי (15 דק'):</b> פעם בשבוע מסתכלים יחד על 4 מספרים — נרשמות חדשות, שיעור הפעלה, שימור, הזמנות. מחליטים מה להגביר ומה לכבות. זהו. פשטות מנצחת מורכבות.</div>
+  </div>
+</section>
+
+<!-- 7 -->
+<section id="roles">
+  <div class="wrap">
+    <p class="kicker">07 · מי עושה מה</p>
+    <h2>חלוקת תפקידים</h2>
+    <div class="grid g2" style="margin-top:16px">
+      <div class="card"><h3>👤 שותף/ה א' — תוכן וקהילה</h3><ul class="clean"><li>פרסום יומי בקבוצות (ערכת הפוסטים מוכנה)</li><li>מענה לכל תגובה והודעה</li><li>גיוס מורות-משפיעניות ומנהלות קבוצות</li><li>פניות וואטסאפ אישיות</li></ul></div>
+      <div class="card"><h3>👤 שותף/ה ב' — מוצר ומדידה</h3><ul class="clean"><li>תיקוני הפעלה/שימור במוצר</li><li>לולאת החוברת המודפסת + הפניה</li><li>מעקב שבועי אחרי 4 המדדים</li><li>טיפול בערעור מטא ובהכנה לממומן</li></ul></div>
+    </div>
+    <div class="callout"><b>הערה:</b> זו חלוקה מוצעת — תתאימו לפי החוזקות שלכם. העיקר ש<b>לכל מדד יש בעלים אחד</b> שאחראי שהוא זז.</div>
+  </div>
+</section>
+
+<!-- 8 -->
+<section id="blocker">
+  <div class="wrap">
+    <p class="kicker">08 · מה חוסם וצריך לטפל</p>
+    <h2>החסם הנוכחי — חשבון מטא בבדיקה</h2>
+    <div class="callout danger"><b>מצב:</b> חשבון המודעות במטא נמצא בתהליך בדיקה/אימות מול הפלטפורמה. זהו מצב נפוץ בחשבונות עסקיים חדשים, ומטופל דרך הגשת בקשה לבדיקה.</div>
+    <h3>תוכנית הפעולה</h3>
+    <ul class="clean"><li><b>להגיש "בקשה לבדיקה"</b> (Request Review) — הערעור הרשמי. יש 179 יום, אבל עושים מיד.</li><li><b>לאמת זהות</b> אם מבקשים (העלאת ת"ז) — הדרך המהירה לשחרר חשבון שנחסם בטעות.</li><li><b>לא לעקוף</b> — לא לפתוח עסק/חשבון חדש. זה רק מחמיר.</li></ul>
+    <div class="callout win"><b>למה אנחנו רגועים:</b> הפרסום הממומן הוא שלב 3, לא שלב 1. כל שלבים 1–2 (אורגני) <b>לא תלויים בחשבון הזה בכלל</b> — אז אנחנו צומחים במלוא הקיטור בזמן שהערעור מתנהל. החסם לא עוצר אותנו, רק דוחה את ה<b>סקייל הממומן</b>.</div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <p><b style="font-family:'Baloo 2';color:var(--ink);font-size:18px">בשבילי</b> · תוכנית שיווק · מסמך חי שמתעדכן לפי הנתונים</p>
+    <p>שאלות? יש לנו ערוץ ייעוץ פתוח — כל שאלה שעולה, פשוט שואלים ומעדכנים את המסמך.</p>
+  </div>
+</footer>
+
+</body>
+</html>
