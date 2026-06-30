@@ -317,10 +317,10 @@ export default function AdminPanel() {
   const paidUsers    = revenueLines.reduce((s, r) => s + r.count, 0);
 
   const statCards = [
-    { label: "סה״כ משתמשים",  value: data.totalUsers,         icon: "👥" },
+    { label: "סה\u05bבכ משתמשים",  value: data.totalUsers,         icon: "👥" },
     { label: "השבוע",          value: data.usersThisWeek,      icon: "📅" },
     { label: "היום",           value: data.usersToday,         icon: "⚡" },
-    { label: "סה״כ חוברות",   value: data.totalBooklets,      icon: "📚" },
+    { label: "סה\u05bבכ חוברות",   value: data.totalBooklets,      icon: "📚" },
     { label: "חוברות השבוע",  value: data.bookletsThisWeek,   icon: "📊" },
     { label: "חוברות היום",   value: data.bookletsToday,      icon: "🔥" },
   ];
@@ -1037,14 +1037,32 @@ export default function AdminPanel() {
           </button>
           {todayResult && <p className="text-xs text-grow mt-2">{todayResult}</p>}
         </div>
-        <div className="bg-canvas rounded-2xl p-4 border border-ink/5">
-          <h3 className="font-bold text-ink mb-1 text-sm">פולואפ D+2</h3>
-          <p className="text-xs text-ink/40 mb-3">אוטומטי דרך GitHub Actions. אפשר ידנית.</p>
-          <button onClick={triggerFollowup} disabled={sending}
-            className="bg-magic/60 text-white rounded-xl px-3 py-2 text-xs font-medium disabled:opacity-50 hover:opacity-90 transition-opacity w-full">
-            {sending ? "שולח…" : "שלח עכשיו ✉️"}
-          </button>
-          {sendResult && <p className="text-xs text-grow mt-2">{sendResult}</p>}
+        <div className="bg-canvas rounded-2xl p-4 border border-magic/20">
+          <h3 className="font-bold text-ink mb-1 text-sm">📧 פולואפ אוטומטי — סטטוס</h3>
+          <p className="text-[11px] text-ink/40 mb-2">רץ כל יומיים אוטומטית. כל משתמש מקבל כל סוג פעם אחת בלבד.</p>
+          {(() => {
+            const s = data.emailLogStats ?? { on_limit: 0, tried_failed: 0, not_activated: 0, created_one: 0, total: 0 };
+            const rows = [
+              { key: "not_activated", label: "לא התחילו", color: "text-brand" },
+              { key: "tried_failed",  label: "ניסו ונכשלו", color: "text-red-500" },
+              { key: "created_one",   label: "חוברת אחת", color: "text-magic" },
+              { key: "on_limit",      label: "סיימו מכסה", color: "text-grow" },
+            ];
+            return (
+              <div className="space-y-1">
+                {rows.map(r => (
+                  <div key={r.key} className="flex justify-between text-xs">
+                    <span className="text-ink/50">{r.label}</span>
+                    <span className={`font-bold ${r.color}`}>{s[r.key]}</span>
+                  </div>
+                ))}
+                <div className="flex justify-between text-xs border-t border-ink/10 pt-1 mt-1">
+                  <span className="font-semibold text-ink/60">סה\u05bבכ נשלחו</span>
+                  <span className="font-bold text-ink">{s.total}</span>
+                </div>
+              </div>
+            );
+          })()}
         </div>
         <div className="bg-canvas rounded-2xl p-4 border border-ink/5 col-span-2">
           <h3 className="font-bold text-ink mb-1 text-sm">תזכורת חידוש D+25</h3>
