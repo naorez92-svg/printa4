@@ -70,9 +70,36 @@ export default function Preview({ html, onReset, shareToken, title, active = tru
           "<style>@page{size:A4;margin:0}*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}</style></head>"
         );
 
+  // Standalone viewer used whenever the booklet opens in its OWN browser tab
+  // (mobile "save as PDF" + the "full screen" button). Two screen-only tweaks —
+  // printing/PDF output is untouched (still real A4 via @page):
+  //   1) viewport width=794 (= the A4 page width) so the fixed-width page fits the
+  //      phone screen instead of overflowing and getting cut off on the right (RTL).
+  //   2) a fixed top toolbar with Print + "back to app" — closes this tab so the
+  //      user lands back in the app instead of being stranded on the raw booklet.
+  //      If the browser refuses to close a script-opened tab, fall back to
+  //      navigating this tab back to the app.
+  const getStandaloneHtml = () => {
+    let h = getPrintHtml();
+    const origin = window.location.origin;
+    const viewport = '<meta name="viewport" content="width=794, viewport-fit=cover">';
+    h = /<meta\s+name=["']viewport["'][^>]*>/i.test(h)
+      ? h.replace(/<meta\s+name=["']viewport["'][^>]*>/i, viewport)
+      : h.replace(/<head>/i, `<head>${viewport}`);
+    // Drop the generator's own inline print button so the toolbar is the single
+    // source of truth (avoids two "print" buttons).
+    h = h.replace(/<button[^>]*onclick=["']window\.print\(\)["'][^>]*>[\s\S]*?<\/button>/i, "");
+    const bar =
+      '<div class="no-print" style="position:fixed;top:0;left:0;right:0;z-index:99999;display:flex;gap:8px;justify-content:center;align-items:center;padding:8px;background:rgba(255,255,255,.97);box-shadow:0 1px 8px rgba(0,0,0,.12);direction:rtl;font-family:Assistant,Arial,sans-serif">' +
+        '<button onclick="window.print()" style="background:#1FB58F;color:#fff;border:none;border-radius:10px;padding:10px 18px;font-size:15px;font-weight:700;cursor:pointer">🖨️ הדפס / שמור PDF</button>' +
+        `<button onclick="window.close();setTimeout(function(){location.href='${origin}'},400)" style="background:#eef0f4;color:#20184A;border:none;border-radius:10px;padding:10px 18px;font-size:15px;font-weight:700;cursor:pointer">✕ חזרה לאפליקציה</button>` +
+      '</div><div class="no-print" style="height:58px"></div>';
+    return /<body[^>]*>/i.test(h) ? h.replace(/(<body[^>]*>)/i, `$1${bar}`) : bar + h;
+  };
+
   const openInNewTab = () => {
     track("booklet_opened_newtab", { context });
-    const printHtml = getPrintHtml();
+    const printHtml = getStandaloneHtml();
     const blob = new Blob([printHtml], { type: "text/html;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const w = window.open(url, "_blank");
@@ -111,7 +138,7 @@ export default function Preview({ html, onReset, shareToken, title, active = tru
       }
       return;
     }
-    const printHtml = getPrintHtml();
+    const printHtml = getStandaloneHtml();
     const blob = new Blob([printHtml], { type: "text/html;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const w = window.open(url, "_blank");
@@ -283,9 +310,10 @@ export default function Preview({ html, onReset, shareToken, title, active = tru
       {isMobile && (
         <div className="bg-canvas border border-ink/10 rounded-xl px-4 py-3 text-xs text-ink/50 text-right space-y-1">
           <p className="font-semibold text-ink/70">📥 איך שומרים PDF בטלפון?</p>
-          <p>לאחר לחיצה תיפתח החוברת בדף חדש עם כפתור הדפסה.</p>
+          <p>לאחר לחיצה תיפתח החוברת בדף חדש עם כפתורי <span className="font-medium text-ink/60">הדפסה</span> ו<span className="font-medium text-ink/60">חזרה לאפליקציה</span>.</p>
           <p><span className="font-medium text-ink/60">iPhone:</span> שתף ← "הדפס" ← פרגני ← שמור PDF</p>
           <p><span className="font-medium text-ink/60">Android:</span> ⋮ ← "הדפס" ← שנה יעד ← "שמור כ-PDF"</p>
+          <p className="text-ink/40">בסיום — לחצי <span className="font-medium text-ink/60">✕ חזרה לאפליקציה</span> כדי לחזור.</p>
         </div>
       )}
 
