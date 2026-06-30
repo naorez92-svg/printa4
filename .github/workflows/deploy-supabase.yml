@@ -34,6 +34,7 @@ jobs:
           supabase functions deploy selftest-booklet --project-ref gywpdzkvkdisonuzhsib --no-verify-jwt
           supabase functions deploy unsubscribe --project-ref gywpdzkvkdisonuzhsib --no-verify-jwt
           supabase functions deploy admin-unsubscribe --project-ref gywpdzkvkdisonuzhsib --no-verify-jwt
+          supabase functions deploy send-followup-emails --project-ref gywpdzkvkdisonuzhsib --no-verify-jwt
         working-directory: beshvili
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
