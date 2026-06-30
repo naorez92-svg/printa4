@@ -323,7 +323,7 @@ export default function Login() {
               </div>
             ) : (
               <div className="space-y-3">
-                <p className="text-white/40 text-xs text-center">── כניסה מהירה ──</p>
+                <p className="text-white/55 text-xs text-center">── כניסה מהירה ──</p>
                 <button
                   onClick={signInWithGoogle}
                   disabled={heroLoading || loading}
@@ -334,12 +334,12 @@ export default function Login() {
                 </button>
                 <div className="relative flex items-center gap-2">
                   <div className="flex-1 border-t border-white/15" />
-                  <span className="text-white/30 text-xs">או</span>
+                  <span className="text-white/55 text-xs">או</span>
                   <div className="flex-1 border-t border-white/15" />
                 </div>
                 <div className="flex gap-2">
                   <input
-                    className="flex-1 min-w-0 bg-white/10 border border-white/20 rounded-xl px-3 py-2.5 text-sm text-white placeholder-white/35 outline-none focus:border-white/50 transition-colors text-right"
+                    className="flex-1 min-w-0 bg-white/10 border border-white/20 rounded-xl px-3 py-2.5 text-sm text-white placeholder-white/55 outline-none focus:border-white/50 transition-colors text-right"
                     placeholder="your@email.com"
                     type="email"
                     value={heroEmail}
@@ -382,7 +382,7 @@ export default function Login() {
         <div className="max-w-4xl mx-auto">
           <div className="text-center mb-10">
             <h2 className="text-2xl font-bold text-ink mb-2 font-display">כך נראית החוברת שנוצרת</h2>
-            <p className="text-ink/50 text-sm">לא דפי עבודה משעממים — <strong className="text-magic">משימות חווייתיות שהילד רוצה לסיים</strong></p>
+            <p className="text-ink/65 text-sm">לא דפי עבודה משעממים — <strong className="text-magic">משימות חווייתיות שהילד רוצה לסיים</strong></p>
           </div>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 items-center">
             {/* Booklet mockup */}
@@ -393,7 +393,7 @@ export default function Login() {
                 <div className="bg-gradient-to-l from-violet-100 to-blue-50 rounded-xl p-4 mb-4 border-2 border-dashed border-violet-300 text-center">
                   <div className="text-xs font-bold text-violet-700 mb-1 tracking-wide">🕵️ תיק משימה סודי</div>
                   <div className="text-base font-bold text-ink">משימה: הצל את ספינת החלל!</div>
-                  <div className="flex justify-center gap-3 mt-1.5 text-[10px] text-ink/50">
+                  <div className="flex justify-center gap-3 mt-1.5 text-[10px] text-ink/65">
                     <span>⚠️ סכנה: מנוע ראשי כבוי</span>
                     <span>·</span>
                     <span>🏆 פרס: החזרה הביתה</span>
@@ -436,7 +436,7 @@ export default function Login() {
                   <div className={`w-11 h-11 rounded-xl ${color} flex items-center justify-center text-2xl flex-shrink-0 border border-ink/5`}>{icon}</div>
                   <div>
                     <div className="font-semibold text-ink text-sm">{title}</div>
-                    <div className="text-xs text-ink/55 mt-0.5 leading-relaxed">{desc}</div>
+                    <div className="text-xs text-ink/65 mt-0.5 leading-relaxed">{desc}</div>
                   </div>
                 </div>
               ))}
@@ -465,7 +465,7 @@ export default function Login() {
       <section className="py-14 px-5 bg-white">
         <div className="max-w-3xl mx-auto text-center">
           <h2 className="text-2xl font-bold text-ink mb-2 font-display">בנויה עבור אנשי חינוך</h2>
-          <p className="text-ink/50 mb-10 text-sm">מורה פרטית, מחנכת, או הורה שרוצה לעזור — בשבילי עובדת בשבילך</p>
+          <p className="text-ink/65 mb-10 text-sm">מורה פרטית, מחנכת, או הורה שרוצה לעזור — בשבילי עובדת בשבילך</p>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
             {[
               { Icon: IconTeacher, title: "מורה פרטית", desc: "חוברת ייחודית לכל תלמיד, בדיוק לפי הקשיים שלו. לא עוד שעות הכנה — 60 שניות במקום שעה", bg: "bg-gradient-to-br from-magic/15 to-magic/5", border: "border-magic/30", highlight: true },
@@ -506,7 +506,7 @@ export default function Login() {
       <section className="py-14 px-5 bg-canvas">
         <div className="max-w-3xl mx-auto text-center">
           <h2 className="text-2xl font-bold text-ink mb-2 font-display">איך זה עובד?</h2>
-          <p className="text-ink/50 mb-10 text-sm">3 שלבים פשוטים — תוך פחות מדקה</p>
+          <p className="text-ink/65 mb-10 text-sm">3 שלבים פשוטים — תוך פחות מדקה</p>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
             {[
               { num: "01", Icon: IconWrite, title: "בחרי תלמיד ונושא", desc: "שם, כיתה, העולם האהוב, יעד פדגוגי — או פשוט כתבי מה תרצי בחופשיות" },
@@ -540,7 +540,7 @@ export default function Login() {
               <div key={title} className="bg-canvas rounded-2xl p-4 text-center border border-ink/5">
                 <div className="text-3xl mb-2">{icon}</div>
                 <div className="font-semibold text-sm text-ink mb-1">{title}</div>
-                <div className="text-xs text-ink/50">{desc}</div>
+                <div className="text-xs text-ink/65">{desc}</div>
               </div>
             ))}
           </div>
@@ -556,7 +556,7 @@ export default function Login() {
               <span className="text-xs font-semibold text-magic">חדש — מקצועות יהדות</span>
             </div>
             <h2 className="text-2xl font-bold text-ink mb-2 font-display">חומרי יהדות לפי תכנית המפמ"ר</h2>
-            <p className="text-ink/55 text-sm max-w-lg mx-auto leading-relaxed">
+            <p className="text-ink/65 text-sm max-w-lg mx-auto leading-relaxed">
               מורות לחינוך דתי לאומי — עכשיו אפשר ליצור דפי עבודה, מבחנים וסיכומים בכל מקצועות היהדות,
               מותאמים לתכנית הלימודים הרשמית של משרד החינוך.
             </p>
@@ -574,7 +574,7 @@ export default function Login() {
               <div key={label} className="bg-white rounded-2xl p-4 border border-magic/10 shadow-sm">
                 <div className="text-2xl mb-2">{icon}</div>
                 <div className="font-bold text-sm text-ink mb-1">{label}</div>
-                <div className="text-[11px] text-ink/50 leading-snug">{desc}</div>
+                <div className="text-[11px] text-ink/65 leading-snug">{desc}</div>
               </div>
             ))}
           </div>
@@ -593,7 +593,7 @@ export default function Login() {
                 </div>
               ))}
             </div>
-            <p className="text-center text-xs text-ink/55">
+            <p className="text-center text-xs text-ink/65">
               כל החומרים מותאמים לתכנית הלימודים הרשמית · ציטוטי מקורות מדויקים · עברית תקנית · מוכן להדפסה A4
             </p>
           </div>
@@ -639,7 +639,7 @@ export default function Login() {
         <div className="max-w-2xl mx-auto">
           <div className="text-center mb-10">
             <h2 className="text-2xl font-bold text-ink mb-2 font-display">שאלות שכולם שואלים</h2>
-            <p className="text-ink/50 text-sm">כולל השאלה הכי חשובה — למה לא פשוט להשתמש ב-ChatGPT?</p>
+            <p className="text-ink/65 text-sm">כולל השאלה הכי חשובה — למה לא פשוט להשתמש ב-ChatGPT?</p>
           </div>
           <div className="space-y-3">
             {[
@@ -670,7 +670,7 @@ export default function Login() {
                         </ul>
                       </div>
                     </div>
-                    <p className="text-xs text-ink/50">בשבילי בנויה על אותה AI (Claude של Anthropic) — אבל הכל מוגדר מראש, מעוצב, ומותאם לצרכים של מורות בישראל.</p>
+                    <p className="text-xs text-ink/65">בשבילי בנויה על אותה AI (Claude של Anthropic) — אבל הכל מוגדר מראש, מעוצב, ומותאם לצרכים של מורות בישראל.</p>
                   </div>
                 ),
               },
@@ -722,8 +722,8 @@ export default function Login() {
       <section id="pricing" className="py-14 px-5 bg-canvas">
         <div className="max-w-3xl mx-auto text-center">
           <h2 className="text-2xl font-bold text-ink mb-2 font-display">מחירים שקופים</h2>
-          <p className="text-ink/50 mb-2 text-sm">מתחילים חינם, משדרגים כשרוצים</p>
-          <p className="text-xs text-magic/70 font-medium mb-10">מורה פרטית = ₪120/שעה · חוברת בבשבילי = ₪3 · החישוב פשוט 🧮</p>
+          <p className="text-ink/65 mb-2 text-sm">מתחילים חינם, משדרגים כשרוצים</p>
+          <p className="text-xs text-magic font-medium mb-10">מורה פרטית = ₪120/שעה · חוברת בבשבילי = ₪3 · החישוב פשוט 🧮</p>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
             {/* Teacher — most prominent, shown first on mobile */}
             <div className="bg-gradient-to-br from-magic/10 to-brand/10 rounded-2xl p-6 border-2 border-magic/40 shadow-float sm:scale-105 text-right relative overflow-hidden flex flex-col order-first sm:order-last">
@@ -794,7 +794,7 @@ export default function Login() {
               ))}
             </div>
             <h2 className="text-2xl font-bold text-ink font-display mb-2">מוכנה להתחיל?</h2>
-            <p className="text-ink/50">2 חוברות חינם · ללא כרטיס אשראי · 30 שניות הרשמה</p>
+            <p className="text-ink/65">2 חוברות חינם · ללא כרטיס אשראי · 30 שניות הרשמה</p>
           </div>
           <div className="bg-canvas rounded-2xl p-6 border border-ink/10 shadow-sm">
             {step === "verify" ? (
@@ -804,7 +804,7 @@ export default function Login() {
                 </div>
                 <div className="space-y-1">
                   <p className="font-bold text-ink text-xl font-display">בדוק את תיבת הדואר</p>
-                  <p className="text-ink/50 text-sm">שלחנו קישור כניסה לכתובת:</p>
+                  <p className="text-ink/65 text-sm">שלחנו קישור כניסה לכתובת:</p>
                   <p className="text-magic font-semibold text-sm break-all">{email}</p>
                 </div>
                 <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-700 leading-relaxed text-right">
@@ -813,7 +813,7 @@ export default function Login() {
                 </div>
                 {error && <p className="text-red-500 text-sm text-center">{error}</p>}
                 <button onClick={() => { track("auth_change_email_click", {}); setStep("email"); setError(""); }}
-                  className="w-full text-sm text-ink/50 hover:text-magic transition-colors border border-ink/15 rounded-xl px-4 py-2.5 hover:border-magic/40">
+                  className="w-full text-sm text-ink/65 hover:text-magic transition-colors border border-ink/15 rounded-xl px-4 py-2.5 hover:border-magic/40">
                   שנה מייל / שלח קישור מחדש
                 </button>
               </div>
@@ -827,7 +827,7 @@ export default function Login() {
                 </button>
                 <div className="relative flex items-center gap-3">
                   <div className="flex-1 border-t border-ink/10" />
-                  <span className="text-xs text-ink/30">או עם מייל</span>
+                  <span className="text-xs text-ink/55">או עם מייל</span>
                   <div className="flex-1 border-t border-ink/10" />
                 </div>
                 <input
@@ -853,13 +853,13 @@ export default function Login() {
       {/* ── Footer ── */}
       <footer className="bg-canvas border-t border-ink/5 py-8 px-5 text-center text-xs text-ink/25">
         <div className="flex justify-center gap-4 flex-wrap mb-2">
-          <a href="https://wa.me/972509139137" target="_blank" rel="noopener noreferrer" onClick={() => track("outbound_click", { dest: "whatsapp_contact" })} className="hover:text-ink/50 transition-colors">צור קשר</a>
+          <a href="https://wa.me/972509139137" target="_blank" rel="noopener noreferrer" onClick={() => track("outbound_click", { dest: "whatsapp_contact" })} className="hover:text-ink/65 transition-colors">צור קשר</a>
           <span>·</span>
-          <a href="/privacy.html" target="_blank" onClick={() => track("legal_link_click", { page: "privacy" })} className="hover:text-ink/50 transition-colors">מדיניות פרטיות</a>
+          <a href="/privacy.html" target="_blank" onClick={() => track("legal_link_click", { page: "privacy" })} className="hover:text-ink/65 transition-colors">מדיניות פרטיות</a>
           <span>·</span>
-          <a href="/terms.html" target="_blank" onClick={() => track("legal_link_click", { page: "terms" })} className="hover:text-ink/50 transition-colors">תנאי שימוש</a>
+          <a href="/terms.html" target="_blank" onClick={() => track("legal_link_click", { page: "terms" })} className="hover:text-ink/65 transition-colors">תנאי שימוש</a>
           <span>·</span>
-          <a href="/accessibility.html" target="_blank" onClick={() => track("legal_link_click", { page: "accessibility" })} className="hover:text-ink/50 transition-colors">נגישות</a>
+          <a href="/accessibility.html" target="_blank" onClick={() => track("legal_link_click", { page: "accessibility" })} className="hover:text-ink/65 transition-colors">נגישות</a>
         </div>
         <p>בשבילי © {new Date().getFullYear()} · כל הזכויות שמורות</p>
       </footer>
