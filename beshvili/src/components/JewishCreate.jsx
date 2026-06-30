@@ -371,7 +371,7 @@ export default function JewishCreate({ onSaved, remaining, isPro, bookletCount =
       if (streamAborted) setSaveWarning(true);
     }
 
-    track("jewish_completed", { subject, grade, topic: effectiveTopic, outputType, level, pageCount });
+    track("jewish_completed", { subject, grade, topic: effectiveTopic, outputType, level, pageCount, booklet_index: bookletCount + 1 });
     onSaved?.();
   }, [canSubmit, subject, grade, effectiveTopic, outputType, level, notes, pageCount, onSaved, fastMode]);
 

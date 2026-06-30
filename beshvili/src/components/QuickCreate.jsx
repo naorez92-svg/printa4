@@ -30,7 +30,7 @@ const LOADING_MSGS = [
   "כמעט מוכן! עוד רגע...",
 ];
 
-export default function QuickCreate({ student, onClose, onSaved, remaining, isPro, initialSubject = "", initialWorld = "כדורגל" }) {
+export default function QuickCreate({ student, onClose, onSaved, remaining, isPro, bookletCount = 0, initialSubject = "", initialWorld = "כדורגל" }) {
   const [showUpgrade, setShowUpgrade] = useState(false);
   const [subject, setSubject]       = useState(initialSubject);
   const [world, setWorld]           = useState(student.worlds?.[0] || initialWorld);
@@ -279,7 +279,7 @@ export default function QuickCreate({ student, onClose, onSaved, remaining, isPr
     setShareToken(inserted?.share_token ?? null);
     setShowRating(true);
     setHtml(finalHtml);
-    track("booklet_completed", { booklet_id: inserted?.id, pages: pageCount, mode: "student_quick", child_id: student?.id });
+    track("booklet_completed", { booklet_id: inserted?.id, pages: pageCount, mode: "student_quick", child_id: student?.id, booklet_index: bookletCount + 1 });
     onSaved?.();
   }, [canSubmit, student, subject, world, specificGoal, pageCount, onSaved]);
 

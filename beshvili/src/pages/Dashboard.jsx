@@ -242,7 +242,7 @@ export default function Dashboard() {
           {tab === "history" && <History isPro={isPro} onUpgrade={() => setShowUpgrade(true)} />}
           <Suspense fallback={<div className="py-12 text-center text-ink/40 text-sm">טוען…</div>}>
             {tab === "jewish" && <JewishCreate onSaved={() => refresh()} remaining={remaining} isPro={isPro} bookletCount={bookletCount} onUpgrade={() => setShowUpgrade(true)} />}
-            {tab === "students" && <Students onBookletSaved={() => { refresh(); setTab("history"); }} remaining={remaining} isPro={isPro} />}
+            {tab === "students" && <Students onBookletSaved={() => { refresh(); setTab("history"); }} remaining={remaining} isPro={isPro} bookletCount={bookletCount} />}
             {tab === "branding" && isPro && <BrandingSettings profile={profile} onSaved={refresh} />}
             {tab === "admin" && isAdmin && <AdminPanel />}
           </Suspense>

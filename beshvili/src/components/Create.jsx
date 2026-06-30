@@ -481,7 +481,7 @@ export default function Create({ onSaved, remaining, isPro, active = true, bookl
     setBookletTitle(title);
     setShowRating(true);
     setHtml(generatedHtml);
-    track("booklet_completed", { booklet_id: inserted?.id, pages: pageCount, mode, durationSec: Math.round((Date.now() - startedAt) / 1000), chars: htmlAccumulated.length, partial: streamAborted, withAnswerKey });
+    track("booklet_completed", { booklet_id: inserted?.id, pages: pageCount, mode, durationSec: Math.round((Date.now() - startedAt) / 1000), chars: htmlAccumulated.length, partial: streamAborted, withAnswerKey, booklet_index: bookletCount + 1 });
     onSaved?.();
 
     // Notify user if they switched away during generation

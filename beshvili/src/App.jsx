@@ -77,6 +77,22 @@ function AuthApp() {
     pageView(session ? "app" : "landing");
   }, [loading]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Active-day signal: fire once per calendar day per device for a logged-in user.
+  // session_start is deduped per browser tab, so it can't measure "came back on a
+  // later day" — the literal definition of a returning user (the cohort we need to
+  // understand the 1→2 booklet drop-off). The localStorage date-gate makes this
+  // idempotent even though `session` changes identity on every token refresh.
+  useEffect(() => {
+    if (loading || !session?.user) return;
+    try {
+      const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+      if (localStorage.getItem("beshvili_active_day") !== today) {
+        localStorage.setItem("beshvili_active_day", today);
+        track("app_day_active", {});
+      }
+    } catch { /* storage blocked — skip */ }
+  }, [loading, session]);
+
   if (loading) return PageSpinner;
   return (
     <Suspense fallback={PageSpinner}>
