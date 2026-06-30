@@ -85,6 +85,24 @@ const JEWISH_SYSTEM = `אתה מומחה פדגוגי בחינוך יהודי ד
 ── פרשת השבוע ──
 כל הכיתות: הפרשה השוטפת — נושא מרכזי, רש"י נבחר, שאלות עיון ודיון ערכי
 
+── גמרא (תלמוד בבלי) ──
+(מתחיל בכיתה ז — דגש על מיומנויות לימוד סוגיה; ציטוט לשון הגמרא + ביאור)
+כיתה ז:   מבוא לגמרא — מבנה הדף (משנה, גמרא, רש"י, תוספות), מונחי יסוד (תנא, אמורא, קושיא, תירוץ, תא שמע); בבא מציעא פרק ב "אלו מציאות" — השבת אבידה, סימנים, ייאוש
+כיתה ח:   בבא מציעא "אלו מציאות" (המשך — מצא בחנות/בכותל); דיני שומרים (שומר חינם ושומר שכר — מבוא); מיומנות זיהוי מבנה הסוגיה
+כיתה ט:   בבא מציעא "השוכר את הפועלים" (מבוא); דיני ממונות (הלוואה, ריבית, פועלים); מסכת סנהדרין/מכות — סוגיה נבחרת; לימוד עצמאי
+
+── תפילה ──
+(מקצוע ליבה — כיתות א–ט; ציטוט לשון התפילה המדויקת ומנוקדת)
+כיתה א–ב: ברכות השחר (מודה אני, נטילת ידיים), מבנה תפילת שחרית, כוונה בתפילה, ברכות ק"ש, פסוקי דזמרה, אשרי (תהילים קמ"ה)
+כיתה ג–ד: שמונה עשרה (ג' ראשונות, ברכות אמצעיות, מודים), קריאת שמע (ג' פרשות), ברכות ק"ש (יוצר אור, אהבה רבה), מנחה וערבית, הלל
+כיתה ה–ו: פירוש ברכות שמונה עשרה, תחנון ונפילת אפיים, קריאת התורה, תפילה בציבור ומניין, פיוטים, תפילות החגים
+כיתה ז–ט: מקורות חיוב התפילה (תושב"ע), תפילה כעבודה שבלב, תפילות מועדים ומוסף, נוסחי תפילה (אשכנז/ספרד/עדות), הלכות תפילה (זמנים), קדושת בית הכנסת
+
+── מועדים וחגים (מעגל השנה) ──
+כיתה א–ב: ראש השנה (שופר, סימנים), יום כיפור (תשובה, צום), סוכות (סוכה, ד' מינים), חנוכה (נס הפך, נרות), פורים (מגילה, ד' מצוות), פסח (יציאת מצרים, סדר), ט"ו בשבט, שבועות
+כיתה ג–ד: עשרת ימי תשובה, הלכות סוכה, חנוכה (המכבים, הדלקה), פורים (המגילה, הלכות), פסח (חמץ ומצה, הגדה), ספירת העומר ול"ג בעומר, שבועות (מתן תורה)
+כיתה ה–ו: מועדי תשרי (עבודת היום), שמיני עצרת ושמחת תורה, ארבע פרשיות, ימי בין המצרים ותשעה באב, שלוש רגלים, לוח השנה העברי (חודשים, עיבור), על הניסים, יום העצמאות ויום ירושלים
+
 === סוגי פלט ===
 
 📄 דף עבודה — תרגילים, שאלות, השלמות, התאמות. מקום לכתיבה. לעבודה עצמאית בכיתה/בית.
@@ -133,7 +151,6 @@ Deno.serve(async (req) => {
   );
 
   try {
-    // ── 1. JWT verification ────────────────────────────────────────────────────
     const jwt = req.headers.get("authorization")?.replace("Bearer ", "");
     if (!jwt) {
       return new Response(JSON.stringify({ error: "unauthorized" }), { status: 401, headers: cors });
@@ -143,7 +160,6 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: "unauthorized" }), { status: 401, headers: cors });
     }
 
-    // ── 2. Plan check + quota ──────────────────────────────────────────────────
     const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString();
     const [{ data: profile }, { count: monthlyCount }] = await Promise.all([
       admin.from("profiles").select("plan, total_booklets_created").eq("id", user.id).single(),
@@ -176,7 +192,6 @@ Deno.serve(async (req) => {
       }
     }
 
-    // ── 3. Rate limiting (atomic CAS — same slot as generate-booklet) ──────────
     const rateCutoff = new Date(Date.now() - RATE_LIMIT_SECONDS * 1000).toISOString();
     const { data: rateLockRow } = await admin
       .from("profiles")
@@ -198,7 +213,6 @@ Deno.serve(async (req) => {
       );
     }
 
-    // ── 4. Parse + sanitize input ──────────────────────────────────────────────
     // Release the rate-limit slot on failure so a failed generation (or the
     // client's 2s auto-retry) isn't rejected with a 60s lockout. Success keeps it.
     const releaseLock = () =>
@@ -208,9 +222,7 @@ Deno.serve(async (req) => {
     const clean = (val: unknown, max = MAX_FIELD_LEN): string =>
       String(val ?? "").trim().substring(0, max);
 
-    // Allowlists — reject unknown values outright to prevent prompt injection via fallback path.
-    // The client sends subject ids with spaces (e.g. "מקור חיים"); match exactly.
-    const VALID_SUBJECTS = ["הלכה", "משנה", "תנ\"ך", "מקור חיים", "פרשת השבוע", "מחשבת ישראל"];
+    const VALID_SUBJECTS = ["הלכה", "משנה", "גמרא", "תנ\"ך", "מקור חיים", "פרשת השבוע", "מחשבת ישראל", "תפילה", "מועדים וחגים"];
     const VALID_OUTPUT_TYPES = ["דף_עבודה", "שאלות_הבנה", "סיכום", "מבחן", "כרטיסיות", "מפת_מושגים"];
 
     const rawSubject    = clean(body.subject, 50);
@@ -225,10 +237,10 @@ Deno.serve(async (req) => {
 
     const subject     = rawSubject;
     const outputType  = rawOutputType;
-    const grade       = clean(body.grade, 20);      // א | ב | ... | ט
-    const topic       = clean(body.topic, 300);     // הנושא הנבחר
+    const grade       = clean(body.grade, 20);
+    const topic       = clean(body.topic, 300);
     const level       = ["basic", "medium", "advanced"].includes(body.level) ? body.level : "medium";
-    const notes       = clean(body.notes, MAX_NOTES_LEN); // הוראות נוספות מהמורה
+    const notes       = clean(body.notes, MAX_NOTES_LEN);
 
     const maxPages = isTeacher ? TEACHER_MAX_PAGES : isParent ? PARENT_MAX_PAGES : FREE_MAX_PAGES;
     const pageCount = Math.min(maxPages, Math.max(1, Number.isInteger(body.pageCount) ? body.pageCount : 2));
@@ -242,19 +254,15 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: "topic required" }), { status: 400, headers: cors });
     }
 
-    // ── 5. Build AI prompt ─────────────────────────────────────────────────────
     const apiKey = Deno.env.get("ANTHROPIC_API_KEY");
     if (!apiKey) throw new Error("ANTHROPIC_API_KEY missing");
 
-    // Sanitize user inputs against prompt injection.
-    // subject/outputType are already allowlist-validated above; only topic/grade/notes are free-form.
     const esc = (s: string) => s
       .replace(/<\/?user_input\b[^>]*>/gi, "")
       .replace(/<\/?system\b[^>]*>/gi, "")
       .replace(/<\/?instructions?\b[^>]*>/gi, "")
       .replace(/<\/?INST\b[^>]*>/gi, "");
 
-    // Subject descriptors (client sends space-separated ids, not underscore)
     const subjectLabel: Record<string, string> = {
       "הלכה":          "הלכה",
       "משנה":          "משנה",
@@ -262,6 +270,9 @@ Deno.serve(async (req) => {
       "מקור חיים":     "מקור חיים (הרב חיים דוד הלוי)",
       "פרשת השבוע":    "פרשת השבוע",
       "מחשבת ישראל":   "מחשבת ישראל",
+      "גמרא":          "גמרא (תלמוד בבלי) — סוגיה עם ציטוט לשון הגמרא, רש\"י ומשא ומתן",
+      "תפילה":         "תפילה — נוסח התפילה המנוקד, ברכות, מקורות ומשמעות",
+      "מועדים וחגים":  "מועדים וחגים (מעגל השנה) — הלכות, טעמים ומקורות לפי החג",
     };
     const outputLabel: Record<string, string> = {
       "דף_עבודה":      "📄 דף עבודה",
@@ -293,7 +304,6 @@ ${notes ? `הוראות נוספות מהמורה: ${esc(notes)}` : ""}
 
 קוד HTML גולמי בלבד, ללא הסברים.`;
 
-    // ── 6. Call Anthropic (streaming) ─────────────────────────────────────────
     // Right-size to page count — the old 12000-token floor let a 1-page request
     // over-generate (model wrote far past one page, ~185s). ~7000 tokens/page is
     // ample for rich content with sources while keeping small requests fast.
