@@ -1,4 +1,5 @@
 import { supabase } from "../lib/supabase";
+import { forwardToPixel } from "../lib/pixel";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Full-funnel analytics. Unlike the old version, track() now fires for
@@ -81,6 +82,11 @@ const APP_VERSION = typeof __APP_VERSION__ !== "undefined" ? __APP_VERSION__ : "
 
 // Core emitter. Fire-and-forget; never throws into the caller.
 export async function track(event, metadata = {}) {
+  // Mirror funnel-defining events to the Meta Pixel (no-op when no pixel id is
+  // configured, and a no-op for the ~90% of events that aren't ad-relevant).
+  // Done first & synchronously so it isn't blocked by the async user lookup
+  // below — fbq has its own queue and is happy to fire before init resolves.
+  forwardToPixel(event, metadata);
   try {
     const userId = await resolveUserId();
     await supabase.from("events").insert({
