@@ -305,7 +305,7 @@ export default function Login() {
             </span>
           </h1>
           <p className="text-xl text-white/65 leading-relaxed max-w-lg mx-auto">
-            מורות פרטיות חוסכות <strong className="text-brand">3+ שעות הכנה בשבוע</strong>. חוברת עבודה מלאה בעברית, מותאמת לכל תלמיד — מוכנה להדפסה תוך 60 שניות
+            מורות פרטיות חוסכות <strong className="text-brand">3+ שעות הכנה בשבוע</strong>. כל תלמיד הופך לגיבור ההרפתקה — בעולם שהוא אוהב, עם 3 רמות קושי ומפתח תשובות. בעברית, מוכנה להדפסה תוך 60 שניות
           </p>
           <button
             onClick={() => goToLoginForm("hero")}
@@ -430,7 +430,7 @@ export default function Login() {
                 { icon: "🎯", title: "משימה חווייתית", desc: "לא תרגילים יבשים — סיפור שהילד רוצה לסיים. הוא לא מרגיש שהוא לומד — הוא חוקר, מציל, בונה.", color: "bg-magic/10" },
                 { icon: "⚽", title: "בעולם שהילד אוהב", desc: "חלל, כדורגל, גיימינג, בישול, פוקימון — הגדרה אחת ובשבילי בונה סביבה שמדברת אליו.", color: "bg-brand/10" },
                 { icon: "🎨", title: "צבוע לפי תשובה", desc: "פעילויות יצירתיות שמגבירות מוטיבציה. הילד מצייר ופותר בו-זמנית — ועושה בדיקה עצמית.", color: "bg-amber-50" },
-                { icon: "📐", title: "מותאם בדיוק לרמה", desc: "בסיסי, בינוני, מתקדם — ה-AI כותב לרמה שציינת. אף פעם לא קל מדי, אף פעם לא קשה מדי.", color: "bg-grow/10" },
+                { icon: "📐", title: "3 רמות קושי בכל עמוד", desc: "קל, בינוני, אתגר — עם דוגמה פתורה לפני כל תרגיל. מתאים לכל ילד בכיתה, בלי לשכפל עבודה.", color: "bg-grow/10" },
               ].map(({ icon, title, desc, color }) => (
                 <div key={title} className="flex items-start gap-4">
                   <div className={`w-11 h-11 rounded-xl ${color} flex items-center justify-center text-2xl flex-shrink-0 border border-ink/5`}>{icon}</div>
