@@ -72,13 +72,31 @@ export default function Preview({ html, onReset, shareToken, title, active = tru
   const scaledW = Math.round(A4_PX * scale);
   const scaledHeight = Math.round(iframeHeight * scale);
 
-  const getPrintHtml = () =>
-    html.includes("@page")
+  const getPrintHtml = () => {
+    let h = html.includes("@page")
       ? html
       : html.replace(
           "</head>",
           "<style>@page{size:A4;margin:0}*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}</style></head>"
         );
+    // Flow-type worksheets (e.g. Jewish-studies materials) lay each page out with
+    // `.page{min-height:296mm}`. When a page's content is taller than A4 it overflows
+    // onto a second physical sheet, leaving a big gap and an awkward mid-content split
+    // in the saved PDF. For those ONLY, let the content flow and fill each sheet,
+    // breaking between questions/tables. Magazine booklets use fixed `height` +
+    // `overflow:hidden` pages (no min-height) and are intentionally left untouched.
+    if (/\.page\s*\{[^}]*\bmin-height\s*:/i.test(h)) {
+      const flow =
+        '<style id="bsv-print-flow">@media print{' +
+        '@page{size:A4;margin:12mm}' +
+        '.page{min-height:0!important;height:auto!important;padding:0!important;margin:0!important;box-shadow:none!important;page-break-after:auto!important}' +
+        '.q-row,table,tr,thead,tbody,.info-box,.rule-box,blockquote,.header-bar,.checkbox-row{break-inside:avoid!important;page-break-inside:avoid!important}' +
+        '.section-title{break-after:avoid!important;page-break-after:avoid!important}' +
+        '}</style>';
+      h = h.includes("</head>") ? h.replace("</head>", flow + "</head>") : flow + h;
+    }
+    return h;
+  };
 
   // Standalone viewer used whenever the booklet opens in its OWN browser tab
   // (mobile "save as PDF" + the "full screen" button). Two screen-only tweaks —
