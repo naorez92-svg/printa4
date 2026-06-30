@@ -299,13 +299,13 @@ export default function Login() {
             120+ מורות פרטיות · ⭐ 4.9/5 · 500+ חוברות נוצרו
           </div>
           <h1 className="text-4xl sm:text-5xl font-bold text-white font-display leading-tight">
-            הפסיקי להכין דפי עבודה ידנית —<br />
+            הילד הופך לגיבור —<br />
             <span className="text-transparent bg-clip-text bg-gradient-to-l from-brand to-[#A78BFA]">
-              תני ל-AI לעשות את זה
+              ואת חוסכת 3 שעות בשבוע
             </span>
           </h1>
           <p className="text-xl text-white/65 leading-relaxed max-w-lg mx-auto">
-            מורות פרטיות חוסכות <strong className="text-brand">3+ שעות הכנה בשבוע</strong>. כל תלמיד הופך לגיבור ההרפתקה — בעולם שהוא אוהב, עם 3 רמות קושי ומפתח תשובות. בעברית, מוכנה להדפסה תוך 60 שניות
+<strong className="text-brand">לא עוד דף עבודה גנרי.</strong> חוברת אישית ומעוצבת בעברית — בעולם שהילד אוהב, עם 3 רמות קושי ומפתח תשובות. מוכנה להדפסה תוך 60 שניות
           </p>
           <button
             onClick={() => goToLoginForm("hero")}
@@ -652,7 +652,7 @@ export default function Login() {
                       <div className="bg-red-50 border border-red-100 rounded-xl p-3">
                         <p className="font-bold text-red-600 mb-2">ChatGPT / Gemini</p>
                         <ul className="space-y-1 text-ink/60 text-xs">
-                          <li>❌ טקסט בלבד — צריך לעצב בעצמך</li>
+                          <li>❌ דף טקסט משעמם — צריך לעצב לבד</li>
                           <li>❌ לא יודע מה לומדים בכיתה ג׳ בישראל</li>
                           <li>❌ צריך לכתוב פרומפט מדויק בכל פעם</li>
                           <li>❌ אין שמירה, ארכיון, או היסטוריה</li>
@@ -662,7 +662,7 @@ export default function Login() {
                       <div className="bg-grow/5 border border-grow/20 rounded-xl p-3">
                         <p className="font-bold text-grow mb-2">בשבילי</p>
                         <ul className="space-y-1 text-ink/60 text-xs">
-                          <li>✅ חוברת מעוצבת, מוכנה להדפסה</li>
+                          <li>✅ מעוצבת כמגזין — הילד גיבור הסיפור</li>
                           <li>✅ יודע כיתות, רמות, ותכנית ישראלית</li>
                           <li>✅ 3 שדות → לחיצה → מוכן</li>
                           <li>✅ ארכיון בענן לכל החוברות</li>
@@ -695,7 +695,7 @@ export default function Login() {
                 a: "לחלוטין. בשבילי לא שומרת שמות תלמידים אמיתיים — רק את מה שאת מזינה (שם, כיתה, נושא). אנחנו עובדים עם Supabase שמצפין את כל הנתונים ועומד בתקנות GDPR. לא מוכרים נתונים לאף גורם.",
               },
               {
-                q: "מה קורה אחרי 3 החוברות החינמיות?",
+                q: "מה קורה אחרי 2 החוברות החינמיות?",
                 a: "האפליקציה תציג הצעה לשדרג. לא נחייב אותך אוטומטית — אין כרטיס אשראי ברירת מחדל. אם תרצי להמשיך, תוכנית מורה עולה ₪59/חודש (20 חוברות) ותוכנית הורה ₪19/חודש (5 חוברות). ביטול בכל עת דרך WhatsApp.",
               },
             ].map(({ q, a }, i) => (
