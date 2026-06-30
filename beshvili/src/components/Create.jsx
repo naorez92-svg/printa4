@@ -1141,7 +1141,7 @@ export default function Create({ onSaved, remaining, isPro, active = true, bookl
 
         {/* Generic error */}
         {error?.startsWith("generic:") && (
-          <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-red-600 text-sm">
+          <div role="alert" className="bg-red-50 border border-red-200 rounded-xl p-3 text-red-600 text-sm">
             {error.replace("generic:", "")}
           </div>
         )}
@@ -1158,8 +1158,9 @@ export default function Create({ onSaved, remaining, isPro, active = true, bookl
               </div>
             </div>
 
-            {/* Context-aware title */}
-            <div className="text-center">
+            {/* Context-aware title — announced to screen readers so blind users
+                aren't left in silence through the 60–90s generation. */}
+            <div className="text-center" role="status" aria-live="polite">
               <p className="font-display font-bold text-ink text-lg">
                 {mode === "exam"
                   ? `📝 מכין מבחן ${examSubject}${examGrade ? ` — ${examGrade}` : ""}`

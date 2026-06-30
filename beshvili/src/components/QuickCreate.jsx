@@ -327,7 +327,7 @@ export default function QuickCreate({ student, onClose, onSaved, remaining, isPr
               )}
             </p>
           </div>
-          <button onClick={() => { track("quick_create_closed", { generated: !!html }); onClose?.(); }} className="text-ink/30 hover:text-ink text-2xl leading-none mt-0.5">×</button>
+          <button onClick={() => { track("quick_create_closed", { generated: !!html }); onClose?.(); }} aria-label="סגור" className="text-ink/30 hover:text-ink text-2xl leading-none mt-0.5">×</button>
         </div>
       </div>
 
@@ -414,7 +414,7 @@ export default function QuickCreate({ student, onClose, onSaved, remaining, isPr
           </div>
         )}
         {error && error !== "quota" && !rateCountdown && (
-          <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-red-600 text-sm">{error.replace(/^generic:/, "")}</div>
+          <div role="alert" className="bg-red-50 border border-red-200 rounded-xl p-3 text-red-600 text-sm">{error.replace(/^generic:/, "")}</div>
         )}
         {error === "quota" && (
           <div className="space-y-3">
@@ -443,7 +443,7 @@ export default function QuickCreate({ student, onClose, onSaved, remaining, isPr
 
         {/* Loading */}
         {loading && (
-          <div className="text-center py-8 space-y-3">
+          <div className="text-center py-8 space-y-3" role="status" aria-live="polite">
             <div className="flex justify-center gap-1">
               {[0, 1, 2].map(i => (
                 <div key={i} className="w-2.5 h-2.5 rounded-full bg-magic animate-bounce" style={{ animationDelay: `${i * 0.15}s` }} />

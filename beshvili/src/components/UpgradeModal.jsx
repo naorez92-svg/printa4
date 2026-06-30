@@ -78,6 +78,14 @@ export default function UpgradeModal({ onClose, bookletCount = 0, source = "unkn
     return () => clearInterval(id);
   }, []);
 
+  // Close on Esc — keyboard/screen-reader users must be able to dismiss the modal
+  // without relying on the mouse-only backdrop click.
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
   const saveLead = (method) => {
     track("upgrade_cta_clicked", { method, plan: plan.id, price: effectivePrice, sale_active: saleActive, source, bookletCount });
     supabase.functions
@@ -123,7 +131,7 @@ export default function UpgradeModal({ onClose, bookletCount = 0, source = "unkn
       className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-ink/40 backdrop-blur-sm"
       onClick={e => e.target === e.currentTarget && onClose()}
     >
-      <div className="bg-white rounded-3xl w-full max-w-sm shadow-2xl p-6 space-y-4 max-h-[95vh] overflow-y-auto">
+      <div className="bg-white rounded-3xl w-full max-w-sm shadow-2xl p-6 space-y-4 max-h-[95vh] overflow-y-auto" role="dialog" aria-modal="true" aria-labelledby="upgrade-modal-title">
 
         {/* Sale countdown banner */}
         {saleActive && (
@@ -136,10 +144,10 @@ export default function UpgradeModal({ onClose, bookletCount = 0, source = "unkn
         {/* Header */}
         <div className="flex justify-between items-start">
           <div>
-            <h2 className="text-xl font-bold text-ink font-display">שדרגי לבשבילי פרו</h2>
+            <h2 id="upgrade-modal-title" className="text-xl font-bold text-ink font-display">שדרגי לבשבילי פרו</h2>
             <p className="text-sm text-ink/50">2 חוברות ניסיון · ביטול בכל עת</p>
           </div>
-          <button onClick={onClose} className="text-ink/30 hover:text-ink text-3xl leading-none">×</button>
+          <button onClick={onClose} aria-label="סגור" className="text-ink/30 hover:text-ink text-3xl leading-none">×</button>
         </div>
 
         {/* Personalized time-saved hook */}
