@@ -70,6 +70,23 @@ export function sanitizeBookletHtml(h) {
     }
   });
 
+  // 4.5 Scrub <style> blocks. AI-authored booklet CSS is normally safe, but the
+  // print/"open in new tab" path renders this HTML in a NON-sandboxed same-origin
+  // window, where a malicious @import or off-origin url() in a <style> block could
+  // phone home (CSS exfiltration). Legitimate booklet CSS never does this — fonts
+  // load via <link>, images via data: URIs — so strip ONLY those three constructs
+  // and leave all layout/print/@page/@media CSS (and url(data:…)) byte-for-byte
+  // intact. The off-origin url() rule anchors the scheme/`//` to the START of the
+  // value so it cannot match a `//` that appears inside a base64 data: URI.
+  doc.querySelectorAll("style").forEach((el) => {
+    const css = el.textContent || "";
+    const cleaned = css
+      .replace(/@import[^;]*;?/gi, "")                              // external stylesheet load
+      .replace(/expression\s*\(/gi, "blocked-expression(")          // legacy IE script-in-CSS
+      .replace(/url\(\s*['"]?\s*(?:https?:\/\/|\/\/)[^)]*\)/gi, "url()"); // off-origin url() → inert
+    if (cleaned !== css) el.textContent = cleaned;
+  });
+
   // 5. Re-inject the single trusted script (Tailwind CDN) removed in step 1.
   if (hasTailwind && doc.head) {
     const s = doc.createElement("script");
