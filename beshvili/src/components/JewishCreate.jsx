@@ -123,6 +123,11 @@ const LOADING_MSGS = [
   "כמעט מוכן! עוד רגע...",
 ];
 
+// Live build-preview constants — same A4 dims as Preview.jsx; display only.
+const A4_PX = 794;
+const A4_H  = 1123;
+const countPages = (html) => (html.match(/296mm/g) || []).length;
+
 export default function JewishCreate({ onSaved, remaining, isPro, bookletCount = 0, onUpgrade }) {
   const [subject, setSubject] = useState("הלכה");
   const [grade,   setGrade]   = useState("ה");
@@ -139,6 +144,7 @@ export default function JewishCreate({ onSaved, remaining, isPro, bookletCount =
   const [loading, setLoading] = useState(false);
   const [loadingMsgIdx, setLoadingMsgIdx] = useState(0);
   const [streamChars, setStreamChars] = useState(0);
+  const [previewHtml, setPreviewHtml] = useState(""); // live build snapshot (display only)
   const [loadingElapsed, setLoadingElapsed] = useState(0);
   const [html,    setHtml]    = useState(null);
   const [error,   setError]   = useState(null);
@@ -169,7 +175,7 @@ export default function JewishCreate({ onSaved, remaining, isPro, bookletCount =
 
   // Loading message rotation + elapsed timer
   useEffect(() => {
-    if (!loading) { setLoadingMsgIdx(0); setStreamChars(0); setLoadingElapsed(0); return; }
+    if (!loading) { setLoadingMsgIdx(0); setStreamChars(0); setLoadingElapsed(0); setPreviewHtml(""); return; }
     const msgId = setInterval(() => setLoadingMsgIdx(i => (i + 1) % LOADING_MSGS.length), 3500);
     const secId = setInterval(() => setLoadingElapsed(s => s + 1), 1000);
     return () => { clearInterval(msgId); clearInterval(secId); };
@@ -203,6 +209,7 @@ export default function JewishCreate({ onSaved, remaining, isPro, bookletCount =
     creatingRef.current = true;
     setLoading(true);
     setHtml(null);
+    setPreviewHtml("");
     setError(null);
     setSaveWarning(false);
 
@@ -295,6 +302,7 @@ export default function JewishCreate({ onSaved, remaining, isPro, bookletCount =
     const decoder = new TextDecoder();
     let buffer = "";
     let updateTimer = 0;
+    let previewTimer = 0; // throttles the live-build iframe
 
     let wakeLock = null;
     try { wakeLock = await navigator.wakeLock?.request("screen"); } catch {}
@@ -327,6 +335,7 @@ export default function JewishCreate({ onSaved, remaining, isPro, bookletCount =
               htmlAccumulated += ev.delta.text;
               const now = Date.now();
               if (now - updateTimer > 100) { setStreamChars(htmlAccumulated.length); updateTimer = now; }
+              if (now - previewTimer > 2000) { setPreviewHtml(htmlAccumulated); previewTimer = now; }
             } else if (ev.type === "error") {
               streamHadError = true;
               streamErrorMsg = ev.error?.type === "overloaded_error"
@@ -664,6 +673,48 @@ export default function JewishCreate({ onSaved, remaining, isPro, bookletCount =
           {fastMode ? "מהיר" : "מלא"}
         </span>
       </button>
+
+      {/* Live build preview — watch the material take shape while it generates,
+          instead of a bare spinner. Display only; mirrors Preview.jsx's sandboxed
+          srcDoc scaling and touches nothing in the generation engine. */}
+      {loading && (previewHtml.includes("</style>") || previewHtml.includes("</head>")) && (
+        <div className="space-y-2 mb-2">
+          <div className="flex justify-center">
+            <div
+              dir="ltr"
+              className="relative rounded-2xl overflow-hidden border border-ink/10 shadow-lg bg-white"
+              style={{ width: 300, height: Math.round(A4_H * (300 / A4_PX)) }}
+            >
+              <iframe
+                title="תצוגה חיה של החומר"
+                srcDoc={previewHtml}
+                sandbox="allow-scripts"
+                style={{
+                  width: `${A4_PX}px`,
+                  height: `${pageCount * A4_H}px`,
+                  transform: `scale(${300 / A4_PX}) translateY(-${Math.max(0, Math.min(pageCount - 1, countPages(previewHtml) - 1)) * A4_H}px)`,
+                  transformOrigin: "top left",
+                  border: "none",
+                  display: "block",
+                  position: "absolute",
+                  top: 0,
+                  left: 0,
+                  transition: "transform 0.7s ease",
+                }}
+              />
+              <div className="absolute top-2 right-2 bg-magic/90 text-white text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 pointer-events-none">
+                <span className="w-1.5 h-1.5 bg-white rounded-full animate-pulse" /> חי
+              </div>
+              <div className="absolute inset-x-0 bottom-0 h-8 bg-gradient-to-t from-white to-transparent pointer-events-none" />
+            </div>
+          </div>
+          {pageCount > 1 && countPages(previewHtml) > 0 && (
+            <p className="text-center text-xs text-ink/45">
+              בונה עמוד {Math.min(pageCount, countPages(previewHtml))} מתוך {pageCount} ✍️
+            </p>
+          )}
+        </div>
+      )}
 
       {/* Generate button */}
       <button
