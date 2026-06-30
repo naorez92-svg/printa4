@@ -1,0 +1,113 @@
+/* ════════════════════════════════════════════════════════════════
+   booklet.css — מערכת העיצוב של חוברות בשבילי
+   נטען פעם אחת ב-<head>; המודל כותב רק class="..." (לא inline styles).
+   ככה היצירה מהירה פי ~3 בלי לרדת באיכות.
+   ════════════════════════════════════════════════════════════════ */
+@page{size:A4;margin:0}
+*{box-sizing:border-box}
+body{margin:0;font-family:'Varela Round','Assistant',sans-serif;color:#20184A;background:#eef;direction:rtl}
+.bk-display,h1,h2,h3{font-family:'Fredoka','Baloo 2',sans-serif}
+
+/* ── A4 page ── */
+.page{width:210mm;height:296mm;margin:10px auto;background:#fff;position:relative;overflow:hidden;padding:12mm;page-break-after:always;box-shadow:0 6px 24px rgba(32,24,74,.12);
+  background-image:radial-gradient(circle,#eef2f7 1.1px,transparent 1.1px);background-size:20px 20px}
+@media print{
+  .no-print{display:none!important}
+  body{margin:0!important;background:#fff!important}
+  .page{margin:0!important;box-shadow:none!important;background-image:none!important}
+  .page:last-child{page-break-after:avoid!important}
+  *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
+}
+
+/* ── cover (ink-friendly: light page + colored top band) ── */
+.cover{padding:0}
+.cover-band{background:linear-gradient(135deg,var(--c1,#6C5CE7) 0%,var(--c2,#8b7aed) 55%,var(--c3,#F4A02C) 100%);height:42%;border-radius:0 0 28px 28px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;color:#fff;padding:14mm 12mm;position:relative}
+.cover-band h1{font-size:34px;font-weight:800;margin:6px 0 2px}
+.cover-band .sub{opacity:.9;font-size:14px}
+.cover-photo{width:104px;height:104px;border-radius:50%;object-fit:cover;border:4px solid #fff;box-shadow:0 4px 14px rgba(0,0,0,.18);margin-bottom:6px}
+.cover-body{padding:8mm 12mm}
+.affirm{background:#f3effc;border:1px solid #e3dcff;border-radius:14px;padding:11px 16px;text-align:center;font-weight:700;color:#5b21b6;margin:0 0 12px}
+
+/* ── mascot ── */
+.brak{display:inline-block;vertical-align:middle}
+
+/* ── section header + kicker ── */
+.kick{color:#6C5CE7;font-weight:800;font-size:12px;letter-spacing:.04em;margin:0 0 2px}
+.h-sec{font-size:21px;font-weight:800;margin:0 0 10px;display:flex;align-items:center;gap:8px}
+.rule{height:1.5px;background:linear-gradient(90deg,transparent,#cbd5e1 25%,#cbd5e1 75%,transparent);margin:10px 0 8px;border:none}
+
+/* ── stage progress bar ── */
+.stage{background:linear-gradient(110deg,#efe9ff,#fff 75%);border-right:3px solid #6C5CE7;border-radius:0 10px 10px 0;padding:7px 14px;font-weight:800;color:#5b21b6;font-size:14px;margin:0 0 10px;display:flex;align-items:center;gap:8px}
+
+/* ── meta-cognition / what-I-know box ── */
+.metabox{background:#eff6ff;border:1px solid #dbeafe;border-radius:12px;padding:8px 14px;font-size:13px;color:#1e40af;margin:0 0 10px}
+
+/* ── quest / mission box ── */
+.quest{border:2px dashed #9aa3b2;border-radius:14px;background:#fafbfc;padding:11px 14px;margin:8px 0}
+.quest p{margin:0 0 3px;font-size:12px;color:#475569}
+.quest b{color:#334155}
+
+/* ── identity / player card ── */
+.idcard{background:linear-gradient(120deg,#fff8ef,#fff);border:1.5px solid #f6d9a8;border-radius:16px;padding:13px 16px;margin:8px 0}
+.idcard .row{display:flex;justify-content:space-between;font-size:13px;margin:4px 0;color:#334155}
+
+/* ── worked example ── */
+.worked{position:relative;background:linear-gradient(120deg,#fff8ef,#fff);border:1.5px solid #f6d9a8;border-radius:16px;padding:13px 15px;margin:8px 0;box-shadow:0 2px 10px rgba(244,160,44,.08)}
+.worked .tag{position:absolute;top:-10px;right:14px;background:#F4A02C;color:#fff;font-weight:700;font-size:11px;padding:3px 12px;border-radius:999px}
+.worked b{color:#b45309}
+
+/* ── 3-level difficulty grid ── */
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:9px;margin:8px 0}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:8px 0}
+.q{position:relative;border:1.5px solid #e5e7eb;border-radius:14px;padding:14px 10px 11px;text-align:center;background:#fff}
+.q .lev{position:absolute;top:-9px;right:50%;transform:translateX(50%);font-size:9.5px;font-weight:800;padding:2px 9px;border-radius:999px;color:#fff;white-space:nowrap}
+.q .ex{font-size:16px;font-weight:700;direction:ltr;margin-top:6px}
+.q .ln{height:1.5px;background:#cbd5e1;width:46px;margin:8px auto 0}
+.easy{border-color:#bbf7d0;background:linear-gradient(180deg,#f0fdf4,#fff)} .easy .lev{background:#16a34a}
+.med{border-color:#fde68a;background:linear-gradient(180deg,#fffbeb,#fff)} .med .lev{background:#d97706}
+.hard{border-color:#ddd6fe;background:linear-gradient(180deg,#f5f3ff,#fff)} .hard .lev{background:#7c3aed}
+
+/* ── inline badges (for questions in text) ── */
+.badge{font-size:9.5px;font-weight:800;padding:2px 8px;border-radius:999px;letter-spacing:.03em;margin-inline-start:4px;display:inline-block}
+.b-easy{background:#dcfce7;color:#15803d}.b-med{background:#fef9c3;color:#92400e}.b-hard{background:#ede9fe;color:#5b21b6}
+.b-find{background:#dbeafe;color:#1d4ed8}.b-infer{background:#f3e8ff;color:#7e22ce}.b-vocab{background:#dcfce7;color:#15803d}.b-opin{background:#ffedd5;color:#c2410c}
+
+/* ── comic word problem ── */
+.comic{display:flex;gap:11px;background:linear-gradient(120deg,#f5f3ff,#fff);border:1.5px solid #e3dcff;border-radius:16px;padding:12px 14px;margin:8px 0;align-items:flex-start}
+.comic .bubble{flex:1;background:#fff;border:1.5px solid #e3dcff;border-radius:14px 14px 14px 4px;padding:9px 12px;font-size:13.5px}
+.comic .qq{font-weight:700;color:#6C5CE7;font-size:12px;margin:6px 0 0}
+
+/* ── plain word problem (compact) ── */
+.wp{background:#fff7ed;border:1px solid #fed7aa;border-radius:12px;padding:10px 13px;margin:8px 0;font-size:13px}
+.wp .lbl{font-weight:700;color:#c2410c;font-size:11px;margin:5px 0 1px}
+
+/* ── manipulative panel ── */
+.viz{background:#fbfaff;border:1px solid #e9e6f5;border-radius:14px;padding:10px 13px;margin:8px 0}
+.viz .pt{font-weight:800;font-size:13px;margin:0 0 6px;display:flex;align-items:center;gap:6px}
+.viz .cap{font-size:11px;color:#64748b;margin:3px 0 0}
+
+/* ── tip box (mascot speaks) ── */
+.tip{display:flex;gap:10px;align-items:center;background:#eafaf4;border-right:5px solid #1FB58F;border-radius:0 12px 12px 0;padding:9px 12px;margin:8px 0}
+.tip p{margin:0;font-size:13px;color:#0f766e;font-weight:600}
+
+/* ── write lines ── */
+.wl{border-bottom:1.5px solid #cbd5e1;height:26px;margin:3px 0 7px;background:linear-gradient(180deg,transparent 80%,#f8fafc)}
+.wl-in{display:inline-block;border-bottom:1.5px solid #94a3b8;min-width:90px}
+
+/* ── card / generic ── */
+.card{background:#fff;border:1px solid #e9e6f5;border-radius:14px;padding:12px 14px;margin:8px 0;box-shadow:0 1px 3px rgba(0,0,0,.05),0 6px 16px rgba(0,0,0,.05)}
+
+/* ── reading story ── */
+.story{font-size:14.5px;line-height:1.75;color:#1f2937}
+.story b{color:#5b21b6}
+
+/* ── victory ── */
+.victory{text-align:center}
+.victory .trophy{font-size:40px}
+.stars{font-size:24px;letter-spacing:6px;color:#f59e0b}
+
+/* ── footer + QR ── */
+.foot{position:absolute;bottom:5mm;left:0;right:0;text-align:center}
+.foot img{display:inline-block}
+.foot p{font-size:8px;color:#9ca3af;margin:2px 0 0}
+.brand-foot{position:absolute;bottom:4mm;left:0;right:0;text-align:center;font-size:8px;color:#9ca3af;margin:0}
