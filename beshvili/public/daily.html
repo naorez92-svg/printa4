@@ -1,0 +1,238 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>בשבילי · קו-פיילוט שיווקי יומי</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;700;800&family=Assistant:wght@400;600;700;800&display=swap&subset=hebrew" rel="stylesheet" />
+<style>
+  :root{--ink:#20184A;--canvas:#F7F6FB;--brand:#F4A02C;--magic:#6C5CE7;--grow:#1FB58F;--line:#e9e6f5;--muted:#6b6685}
+  *{box-sizing:border-box}
+  body{margin:0;font-family:'Assistant',sans-serif;color:var(--ink);background:var(--canvas);line-height:1.65}
+  h1,h2,h3,.display{font-family:'Baloo 2',cursive}
+  .wrap{max-width:840px;margin:0 auto;padding:0 16px}
+  header{background:linear-gradient(135deg,var(--ink),var(--magic));color:#fff;padding:30px 0 34px;text-align:center}
+  header h1{margin:.1em 0;font-size:clamp(24px,5vw,34px);font-weight:800}
+  .today{display:inline-block;background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.3);padding:6px 16px;border-radius:999px;font-weight:700;margin-top:8px}
+  header p{opacity:.92;margin:.6em auto 0;max-width:560px;font-size:15px}
+  section{padding:22px 0;border-bottom:1px solid var(--line)}
+  h2{font-size:22px;margin:.2em 0 .6em;display:flex;align-items:center;gap:8px}
+  .kicker{color:var(--magic);font-weight:800;font-size:12px;letter-spacing:.05em;text-transform:uppercase;margin:0}
+  .card{background:#fff;border:1px solid var(--line);border-radius:16px;padding:0;box-shadow:0 2px 10px rgba(32,24,74,.05);overflow:hidden;margin-bottom:16px}
+  .card .head{display:flex;align-items:center;gap:10px;padding:13px 16px;background:#faf9ff;border-bottom:1px solid var(--line);flex-wrap:wrap}
+  .time{font-family:'Baloo 2';font-weight:800;font-size:20px;color:var(--magic);background:#efeafd;border-radius:10px;padding:4px 12px}
+  .aud{font-weight:800;font-size:13px;padding:4px 11px;border-radius:999px;color:#fff}
+  .a-tutor{background:var(--magic)}.a-mechanech{background:var(--brand)}.a-chamad{background:var(--grow)}
+  .where{font-size:13px;color:var(--muted);font-weight:600;flex-basis:100%}
+  .card .body{padding:16px}
+  .posttext{background:var(--canvas);border:1px dashed var(--magic);border-radius:12px;padding:14px;white-space:pre-wrap;font-size:15.5px;line-height:1.7}
+  .copybtn{display:inline-flex;align-items:center;gap:6px;background:var(--magic);color:#fff;border:none;border-radius:10px;padding:9px 16px;font-family:'Assistant';font-weight:800;font-size:14px;cursor:pointer;margin-top:10px}
+  .copybtn:active{transform:scale(.97)}
+  .copybtn.alt{background:#fff;color:var(--magic);border:1.5px solid var(--magic)}
+  .label{font-weight:800;font-size:13px;color:var(--ink);margin:14px 0 4px;display:block}
+  ol.steps{margin:8px 0 0;padding-right:20px}
+  ol.steps li{margin:3px 0;font-size:14.5px}
+  .rules{background:#fff8ef;border-right:5px solid var(--brand);border-radius:0 12px 12px 0;padding:14px 18px}
+  .rules b{color:var(--ink)}
+  .rules ul{margin:6px 0 0;padding-right:20px}
+  .tip{background:#f1effc;border-right:5px solid var(--magic);border-radius:0 12px 12px 0;padding:14px 18px}
+  details{background:#fff;border:1px solid var(--line);border-radius:14px;padding:6px 16px;margin-bottom:12px}
+  summary{font-weight:800;cursor:pointer;padding:8px 0;font-size:16px}
+  .grp{display:inline-block;background:#efeafd;color:var(--magic);font-weight:700;font-size:13px;padding:3px 10px;border-radius:8px;margin:3px}
+  .reply{background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:10px}
+  .reply .q{color:var(--brand);font-weight:800;font-size:14px}
+  .reply .a{margin-top:4px;font-size:15px}
+  .chk{display:flex;align-items:flex-start;gap:8px;font-size:15px;margin:7px 0}
+  .chk input{margin-top:5px;width:18px;height:18px;accent-color:var(--grow);flex:none}
+  footer{padding:26px 0 44px;text-align:center;color:var(--muted);font-size:13px}
+  .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(40px);background:var(--ink);color:#fff;padding:11px 22px;border-radius:12px;font-weight:700;opacity:0;transition:.25s;z-index:50}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  .mini{font-size:13px;color:var(--muted)}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap">
+    <p class="kicker" style="color:#fff;opacity:.8">בשבילי · קו-פיילוט שיווקי</p>
+    <h1>משימת היום 🎯</h1>
+    <div class="today" id="todayLabel">—</div>
+    <p>פתחי כל בוקר. עשי <b>בדיוק</b> מה שכתוב, לפי הסדר. הכל מוכן — רק להעתיק, להדביק ולענות. התוכנית <b>מתחלפת לבד כל יום</b>.</p>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <!-- Setup (collapsible) -->
+  <section>
+    <details>
+      <summary>⚙️ הכנה חד-פעמית (שבוע ראשון) — לחצי לפתיחה</summary>
+      <p class="mini" style="margin-top:8px">פעם אחת בלבד: הצטרפי ל-10–15 קבוצות פייסבוק של מורות. חפשי בפייסבוק את הביטויים האלה ולחצי "הצטרף":</p>
+      <div>
+        <span class="grp">מורים מורות מחליפים רעיונות</span><span class="grp">מורות פרטיות</span>
+        <span class="grp">מחנכות כיתה ד</span><span class="grp">מורות חמ"ד</span>
+        <span class="grp">חינוך דתי לאומי מורים</span><span class="grp">הוראה מתקנת</span>
+        <span class="grp">ליקויי למידה מורים</span><span class="grp">כלים דיגיטליים למורים</span>
+      </div>
+      <div class="chk"><input type="checkbox"><span>הצטרפתי ל-10+ קבוצות</span></div>
+      <div class="chk"><input type="checkbox"><span>קראתי את חוקי כל קבוצה (יש שמרשות פרסום רק ביום מסוים)</span></div>
+    </details>
+  </section>
+
+  <!-- Golden rules -->
+  <section>
+    <div class="rules">
+      <b>⚠️ 3 כללי הזהב (קראי כל יום):</b>
+      <ul>
+        <li><b>בלי לינק בגוף הפוסט!</b> הלינק תמיד בתגובה הראשונה (יש כפתור מוכן לכל פוסט).</li>
+        <li><b>פוסט אחד בכל קבוצה.</b> אל תדביקי את אותו פוסט ב-5 קבוצות באותה דקה — פזרי לפי השעות למטה.</li>
+        <li><b>עני לכל תגובה!</b> זה הכי חשוב — האלגוריתם דוחף פוסטים פעילים, וזה מה שבונה אמון.</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- Today's missions (generated) -->
+  <section>
+    <p class="kicker">5 המשימות של היום</p>
+    <h2>📋 לפי הסדר, לפי השעה</h2>
+    <div id="missions"></div>
+  </section>
+
+  <!-- Reply templates -->
+  <section>
+    <p class="kicker">כשמישהי מגיבה</p>
+    <h2>💬 תשובות מוכנות</h2>
+    <div class="reply"><div class="q">מישהי כותבת "מעניין" / "אשמח"</div><div class="a">היי 🙂 שלחתי לך גם בפרטי! בקיצור — זה כלי שמייצר חוברת לימוד אישית לכל ילד תוך דקה, מותאמת לרמה ולתחומי העניין. יש 2 חוברות חינם להתנסות: www.beshvili.com 💛</div></div>
+    <div class="reply"><div class="q">"כמה זה עולה?"</div><div class="a">יש 2 חוברות חינם להתנסות בלי כרטיס אשראי 🙏 ואחר כך יש תוכנית פרו במחיר נוח. תכתבי לי בפרטי ואשמח להסביר 🙂</div></div>
+    <div class="reply"><div class="q">"זה באמת עובד? / איך זה עובד?"</div><div class="a">כן! את כותבת מה התלמיד צריך (מקצוע, כיתה, תחום עניין), וה-AI מכין חוברת מלאה מוכנה להדפסה. הכי קל פשוט לנסות חינם ולראות בעצמך 🙂 www.beshvili.com</div></div>
+    <div class="reply"><div class="q">"מתאים גם לחינוך מיוחד / דיסלקציה / ADHD?"</div><div class="a">בהחלט 🙏 אפשר להתאים את הרמה והניסוח לצרכים מיוחדים. תנסי חינם ותראי אם זה מתאים לתלמידים שלך 💛</div></div>
+  </section>
+
+  <!-- Out of box tip of the day -->
+  <section>
+    <p class="kicker">בונוס</p>
+    <h2>💡 הרעיון מחוץ לקופסא של היום</h2>
+    <div class="tip" id="tipBox">—</div>
+  </section>
+
+  <!-- End of day checklist -->
+  <section>
+    <p class="kicker">לפני שסוגרים את היום</p>
+    <h2>✅ צ'ק-ליסט סיום</h2>
+    <div class="chk"><input type="checkbox"><span>פרסמתי את כל 5 הפוסטים (כל אחד בקבוצה אחרת)</span></div>
+    <div class="chk"><input type="checkbox"><span>שמתי את הלינק בתגובה הראשונה בכל פוסט</span></div>
+    <div class="chk"><input type="checkbox"><span>עניתי לכל מי שהגיב</span></div>
+    <div class="chk"><input type="checkbox"><span>בדקתי הודעות פרטיות וחזרתי לכולן</span></div>
+  </section>
+
+</div>
+
+<footer>
+  <div class="wrap">
+    <p><b style="font-family:'Baloo 2';color:var(--ink);font-size:17px">בשבילי</b> · קו-פיילוט יומי · מתעדכן אוטומטית כל בוקר</p>
+    <p class="mini">שאלה? פשוט שואלים ומעדכנים את הדף. <a href="/marketing-plan.html">↩ לתוכנית השיווק המלאה</a></p>
+  </div>
+</footer>
+
+<div class="toast" id="toast">הועתק! ✓</div>
+
+<script>
+/* ── Content library — rotates by calendar day so each morning is fresh ── */
+const LINK = "www.beshvili.com";
+const FIRST_COMMENT = "(מוסיפה את הקישור למי ששאל 🙏)\n" + LINK + " — יש 2 חוברות חינם להתנסות, בלי כרטיס אשראי.";
+
+const tutor = [
+  "בא לי לשתף משהו שחסך לי שעות השבוע 🙌\n\nכל שבוע הייתי יושבת בערב ומכינה דפי תרגול לכל תלמיד בנפרד — לכל אחד רמה אחרת, קושי אחר.\n\nלפני כמה שבועות גיליתי דרך לייצר חוברת אישית לכל ילד בעברית תוך דקה, מותאמת בדיוק לרמה ולתחומי העניין שלו. יש לי תלמיד שמשוגע על כדורגל — עכשיו כל התרגילים שלו דרך כדורגל, והוא פשוט אוהב לשבת על זה 😅\n\nמישהי עוד מתישה את עצמה בהכנת חומרים לכל תלמיד בנפרד? תכתבו \"מעניין\" ואשמח לשתף 💛",
+  "שאלה למורות הפרטיות פה 🙋‍♀️\nכמה שעות בשבוע אתן מבזבזות על הכנת דפי עבודה ותרגולים?\n\nאני הייתי על 4–5 שעות, עד שמצאתי כלי שמכין לי חוברת מותאמת אישית לכל תלמיד תוך דקה — גם לילדים עם קשיים (דיסלקציה, ADHD).\n\nתכתבו לי כמה זמן זה לוקח לכן — סקרנית אם אני היחידה שסבלה מזה 😅",
+  "תלמיד ששונא שיעורי בית? 🙈\nהיה לי אחד כזה. עד שהתחלתי להכין לו חוברת תרגול דרך הדבר שהוא הכי אוהב (אצלו זה היה חלל וכוכבים 🚀).\n\nפתאום הוא מבקש לעשות עוד. אותו חומר לימודי — רק עטוף במשהו שמדבר אליו.\n\nמי עוד מתמודדת עם תלמיד שמתנגד? תכתבו \"מעניין\" ואספר איך אני עושה את זה 💫",
+  "ההורים שואלים אותי כל הזמן: \"יש עוד תרגול לבית?\" 📚\nפעם הייתי מכינה ידנית וזה לקח לי נצח.\n\nהיום אני מייצרת חוברת תרגול אישית לכל תלמיד תוך דקה, מודפסת ומוכנה. ההורים מרוצים, אני חוסכת שעות.\n\nמישהי מכירה את הלחץ הזה? אשמח לשתף מה עובד לי 🙏",
+  "קשיי קריאה / דיסלקציה — איך אני מתאימה את החומר בלי לבזבז ערב שלם ✍️\nגיליתי דרך לייצר דף עבודה ברמה ובניסוח שמתאים בדיוק לתלמיד, תוך דקה.\n\nשינה לי לגמרי את ההכנה לתלמידים עם קשיים. מי עוד עובדת עם ילדים כאלה? תכתבו \"מעניין\" 💛",
+  "סוף השבוע שלי חזר אליי 🙌\nשנים ביליתי שישי-שבת בהכנת חומרים לתלמידים. החודש הפסקתי.\n\nמצאתי כלי שמכין לי חוברת אישית לכל תלמיד תוך דקה — מותאמת לרמה ולעניין. במקום 4 שעות, 4 דקות.\n\nמי עוד מקריבה את הסופ\"ש על הכנות? אשמח לשתף 🙂",
+  "6 תלמידים, 6 רמות שונות, ערב אחד 😅\nפעם זה היה סיוט. היום אני מכינה 6 חוברות שונות — אחת לכל תלמיד, מותאמת בדיוק אליו — בכמה דקות.\n\nכל ילד מקבל בדיוק את מה שהוא צריך, ואני לא מאבדת את הערב. מי מכירה את זה? תכתבו \"מעניין\" 💫"
+];
+const mechanech = [
+  "טיפ למחנכות לפני תקופת המבחנים 📚\nלפני המבחן בחשבון הכנתי חוברת חזרה ל-28 הילדים שלי — תוך כמה דקות, והדפסתי ישר מהטלפון.\nהכי אהבתי: גרסאות ברמות שונות לכיתה הטרוגנית בלי לשבת על זה כל הלילה.\n\nאיך אתן מכינות חומרי חזרה לכיתה? אשמח לשמוע — ולשתף מה עובד לי 🙏",
+  "הדבר הכי קשה בכיתה הטרוגנית = להכין חומר שמתאים גם לחזק וגם למתקשה ❤️\nהשנה גיליתי דרך לייצר את אותו דף עבודה בכמה רמות תוך דקה — אותו נושא, התאמה לכל ילד.\n\nמי עוד מתמודדת עם פערי רמות? תכתבו \"כן\" ואשתף איך 🙌",
+  "כיתה הטרוגנית? אותו דף עבודה ב-3 רמות, תוך דקה 📝\nבמקום לשכפל עבודה — מייצרת גרסה קלה, בינונית ומאתגרת לאותו נושא. החזקים לא משתעממים, המתקשים לא נשברים.\n\nמחנכות — איך אתן מתמודדות עם זה? אשמח לשתף 💛",
+  "תקופת מבחנים מתקרבת 😅\nככה אני מכינה חוברת חזרה לכל הכיתה בלי להישאר ערה עד 2 בלילה: כלי שמייצר חוברת מותאמת תוך דקה, מוכנה להדפסה.\n\nמי עוד בלחץ של סוף תקופה? תכתבו \"מעניין\" ואשתף 🙏",
+  "תלמיד מתקשה שצריך תרגול נוסף? 📚\nבמקום לצלם דפים מספר ישן, אני מייצרת לו חוברת אישית ברמה שלו תוך דקה. הוא מרגיש שיש לו משהו משלו, ואני חוסכת זמן.\n\nמחנכות, מה אתן עושות במקרים כאלה? אשמח לשמוע 💫",
+  "הדפסתי ישר מהטלפון בחדר המורים 😅\nמי עוד שונאת את הרגע שצריך חומר עכשיו ואין זמן להכין?\nהיום אני מייצרת חוברת מותאמת תוך דקה ומדפיסה במקום. מציל אותי כל שבוע.\n\nתכתבו \"מעניין\" ואשתף מה זה 🙏"
+];
+const chamad = [
+  "למורות בחמ\"ד 🙏\nמצאתי משהו ששינה לי את ההכנה: דרך לייצר דפי עבודה, מבחנים וסיכומים בכל מקצועות היהדות — פרשת שבוע, גמרא, תפילה, מועדים — מותאם לכיתה ולרמה, בעברית, מוכן להדפסה תוך דקה.\n\nהכנתי דף על פרשת השבוע בזמן ששתיתי קפה ☕\nמי עוד מלמדת יהדות ומחפשת לחסוך בהכנה? תכתבו \"מעניין\" 💛",
+  "כל ערב שבת אותה התלבטות — איך להכין דף פרשה שגם מלמד וגם הילדים יתחברו 📖\nהשנה אני מייצרת דף פרשה מותאם לרמת הכיתה תוך דקה, מוכן להדפסה. נגמרו הערבים על גוגל וגזור-הדבק.\n\nמורות חמ\"ד — תכתבו באיזו כיתה אתן ואשמח לשתף 🙏",
+  "מבחן בגמרא לכיתה ו' — הכנתי תוך דקה, מותאם לרמה 📜\nבמקום לשבת שעה על ניסוח שאלות, הכלי מייצר לי מבחן מסודר ומוכן להדפסה.\n\nמי עוד מלמדת גמרא ומחפשת לחסוך זמן הכנה? תכתבו \"מעניין\" 💫",
+  "המועד מתקרב והכיתה צריכה דף עבודה 🕎\nבמקום לחפש שעות בגוגל, אני מייצרת דף על המועד מותאם לכיתה תוך דקה.\n\nמורות חמ\"ד — אשמח לשתף איך. תכתבו \"מעניין\" 🙏",
+  "סיכום תפילה לתלמידים — בעברית, מותאם לכיתה, מוכן להדפסה 🙏\nהכנתי תוך דקה במקום ערב שלם. הילדים מקבלים חומר ברור ומסודר.\n\nמי עוד מלמדת תפילה ומחפשת חומרים? תכתבו \"מעניין\" ואשתף 💛"
+];
+
+/* 5 daily slots: time + audience. Each slot rotates through its audience pool by day. */
+const SLOTS = [
+  {time:"08:30", aud:"מורות פרטיות", cls:"a-tutor",     pool:tutor,    off:0, where:"פתחי קבוצה אחת של מורות פרטיות"},
+  {time:"11:00", aud:"מחנכות",       cls:"a-mechanech", pool:mechanech,off:0, where:"פתחי קבוצה אחת של מחנכות / מורים כללי"},
+  {time:"13:30", aud:"חמ\"ד",        cls:"a-chamad",    pool:chamad,   off:0, where:"פתחי קבוצה אחת של חינוך דתי-לאומי"},
+  {time:"16:30", aud:"מורות פרטיות", cls:"a-tutor",     pool:tutor,    off:3, where:"קבוצה אחרת של מורות פרטיות / הוראה מתקנת"},
+  {time:"20:30", aud:"מחנכות",       cls:"a-mechanech", pool:mechanech,off:3, where:"קבוצה גדולה — זו שעת השיא (20:00–22:30)"}
+];
+
+const TIPS = [
+  "שימי בכל חוברת מודפסת QR קטן עם הקישור — כל כיתה הופכת לפרסומת חינמית. מורה מדפיסה ל-28 ילדים → 28 בתים רואים את בשבילי 🖨️",
+  "צלמי סרטון של 15 שניות שמראה יצירת חוברת. רילס עובד פי 10 מפוסט טקסט — וזה לוקח 2 דקות 🎬",
+  "פני אישית בוואטסאפ ל-3 מורות שאת מכירה. הפניה אישית ממירה הכי טוב — 90% מההפניות עוברות בוואטסאפ 💬",
+  "הציעי 'הזמיני חברה מורה — ושתיכן מקבלות חוברת חינם'. תגמול דו-צדדי = מנוע צמיחה זול 🔁",
+  "פרסמי דף עבודה אחד לדוגמה כקובץ חינם בקבוצה. תני ערך לפני שאת מבקשת — וזה לא נחשב פרסום 🎁",
+  "עני לכל תגובה תוך שעה. האלגוריתם דוחף פוסטים פעילים — מהירות התגובה = חשיפה ⚡",
+  "פני למנהלת קבוצה גדולה והציעי פרו חינם תמורת פוסט מוצמד. גישה למאות מורות בבת אחת 🤝"
+];
+
+/* ── Render ── */
+function dayIndex(){ const d=new Date(); return Math.floor(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate())/86400000); }
+function pick(pool,off,di){ return pool[(di+off)%pool.length]; }
+
+function copy(txt,btn){
+  navigator.clipboard.writeText(txt).then(()=>{ toast(); if(btn){const o=btn.innerHTML;btn.innerHTML="✓ הועתק";setTimeout(()=>btn.innerHTML=o,1500);} });
+}
+let toastT;
+function toast(){ const t=document.getElementById('toast'); t.classList.add('show'); clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove('show'),1500); }
+
+(function(){
+  const di=dayIndex();
+  const days=["יום ראשון","יום שני","יום שלישי","יום רביעי","יום חמישי","יום שישי","שבת"];
+  const now=new Date();
+  document.getElementById('todayLabel').textContent = days[now.getDay()] + " · " + now.toLocaleDateString('he-IL');
+
+  const host=document.getElementById('missions');
+  SLOTS.forEach((s,i)=>{
+    const post=pick(s.pool,s.off,di);
+    const card=document.createElement('div'); card.className='card';
+    const fcId='fc'+i, ptId='pt'+i;
+    card.innerHTML =
+      '<div class="head">'+
+        '<span class="time">'+s.time+'</span>'+
+        '<span class="aud '+s.cls+'">'+s.aud+'</span>'+
+        '<span class="where">📍 '+s.where+'</span>'+
+      '</div>'+
+      '<div class="body">'+
+        '<span class="label">1️⃣ הדביקי את הפוסט הזה:</span>'+
+        '<div class="posttext" id="'+ptId+'"></div>'+
+        '<button class="copybtn" data-t="'+ptId+'">📋 העתק פוסט</button>'+
+        '<span class="label">2️⃣ אחרי הפרסום — הדביקי מיד בתגובה הראשונה:</span>'+
+        '<div class="posttext" id="'+fcId+'" style="border-color:var(--grow)"></div>'+
+        '<button class="copybtn alt" data-t="'+fcId+'">🔗 העתק תגובה</button>'+
+        '<span class="label">3️⃣ איך:</span>'+
+        '<ol class="steps"><li>'+s.where+'</li><li>פרסמי את הפוסט (בלי לינק בגוף!)</li><li>הוסיפי מיד תגובה ראשונה עם הקישור</li><li>חזרי במהלך היום לענות לתגובות</li></ol>'+
+      '</div>';
+    host.appendChild(card);
+    card.querySelector('#'+ptId).textContent=post;
+    card.querySelector('#'+fcId).textContent=FIRST_COMMENT;
+    card.querySelectorAll('.copybtn').forEach(b=>{
+      b.addEventListener('click',()=>copy(document.getElementById(b.dataset.t).textContent,b));
+    });
+  });
+
+  document.getElementById('tipBox').textContent = TIPS[di%TIPS.length];
+})();
+</script>
+</body>
+</html>
