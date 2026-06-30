@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>בשבילי · מה זה ולמה זה שונה</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;600;700;800&family=Baloo+2:wght@600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#20184A; --canvas:#F7F6FB; --brand:#F4A02C; --magic:#6C5CE7; --grow:#1FB58F;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{background:var(--canvas);color:var(--ink);font-family:Assistant,sans-serif;line-height:1.5}
+  .wrap{max-width:560px;margin:0 auto;padding-bottom:40px}
+  .display{font-family:"Baloo 2",sans-serif}
+
+  /* hero */
+  .hero{background:linear-gradient(160deg,#211a4d,#2d2466 60%,#1d1640);color:#fff;text-align:center;padding:46px 24px 40px;position:relative;overflow:hidden}
+  .hero .glow{position:absolute;top:-120px;left:50%;transform:translateX(-50%);width:360px;height:360px;background:rgba(108,92,231,.35);border-radius:50%;filter:blur(70px)}
+  .hero .logo{font-family:"Baloo 2";font-weight:800;font-size:30px;position:relative}
+  .hero .logo b{color:var(--brand)}
+  .hero h1{position:relative;font-family:"Baloo 2";font-weight:800;font-size:30px;line-height:1.2;margin:18px 0 10px}
+  .hero h1 .hl{color:var(--brand)}
+  .hero p{position:relative;color:#cdc6f0;font-size:17px;font-weight:600;max-width:420px;margin:0 auto}
+  .badge{position:relative;display:inline-flex;align-items:center;gap:7px;margin-top:18px;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.25);border-radius:999px;padding:8px 16px;font-size:14px;font-weight:700}
+  .dot{width:8px;height:8px;border-radius:50%;background:var(--grow);box-shadow:0 0 0 4px rgba(31,181,143,.25)}
+
+  .sec{padding:30px 22px 6px}
+  .kicker{text-align:center;color:var(--magic);font-weight:800;font-size:13px;letter-spacing:.04em;margin-bottom:6px}
+  .h2{font-family:"Baloo 2";font-weight:800;font-size:23px;text-align:center;margin-bottom:18px}
+
+  /* one-liner */
+  .what{background:#fff;border:1px solid #ece9f6;border-radius:20px;padding:22px;text-align:center;box-shadow:0 6px 20px rgba(32,24,74,.05)}
+  .what b{color:var(--magic)}
+  .what .big{font-size:18px;font-weight:700;line-height:1.55}
+
+  /* pillars */
+  .pillar{display:flex;gap:14px;background:#fff;border:1px solid #ece9f6;border-radius:18px;padding:16px 18px;margin-bottom:12px;align-items:flex-start;box-shadow:0 4px 14px rgba(32,24,74,.04)}
+  .pillar .ic{flex:0 0 auto;width:46px;height:46px;border-radius:13px;display:flex;align-items:center;justify-content:center;font-size:24px}
+  .pillar h3{font-weight:800;font-size:16px;margin-bottom:3px}
+  .pillar p{font-size:14px;color:#5b5577}
+  .pillar .vs{display:block;margin-top:6px;font-size:12.5px;color:#9c95c4;font-style:italic}
+  .b1{background:rgba(108,92,231,.1)} .b2{background:rgba(244,160,44,.12)} .b3{background:rgba(31,181,143,.12)}
+
+  /* comparison */
+  .cmp{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .col{border-radius:18px;padding:18px 16px}
+  .col h4{font-weight:800;font-size:15px;margin-bottom:12px;display:flex;align-items:center;gap:7px}
+  .col ul{list-style:none;display:flex;flex-direction:column;gap:9px}
+  .col li{font-size:13.5px;line-height:1.4;display:flex;gap:7px;align-items:flex-start}
+  .bad{background:#fef2f2;border:1px solid #fecaca}
+  .bad h4{color:#dc2626} .bad li{color:#7f5b5b}
+  .good{background:rgba(31,181,143,.07);border:1px solid rgba(31,181,143,.3)}
+  .good h4{color:var(--grow)} .good li{color:#2f5b50}
+
+  /* steps */
+  .steps{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;text-align:center}
+  .step{background:#fff;border:1px solid #ece9f6;border-radius:16px;padding:16px 8px}
+  .step .n{font-family:"Baloo 2";font-weight:800;color:#fff;background:linear-gradient(90deg,var(--magic),var(--brand));width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 8px;font-size:14px}
+  .step .t{font-weight:700;font-size:13.5px}
+  .step .d{font-size:12px;color:#7a749b;margin-top:2px}
+
+  /* cta */
+  .cta{margin:26px 22px 0;background:linear-gradient(90deg,var(--magic),var(--brand));border-radius:22px;padding:26px 22px;text-align:center;color:#fff}
+  .cta .big{font-family:"Baloo 2";font-weight:800;font-size:22px}
+  .cta .url{display:inline-block;margin-top:14px;background:#fff;color:var(--ink);font-weight:800;font-size:17px;border-radius:999px;padding:11px 26px}
+  .cta .sub{margin-top:10px;font-size:13px;color:rgba(255,255,255,.85)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- HERO -->
+  <div class="hero">
+    <div class="glow"></div>
+    <div class="logo">בשבילי<b>·</b></div>
+    <h1>לא עוד פרומפטים.<br><span class="hl">חוברת לימוד מוכנה לכל ילד.</span></h1>
+    <p>מזינים שם, כיתה ונושא — ומקבלים חוברת עבודה מלאה, מעוצבת ומותאמת, מוכנה להדפסה.</p>
+    <div class="badge"><span class="dot"></span> מ-3 שדות לחוברת מודפסת — תוך 60 שניות</div>
+  </div>
+
+  <!-- WHAT -->
+  <div class="sec">
+    <div class="kicker">מה זה בעצם?</div>
+    <div class="h2">"מורה פרטי-על" בכיס</div>
+    <div class="what">
+      <p class="big">בשבילי הופך כל <b>מורה והורה</b> ליצרן חומרי לימוד — <b>AI שמכין חוברת עבודה שלמה בעברית</b>, נכונה לתכנית הלימודים ומותאמת בדיוק לילד. בלי לדעת לכתוב פרומפט, בלי לעצב, בלי מחשב — הכל מהטלפון.</p>
+    </div>
+  </div>
+
+  <!-- WHY UNIQUE -->
+  <div class="sec">
+    <div class="kicker">למה זה שונה מ-ChatGPT?</div>
+    <div class="h2">3 דברים שאף כלי גנרי לא נותן</div>
+
+    <div class="pillar">
+      <div class="ic b1">🇮🇱</div>
+      <div>
+        <h3>נאמן לתכנית הישראלית</h3>
+        <p>יודע מה לומדים בכיתה ג', כולל מקצועות <b>מפמ"ר / חמ"ד</b> (הלכה, תפילה, גמרא, תנ"ך ועוד) — עם מקורות מדויקים ומנוקדים.</p>
+        <span class="vs">ChatGPT מנחש — לא מכיר את התכנית הרשמית.</span>
+      </div>
+    </div>
+
+    <div class="pillar">
+      <div class="ic b2">⚡</div>
+      <div>
+        <h3>מוכן להדפסה, בלי מיומנות</h3>
+        <p>3 שדות → לחיצה → חוברת A4 מעוצבת עם תרגילים ומפתח תשובות. שמירה בענן, הדפסה מהטלפון.</p>
+        <span class="vs">ChatGPT נותן טקסט גולמי שצריך לעצב ולפרמט לבד.</span>
+      </div>
+    </div>
+
+    <div class="pillar">
+      <div class="ic b3">🎯</div>
+      <div>
+        <h3>אישי לכל ילד</h3>
+        <p>לפי העולם שהילד אוהב (כדורגל, חלל, גיימינג), הרמה שלו, וצרכים מיוחדים — <b>משימה חווייתית שהילד רוצה לסיים</b>, לא דף משעמם.</p>
+        <span class="vs">לא "דף עבודה" — חוויה מותאמת אישית.</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- COMPARISON -->
+  <div class="sec">
+    <div class="h2">בשבילי מול ChatGPT</div>
+    <div class="cmp">
+      <div class="col bad">
+        <h4>🤖 ChatGPT</h4>
+        <ul>
+          <li>❌ טקסט בלבד — לעצב לבד</li>
+          <li>❌ לא מכיר תכנית ישראלית</li>
+          <li>❌ צריך פרומפט מדויק כל פעם</li>
+          <li>❌ אין שמירה / היסטוריה</li>
+          <li>❌ ~20 דקות עד דף מוכן</li>
+        </ul>
+      </div>
+      <div class="col good">
+        <h4>✨ בשבילי</h4>
+        <ul>
+          <li>✅ חוברת מעוצבת להדפסה</li>
+          <li>✅ נכון לכיתה ולמפמ"ר</li>
+          <li>✅ 3 שדות → מוכן</li>
+          <li>✅ ארכיון בענן לכל החוברות</li>
+          <li>✅ 60 שניות</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- HOW -->
+  <div class="sec">
+    <div class="h2">איך זה עובד</div>
+    <div class="steps">
+      <div class="step"><div class="n">1</div><div class="t">בוחרים</div><div class="d">כיתה, נושא, עולם</div></div>
+      <div class="step"><div class="n">2</div><div class="t">AI יוצר</div><div class="d">חוברת מלאה ב-60 שנ'</div></div>
+      <div class="step"><div class="n">3</div><div class="t">מדפיסים</div><div class="d">A4 מוכן / PDF</div></div>
+    </div>
+  </div>
+
+  <!-- CTA -->
+  <div class="cta">
+    <div class="big">2 חוברות חינם — נסו עכשיו ✨</div>
+    <a class="url">beshvili.com</a>
+    <div class="sub">ללא כרטיס אשראי · 100% בעברית · מהטלפון</div>
+  </div>
+
+</div>
+</body>
+</html>
