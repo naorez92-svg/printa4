@@ -11,6 +11,15 @@ function injectHeightProbe(html) {
   return html.includes("</body>") ? html.replace("</body>", probe + "</body>") : html + probe;
 }
 
+// Listener for the hidden print iframe: when the app posts "bsv-print", the
+// iframe prints ITS OWN document. The iframe stays sandboxed (allow-scripts
+// allow-modals, no allow-same-origin) so even an injected booklet script can't
+// reach the parent session — and the print runs entirely in-app (no new tab).
+function injectPrintListener(html) {
+  const s = `<script>window.addEventListener("message",function(e){if(e&&e.data==="bsv-print"){try{window.focus()}catch(_){ } window.print()}})</script>`;
+  return html.includes("</body>") ? html.replace("</body>", s + "</body>") : html + s;
+}
+
 function isMobileDevice() {
   return typeof navigator !== "undefined" && /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
 }
@@ -24,6 +33,7 @@ function extractText(html) {
 export default function Preview({ html, onReset, shareToken, title, active = true, context = "unknown", bookletId = null }) {
   const containerRef = useRef(null); // outer div — measures available width
   const iframeRef = useRef(null);
+  const printFrameRef = useRef(null); // hidden iframe used for native in-app printing
   const [scale, setScale]   = useState(1);
   const [iframeHeight, setIframeHeight] = useState(A4_H);
   const [copied, setCopied] = useState(false);
@@ -138,6 +148,16 @@ export default function Preview({ html, onReset, shareToken, title, active = tru
       }
       return;
     }
+    // Native in-app print: ask the hidden, sandboxed print iframe to print ITSELF.
+    // Real browser rendering (true A4, real fonts/gradients/SVG), and the user
+    // never leaves the app — no new tab to get stranded in. The browser's own
+    // "Save as PDF" is one step inside the print dialog.
+    const pf = printFrameRef.current;
+    if (pf?.contentWindow) {
+      try { pf.contentWindow.postMessage("bsv-print", "*"); track("booklet_printed_inapp", { context }); return; } catch { /* fall through */ }
+    }
+    // Fallback (iframe not ready / postMessage blocked): open a standalone tab
+    // that has its own Print + "back to app" toolbar.
     const printHtml = getStandaloneHtml();
     const blob = new Blob([printHtml], { type: "text/html;charset=utf-8" });
     const url = URL.createObjectURL(blob);
@@ -259,6 +279,18 @@ export default function Preview({ html, onReset, shareToken, title, active = tru
 
   return (
     <div className="space-y-3">
+      {/* Hidden print iframe — off-screen, sandboxed (allow-modals enables its own
+          window.print()). The "Save PDF" button posts a message here so the booklet
+          prints natively from inside the app. aria-hidden so screen readers skip it. */}
+      <iframe
+        ref={printFrameRef}
+        title=""
+        aria-hidden="true"
+        tabIndex={-1}
+        srcDoc={injectPrintListener(getPrintHtml())}
+        sandbox="allow-scripts allow-modals"
+        style={{ position: "fixed", left: "-10000px", top: 0, width: `${A4_PX}px`, height: `${A4_H}px`, border: "none", opacity: 0, pointerEvents: "none" }}
+      />
       {/* Scaled iframe — containerRef measures available width; inner div gets exact scaled dims */}
       <div ref={containerRef} className="w-full">
       <div
@@ -310,10 +342,9 @@ export default function Preview({ html, onReset, shareToken, title, active = tru
       {isMobile && (
         <div className="bg-canvas border border-ink/10 rounded-xl px-4 py-3 text-xs text-ink/50 text-right space-y-1">
           <p className="font-semibold text-ink/70">📥 איך שומרים PDF בטלפון?</p>
-          <p>לאחר לחיצה תיפתח החוברת בדף חדש עם כפתורי <span className="font-medium text-ink/60">הדפסה</span> ו<span className="font-medium text-ink/60">חזרה לאפליקציה</span>.</p>
-          <p><span className="font-medium text-ink/60">iPhone:</span> שתף ← "הדפס" ← פרגני ← שמור PDF</p>
-          <p><span className="font-medium text-ink/60">Android:</span> ⋮ ← "הדפס" ← שנה יעד ← "שמור כ-PDF"</p>
-          <p className="text-ink/40">בסיום — לחצי <span className="font-medium text-ink/60">✕ חזרה לאפליקציה</span> כדי לחזור.</p>
+          <p>הלחיצה פותחת את חלון ההדפסה <span className="font-medium text-ink/60">בתוך האפליקציה</span> — בוחרים "שמור כ-PDF" וזהו, בלי לצאת.</p>
+          <p><span className="font-medium text-ink/60">iPhone:</span> בחלון ← "אפשרויות" ← שמור PDF (או שיתוף ← שמור בקבצים)</p>
+          <p><span className="font-medium text-ink/60">Android:</span> בחלון ← יעד ← "שמור כ-PDF"</p>
         </div>
       )}
 
