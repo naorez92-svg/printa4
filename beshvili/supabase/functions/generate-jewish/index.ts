@@ -312,8 +312,8 @@ ${notes ? `הוראות נוספות מהמורה: ${esc(notes)}` : ""}
     // over-generate (model wrote far past one page, ~185s). ~7000 tokens/page is
     // ample for rich content with sources while keeping small requests fast.
     const maxTokens = fast
-      ? Math.min(32000, Math.max(5000, effPages * 4000))   // fast: lighter, ~half the output
-      : Math.min(48000, Math.max(8000, effPages * 7000));
+      ? Math.min(40000, Math.max(5000, effPages * 4000))   // fast: lighter, ~half the output
+      : Math.min(64000, Math.max(8000, effPages * 7000));   // match generate-booklet ceiling
 
     const monthlyLimit = isAdmin ? -1 : isTeacher ? TEACHER_MONTHLY_LIMIT : isParent ? PARENT_MONTHLY_LIMIT : FREE_BOOKLET_LIMIT;
     const remaining = isAdmin ? -1 : monthlyLimit - (isPaid ? usedMonthly : usedTotal) - 1;
