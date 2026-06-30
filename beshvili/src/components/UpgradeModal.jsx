@@ -131,7 +131,10 @@ export default function UpgradeModal({ onClose, bookletCount = 0, source = "unkn
       className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-ink/40 backdrop-blur-sm"
       onClick={e => e.target === e.currentTarget && onClose()}
     >
-      <div className="bg-white rounded-3xl w-full max-w-sm shadow-2xl p-6 space-y-4 max-h-[95vh] overflow-y-auto" role="dialog" aria-modal="true" aria-labelledby="upgrade-modal-title">
+      <div className="bg-white rounded-3xl w-full max-w-sm shadow-2xl max-h-[95vh] flex flex-col overflow-hidden" role="dialog" aria-modal="true" aria-labelledby="upgrade-modal-title">
+
+        {/* Scrollable content area */}
+        <div className="flex-1 overflow-y-auto p-6 pb-3 space-y-4">
 
         {/* Sale countdown banner */}
         {saleActive && (
@@ -241,17 +244,11 @@ export default function UpgradeModal({ onClose, bookletCount = 0, source = "unkn
           ))}
         </ul>
 
-        {/* Social proof */}
-        <div className="flex items-center justify-center gap-3 text-[10px] text-ink/40">
-          <span>👥 147+ מורות</span>
-          <span>·</span>
-          <span>⭐ 4.9/5</span>
-          <span>·</span>
-          <span>🔒 ביטול חופשי</span>
-        </div>
+        </div>{/* end scrollable content */}
 
+        {/* Sticky payment section — always visible at bottom */}
         {sent ? (
-          <div className="text-center py-3 space-y-3">
+          <div className="px-6 pb-6 pt-3 border-t border-ink/5 text-center space-y-3">
             <div className="text-4xl">💙</div>
             <p className="font-semibold text-ink">תשלחי {displayPrice} ₪ בביט למספר:</p>
             <p className="text-2xl font-bold text-brand tracking-widest">{BIT_PHONE}</p>
@@ -266,7 +263,7 @@ export default function UpgradeModal({ onClose, bookletCount = 0, source = "unkn
             <button onClick={onClose} className="text-xs text-ink/40 underline hover:text-ink/60">סגור</button>
           </div>
         ) : (
-          <div className="space-y-3">
+          <div className="px-6 pb-6 pt-3 border-t border-ink/5 space-y-3">
             <input
               className="w-full border border-ink/20 rounded-xl p-3 text-right bg-canvas/50 outline-none focus:border-magic text-sm"
               placeholder="שם (אופציונלי)"
