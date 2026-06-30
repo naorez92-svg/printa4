@@ -84,6 +84,7 @@ Deno.serve(async (req) => {
     { data: allBookletRows },
     { data: lifecycleEvents },
     { count: profilesCount },
+    { data: emailLogs },
   ] = await Promise.all([
     admin.auth.admin.listUsers({ perPage: 1000 }),
     admin.from("booklets").select("*", { count: "exact", head: true }),
@@ -104,11 +105,25 @@ Deno.serve(async (req) => {
     // Accurate total-user count (one profile row per user) — listUsers caps at
     // 1000, so the headline number must come from a COUNT, not the capped list.
     admin.from("profiles").select("*", { count: "exact", head: true }),
+    admin.from("email_logs").select("email_type"),
   ]);
 
   const users = authData?.users ?? [];
   const usersThisWeek = users.filter(u => u.created_at >= weekAgo).length;
   const usersToday    = users.filter(u => u.created_at >= todayStart).length;
+
+  // email_logs breakdown by type
+  const emailLogCounts: Record<string, number> = {};
+  (emailLogs ?? []).forEach((r: { email_type: string }) => {
+    emailLogCounts[r.email_type] = (emailLogCounts[r.email_type] ?? 0) + 1;
+  });
+  const emailLogStats = {
+    on_limit:      emailLogCounts["on_limit"]      ?? 0,
+    tried_failed:  emailLogCounts["tried_failed"]  ?? 0,
+    not_activated: emailLogCounts["not_activated"] ?? 0,
+    created_one:   emailLogCounts["created_one"]   ?? 0,
+    total: (emailLogs ?? []).length,
+  };
 
   // Profile map
   const profileMap: Record<string, { plan: string; full_name: string | null; followup_sent_at: string | null }> = {};
@@ -215,7 +230,7 @@ Deno.serve(async (req) => {
     return plan !== "admin" && (bookletsByUser[u.id] ?? 0) >= 1;
   }).length;
   const retentionToSecond = users.filter(u => (bookletsByUser[u.id] ?? 0) >= 2).length;
-  const retentionToThird  = users.filter(u => (bookletsByUser[u.id] ?? 0) >= 3).length; // "habit" = 3+ (kept literal so it stays distinct from the 2+ free-limit metric)
+  const retentionToThird  = users.filter(u => (bookletsByUser[u.id] ?? 0) >= 3).length;
 
   // Free users who hit the free limit — prime upgrade opportunities
   const freeAtLimitAllUsers = users.filter(u => {
@@ -713,6 +728,7 @@ Deno.serve(async (req) => {
     dormantUsers,
     silentFailures,
     proposals: pendingProposals,
+    emailLogStats,
   }), { headers: { ...cors, "content-type": "application/json" } });
   } catch (e) {
     console.error("admin-stats fatal:", e);
