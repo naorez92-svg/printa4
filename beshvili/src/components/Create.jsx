@@ -16,6 +16,13 @@ const WORLDS = [
   "נינג'ה", "קסמים", "רובוטיקה", "טבע ויערות",
   "ספורט כללי", "מחשבים", "אחר",
 ];
+const WORLD_EMOJIS = {
+  "כדורגל": "⚽", "כדורסל": "🏀", "גיימינג": "🎮", "מינקראפט": "⛏️", "פוקימון": "🐱",
+  "חיות": "🐾", "סוסים": "🐴", "דינוזאורים": "🦕", "חלל": "🚀", "ים וגלים": "🌊",
+  "בישול ואפייה": "🍳", "מוזיקה": "🎵", "ריקוד": "💃", "אמנות וציור": "🎨",
+  "נינג'ה": "🥷", "קסמים": "🪄", "רובוטיקה": "🤖", "טבע ויערות": "🌿",
+  "ספורט כללי": "🏅", "מחשבים": "💻", "אחר": "✏️",
+};
 const EXAM_GRADES   = ["כיתה ג", "כיתה ד", "כיתה ה", "כיתה ו"];
 const EXAM_SUBJECTS = [
   { id: "math",    label: "חשבון" },
@@ -951,13 +958,23 @@ export default function Create({ onSaved, remaining, isPro, active = true, bookl
             )}
             <div>
               <p className="text-xs text-ink/40 mb-1.5 font-medium">מה הילד/ה אוהב? (עולם התוכן)</p>
-              <select className="w-full border border-ink/20 rounded-xl p-3 outline-none focus:border-magic bg-canvas/50 text-right" value={f.world} onChange={set("world")} disabled={loading}>
-                {WORLDS.map((w) => <option key={w}>{w}</option>)}
-              </select>
+              <div className="flex flex-wrap gap-1.5">
+                {WORLDS.map((w) => (
+                  <button key={w} type="button" disabled={loading}
+                    onClick={() => setF(p => ({ ...p, world: w }))}
+                    className={`flex items-center gap-1 text-xs rounded-full px-2.5 py-1 border transition-colors disabled:opacity-30 ${
+                      f.world === w
+                        ? "bg-magic text-white border-magic shadow-sm"
+                        : "border-ink/15 text-ink/50 bg-canvas/50 hover:border-magic/50 hover:text-ink/70"
+                    }`}>
+                    <span>{WORLD_EMOJIS[w]}</span><span>{w}</span>
+                  </button>
+                ))}
+              </div>
               {f.world === "אחר" && (
                 <input
                   className="w-full border border-ink/20 rounded-xl p-3 mt-2 outline-none focus:border-magic text-right bg-canvas/50"
-                  placeholder="למשל: בלט, כדורעף, כישוף, ספרים... (כתוב כאן את הנושא)"
+                  placeholder="למשל: בלט, כדורעף, כישוף, ספרים..."
                   value={customWorld}
                   onChange={(e) => setCustomWorld(e.target.value)}
                   disabled={loading}
@@ -1026,24 +1043,32 @@ export default function Create({ onSaved, remaining, isPro, active = true, bookl
                 ))}
               </div>
             </div>
-            <select
-              className="w-full border border-ink/20 rounded-xl p-3 outline-none focus:border-magic bg-canvas/50 text-right"
-              value={f.world}
-              onChange={set("world")}
-              disabled={loading}
-            >
-              {WORLDS.map((w) => <option key={w}>{w}</option>)}
-            </select>
-            {f.world === "אחר" && (
-              <input
-                className="w-full border border-ink/20 rounded-xl p-3 mt-2 outline-none focus:border-magic text-right bg-canvas/50"
-                placeholder="למשל: בלט, כדורעף, כישוף, ספרים... (כתוב כאן את הנושא)"
-                value={customWorld}
-                onChange={(e) => setCustomWorld(e.target.value)}
-                disabled={loading}
-                autoFocus
-              />
-            )}
+            <div>
+              <p className="text-xs text-ink/40 mb-1.5 font-medium">עולם התוכן — מה הילד/ה אוהב?</p>
+              <div className="flex flex-wrap gap-1.5">
+                {WORLDS.map((w) => (
+                  <button key={w} type="button" disabled={loading}
+                    onClick={() => setF(p => ({ ...p, world: w }))}
+                    className={`flex items-center gap-1 text-xs rounded-full px-2.5 py-1 border transition-colors disabled:opacity-30 ${
+                      f.world === w
+                        ? "bg-magic text-white border-magic shadow-sm"
+                        : "border-ink/15 text-ink/50 bg-canvas/50 hover:border-magic/50 hover:text-ink/70"
+                    }`}>
+                    <span>{WORLD_EMOJIS[w]}</span><span>{w}</span>
+                  </button>
+                ))}
+              </div>
+              {f.world === "אחר" && (
+                <input
+                  className="w-full border border-ink/20 rounded-xl p-3 mt-2 outline-none focus:border-magic text-right bg-canvas/50"
+                  placeholder="למשל: בלט, כדורעף, כישוף, ספרים..."
+                  value={customWorld}
+                  onChange={(e) => setCustomWorld(e.target.value)}
+                  disabled={loading}
+                  autoFocus
+                />
+              )}
+            </div>
           </div>
         )}
 
