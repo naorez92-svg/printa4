@@ -746,11 +746,13 @@ export default function JewishCreate({ onSaved, remaining, isPro, bookletCount =
         </div>
       )}
 
-      {/* Generate button */}
+      {/* Generate button — hidden on mobile when not loading (sticky CTA below covers that) */}
       <button
         onClick={create}
         disabled={!canSubmit}
         className={`w-full py-4 rounded-2xl font-bold text-base transition-all ${
+          loading ? "" : "hidden lg:block"
+        } ${
           canSubmit
             ? "bg-gradient-to-l from-magic to-brand text-white shadow-lg hover:opacity-90 active:scale-98"
             : "bg-ink/8 text-ink/25 cursor-not-allowed"
@@ -767,7 +769,7 @@ export default function JewishCreate({ onSaved, remaining, isPro, bookletCount =
       </button>
       {/* Tell the user exactly what's missing instead of a silently-disabled button */}
       {!canSubmit && !loading && (
-        <p className="text-center text-xs text-magic/70 mt-2 font-medium">
+        <p className="text-center text-xs text-magic/70 mt-2 font-medium hidden lg:block">
           {!subject ? "👆 בחר/י מקצוע כדי להמשיך"
             : !grade ? "👆 בחר/י כיתה כדי להמשיך"
             : effectiveTopic.length <= 2 ? "👆 בחר/י נושא (או כתוב/כתבי נושא חופשי) כדי ליצור"
