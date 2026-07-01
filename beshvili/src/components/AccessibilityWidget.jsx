@@ -5,7 +5,7 @@ import { createPortal } from "react-dom";
 // WCAG-style adjustments. Adjustments are applied to #root (so the widget itself,
 // portaled to <body>, stays unaffected by contrast) and persisted in localStorage.
 const KEY = "beshvili_a11y";
-const DEFAULTS = { font: 0, contrast: false, links: false, readable: false };
+const DEFAULTS = { font: 0, contrast: false, links: false, readable: false, motion: false };
 
 const STYLE_ID = "a11y-styles";
 const CSS = `
@@ -21,6 +21,7 @@ function apply(s) {
       root.classList.toggle("a11y-contrast", s.contrast);
       root.classList.toggle("a11y-links", s.links);
       root.classList.toggle("a11y-readable", s.readable);
+      root.classList.toggle("a11y-reduce-motion", s.motion);
     }
     // Font scaling via the document root so rem-based sizing scales everywhere.
     document.documentElement.style.fontSize = s.font ? `${100 + s.font * 12.5}%` : "";
@@ -117,6 +118,7 @@ export default function AccessibilityWidget() {
           <Toggle label="ניגודיות גבוהה" active={s.contrast} onClick={() => set({ contrast: !s.contrast })} />
           <Toggle label="הדגשת קישורים" active={s.links} onClick={() => set({ links: !s.links })} />
           <Toggle label="פונט קריא" active={s.readable} onClick={() => set({ readable: !s.readable })} />
+          <Toggle label="הפחתת אנימציות" active={s.motion} onClick={() => set({ motion: !s.motion })} />
 
           <button onClick={reset} className="w-full py-2 rounded-xl text-sm text-ink/50 hover:text-ink border border-transparent hover:border-ink/10">
             איפוס הגדרות

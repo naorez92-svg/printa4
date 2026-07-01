@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabase";
 import Preview from "./Preview";
+import EmptyState from "./EmptyState";
 import { track } from "../hooks/useEvents";
 
 const WORLD_COLORS = {
@@ -61,7 +62,7 @@ function UpgradeNudge({ onUpgrade }) {
   );
 }
 
-export default function History({ isPro = false, onUpgrade }) {
+export default function History({ isPro = false, onUpgrade, onCreateNew }) {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
@@ -136,10 +137,28 @@ export default function History({ isPro = false, onUpgrade }) {
         </div>
       )}
 
-      {loading && <p className="text-ink/40 text-sm animate-pulse">טוען…</p>}
+      {loading && (
+        <div className="space-y-3" aria-hidden="true">
+          {[0, 1, 2].map((i) => (
+            <div key={i} className="bg-white rounded-xl border border-ink/5 shadow-sm p-4 flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-ink/8 animate-pulse flex-shrink-0" />
+              <div className="flex-1 space-y-2">
+                <div className="h-3.5 bg-ink/8 rounded animate-pulse w-2/3" />
+                <div className="h-2.5 bg-ink/6 rounded animate-pulse w-1/3" />
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
       {loadError && <p className="text-red-500 text-sm">שגיאה בטעינת החוברות — נסה לרענן את הדף</p>}
       {!loading && items.length === 0 && !loadError && (
-        <p className="text-ink/50 text-sm">עדיין אין חוברות. צור את הראשונה למעלה.</p>
+        <EmptyState
+          emoji="📚"
+          title="עדיין לא יצרת חוברות"
+          subtitle="החוברת הראשונה שלך מוכנה תוך 60 שניות. כל החוברות שתיצרי יישמרו כאן בענן — גישה מכל מכשיר."
+          actionLabel={onCreateNew ? "✨ צרי חוברת ראשונה" : undefined}
+          onAction={onCreateNew}
+        />
       )}
       {!loading && items.length > 0 && filtered.length === 0 && (
         <p className="text-ink/40 text-sm text-center py-4">לא נמצאו תוצאות עבור "{search}"</p>
