@@ -774,6 +774,27 @@ export default function JewishCreate({ onSaved, remaining, isPro, bookletCount =
             : ""}
         </p>
       )}
+
+      {/* Sticky mobile CTA — above the bottom tab bar, hidden during generation */}
+      {!loading && !html && (
+        <div className="lg:hidden fixed bottom-16 inset-x-0 z-10 px-4 pb-2 pt-3 bg-gradient-to-t from-canvas/95 to-transparent pointer-events-none">
+          <button
+            onClick={create}
+            disabled={!canSubmit}
+            className={`w-full pointer-events-auto py-3.5 rounded-2xl font-bold text-sm transition-all ${
+              canSubmit
+                ? "bg-gradient-to-l from-magic to-brand text-white shadow-lg shadow-magic/20"
+                : "bg-white/80 text-ink/30 border border-ink/10 cursor-not-allowed"
+            }`}
+          >
+            {canSubmit
+              ? `✨ צור ${OUTPUT_TYPES.find(o => o.id === outputType)?.label ?? "חומר"}`
+              : !subject ? "בחר/י מקצוע תחילה"
+              : !grade ? "בחר/י כיתה תחילה"
+              : "בחר/י נושא תחילה"}
+          </button>
+        </div>
+      )}
     </div>
   );
 }
