@@ -85,6 +85,7 @@ Deno.serve(async (req) => {
     { data: lifecycleEvents },
     { count: profilesCount },
     { data: emailLogs },
+    { data: surveyRows },
   ] = await Promise.all([
     admin.auth.admin.listUsers({ perPage: 1000 }),
     admin.from("booklets").select("*", { count: "exact", head: true }),
@@ -106,6 +107,7 @@ Deno.serve(async (req) => {
     // 1000, so the headline number must come from a COUNT, not the capped list.
     admin.from("profiles").select("*", { count: "exact", head: true }),
     admin.from("email_logs").select("email_type"),
+    admin.from("survey_responses").select("question_key, answer"),
   ]);
 
   const users = authData?.users ?? [];
@@ -124,6 +126,13 @@ Deno.serve(async (req) => {
     created_one:   emailLogCounts["created_one"]   ?? 0,
     total: (emailLogs ?? []).length,
   };
+
+  // Survey breakdown: { question_key → { answer → count } }
+  const surveyBreakdown: Record<string, Record<string, number>> = {};
+  (surveyRows ?? []).forEach((r: { question_key: string; answer: string }) => {
+    (surveyBreakdown[r.question_key] ??= {})[r.answer] =
+      ((surveyBreakdown[r.question_key]?.[r.answer]) ?? 0) + 1;
+  });
 
   // Profile map
   const profileMap: Record<string, { plan: string; full_name: string | null; followup_sent_at: string | null }> = {};
@@ -729,6 +738,7 @@ Deno.serve(async (req) => {
     silentFailures,
     proposals: pendingProposals,
     emailLogStats,
+    surveyBreakdown,
   }), { headers: { ...cors, "content-type": "application/json" } });
   } catch (e) {
     console.error("admin-stats fatal:", e);
