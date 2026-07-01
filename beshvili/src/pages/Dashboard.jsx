@@ -168,21 +168,10 @@ export default function Dashboard() {
           </div>
         </div>
         <QuotaBar loading={loading} isPro={isPro} monthlyBookletCount={monthlyBookletCount} monthlyLimit={monthlyLimit} bookletCount={bookletCount} className="px-4 pb-2" />
-        {/* Mobile tabs */}
-        <div className="px-3 pb-2 flex gap-1 overflow-x-auto scrollbar-none">
-          {tabs.map(([id, icon, label]) => (
-            <button key={id} onClick={() => setTab(id)}
-              className={`flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
-                tab === id ? "bg-white text-ink shadow-sm" : "text-white/50 hover:text-white/80"
-              }`}>
-              <span>{icon}</span><span>{label}</span>
-            </button>
-          ))}
-        </div>
       </header>
 
       {/* ── Main content ── */}
-      <div className="lg:mr-60">
+      <div className="lg:mr-60 pb-20 lg:pb-0">
         <main className="max-w-3xl mx-auto px-5 py-6 lg:py-8">
           {/* First-time welcome nudge — mirrors landing page promise */}
           {tab === "create" && !loading && !isPro && bookletCount === 0 && (
@@ -271,6 +260,30 @@ export default function Dashboard() {
           <p>בשבילי © {new Date().getFullYear()} · כל הזכויות שמורות</p>
         </footer>
       </div>
+
+      {/* ── Mobile bottom tab bar ── */}
+      <nav
+        className="lg:hidden fixed bottom-0 inset-x-0 z-20 bg-ink border-t border-white/10 flex"
+        style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+      >
+        {tabs.map(([id, icon, label]) => (
+          <button
+            key={id}
+            onClick={() => setTab(id)}
+            className={`flex-1 flex flex-col items-center justify-center py-2 relative transition-colors min-w-0 ${
+              tab === id ? "text-brand" : "text-white/40 active:text-white/70"
+            }`}
+          >
+            {tab === id && (
+              <span className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-0.5 bg-brand rounded-full" />
+            )}
+            <span className="text-xl leading-none">{icon}</span>
+            <span className="text-[10px] font-medium leading-tight mt-0.5 truncate w-full text-center px-1">
+              {label}
+            </span>
+          </button>
+        ))}
+      </nav>
 
       {showUpgrade && <UpgradeModal onClose={() => setShowUpgrade(false)} bookletCount={bookletCount} source="dashboard" />}
       {showSurvey && <SurveyModal questionKey="use_case" onClose={() => setShowSurvey(false)} />}

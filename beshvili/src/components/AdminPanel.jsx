@@ -317,10 +317,10 @@ export default function AdminPanel() {
   const paidUsers    = revenueLines.reduce((s, r) => s + r.count, 0);
 
   const statCards = [
-    { label: "סה\u05bבכ משתמשים",  value: data.totalUsers,         icon: "👥" },
+    { label: "סה״כ משתמשים",  value: data.totalUsers,         icon: "👥" },
     { label: "השבוע",          value: data.usersThisWeek,      icon: "📅" },
     { label: "היום",           value: data.usersToday,         icon: "⚡" },
-    { label: "סה\u05bבכ חוברות",   value: data.totalBooklets,      icon: "📚" },
+    { label: "סה״כ חוברות",   value: data.totalBooklets,      icon: "📚" },
     { label: "חוברות השבוע",  value: data.bookletsThisWeek,   icon: "📊" },
     { label: "חוברות היום",   value: data.bookletsToday,      icon: "🔥" },
   ];
@@ -1057,7 +1057,7 @@ export default function AdminPanel() {
                   </div>
                 ))}
                 <div className="flex justify-between text-xs border-t border-ink/10 pt-1 mt-1">
-                  <span className="font-semibold text-ink/60">סה\u05bבכ נשלחו</span>
+                  <span className="font-semibold text-ink/60">סה״כ נשלחו</span>
                   <span className="font-bold text-ink">{s.total}</span>
                 </div>
               </div>
