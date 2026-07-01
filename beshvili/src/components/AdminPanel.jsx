@@ -150,16 +150,10 @@ export default function AdminPanel() {
     const { data: res, error: err } = await supabase.functions.invoke("admin-stats");
     if (err) {
       const isFetch = /failed to send a request/i.test(err.message || "");
-      // A bare fetch-failure (no response) is almost always a cold boot right
-      // after a deploy — the function returns a CORS-less 503 for a few seconds
-      // while it wakes. Retry patiently (up to ~14s total) so the wake-up window
-      // is ridden out invisibly; a warm function answers on the first try.
       if (isFetch && attempt < 4) {
         await new Promise(r => setTimeout(r, 2000 + attempt * 1500));
         return loadStats(attempt + 1);
       }
-      // Read the function's JSON error body (FunctionsHttpError carries the
-      // Response in .context) so a real crash shows its reason, not the opaque message.
       let detail = "";
       try { detail = (await err.context?.json?.())?.detail || ""; } catch { /* not JSON */ }
       setError(detail
@@ -177,8 +171,6 @@ export default function AdminPanel() {
   useEffect(() => { loadStats(); }, []);
 
   const handleProposal = async (id, status, proposal = null) => {
-    // For an approved WhatsApp action, open the window FIRST (inside the click
-    // gesture) so the popup blocker doesn't eat it.
     if (status === "approved" && proposal?.action_type === "whatsapp") {
       const msg   = encodeURIComponent(proposal.action_payload?.message ?? "");
       const phone = proposal.action_payload?.phone ?? "972509139137";
@@ -188,8 +180,6 @@ export default function AdminPanel() {
       status,
       reviewed_at: new Date().toISOString(),
     }).eq("id", id);
-    // Only remove the card if the DB actually recorded it — otherwise it would
-    // silently reappear on the next load, looking like the action didn't stick.
     if (err) { alert("לא הצלחנו לעדכן את ההצעה — נסי שוב"); return; }
     setProposals(prev => prev.filter(p => p.id !== id));
   };
@@ -225,14 +215,12 @@ export default function AdminPanel() {
 
   const fmtFollowupResult = (res, err, label) => {
     if (err) return `שגיאה: ${err.message}`;
-    // Function-level error (e.g. RESEND_API_KEY missing, profiles query failed)
     if (res?.error) return `שגיאה: ${res.error}${res.detail ? ` — ${res.detail}` : ""}`;
     const dbg = res?._debug ?? {};
     const parts = [];
     if (dbg.list_users_error) parts.push(`⚠️ שגיאת רישום משתמשים: ${dbg.list_users_error}`);
     if (dbg.auth_users_found != null) parts.push(`${dbg.auth_users_found} משתמשים במערכת`);
     if (dbg.profiles_found  != null) parts.push(`${dbg.profiles_found} פרופילים`);
-    // Surface the first Resend send error so a domain/verification problem is visible
     if (res?.errors?.length) parts.push(`⚠️ ${res.errors.length} שגיאות שליחה — ${String(res.errors[0]).slice(0, 140)}`);
     const suffix = parts.length ? ` · ${parts.join(" · ")}` : "";
     return `${label}${suffix}`;
@@ -317,10 +305,10 @@ export default function AdminPanel() {
   const paidUsers    = revenueLines.reduce((s, r) => s + r.count, 0);
 
   const statCards = [
-    { label: "סה״כ משתמשים",  value: data.totalUsers,         icon: "👥" },
+    { label: "סה׳כ משתמשים",  value: data.totalUsers,         icon: "👥" },
     { label: "השבוע",          value: data.usersThisWeek,      icon: "📅" },
     { label: "היום",           value: data.usersToday,         icon: "⚡" },
-    { label: "סה״כ חוברות",   value: data.totalBooklets,      icon: "📚" },
+    { label: "סה׳כ חוברות",   value: data.totalBooklets,      icon: "📚" },
     { label: "חוברות השבוע",  value: data.bookletsThisWeek,   icon: "📊" },
     { label: "חוברות היום",   value: data.bookletsToday,      icon: "🔥" },
   ];
@@ -328,13 +316,9 @@ export default function AdminPanel() {
   const fs = data.funnelStats ?? { sessions: 0, started: 0, completed: 0, upgradeOpened: 0, ctaClicked: 0, leads: 0 };
   const convStart = fs.sessions > 0 ? Math.round((fs.started / fs.sessions) * 100) : 0;
   const convDone  = fs.started  > 0 ? Math.round((fs.completed / fs.started) * 100) : 0;
-  // Upgrade funnel: saw paywall → clicked pay → became a lead.
-  // Clamp to 100%: the modal also opens from non-completion paths (dashboard/quota),
-  // so upgradeOpened can exceed completed — a raw ratio would read >100%.
   const convCta  = fs.upgradeOpened > 0 ? Math.min(100, Math.round(((fs.ctaClicked ?? 0) / fs.upgradeOpened) * 100)) : 0;
   const convLead = fs.completed     > 0 ? Math.min(100, Math.round(((fs.upgradeOpened ?? 0) / fs.completed) * 100)) : 0;
 
-  // Full-funnel analytics (anonymous → signup → activation + virality + reliability)
   const an = data.analytics ?? {
     visitors: 0, signups: 0, logins: 0, activated: 0, emailSubmitted: 0, verifyView: 0,
     googleClicks: 0, shares: 0, publicViews: 0, prints: 0, pwaInstalls: 0, ratings: 0,
@@ -355,7 +339,7 @@ export default function AdminPanel() {
   return (
     <div className="space-y-6">
 
-      {/* ── 🩺 System health (today) — "is generation working right now" ────── */}
+      {/* ── 🩺 System health (today) ────── */}
       {(() => {
         const r = data.reliability ?? { startedToday: 0, completedToday: 0, errorsToday: 0, successRate: 0, errorsByType: [], versions: [] };
         const hasIssue = r.startedToday >= 3 && r.successRate < 70;
@@ -398,7 +382,7 @@ export default function AdminPanel() {
         );
       })()}
 
-      {/* ── AI strategic insight — one conclusion from all the data ──────── */}
+      {/* ── AI strategic insight ──────────── */}
       <div className={`rounded-2xl p-5 border-2 shadow-sm bg-gradient-to-bl ${insight ? `${im.ring} ${im.bg}` : "border-magic/20 from-magic/5 to-brand/5"}`}>
         <div className="flex items-center justify-between mb-2">
           <h3 className="font-bold text-ink text-sm flex items-center gap-2">
@@ -434,12 +418,10 @@ export default function AdminPanel() {
         )}
       </div>
 
-      {/* ── Silent-failure detector — answers "do users fail or just not try?" ── */}
+      {/* ── Silent-failure detector ── */}
       {(() => {
         const sf = data.silentFailures ?? { count: 0, recentCount: 0, errorBreakdown: [], recentErrorBreakdown: [], users: [] };
         const notQuota = (e) => e.type !== "quota" && e.type !== "quota_monthly";
-        // All-time (30d) vs RECENT (last 3d). Recent is what tells us if a bug is
-        // still live; the 30d total carries pre-fix history and shouldn't alarm.
         const realAll    = (sf.errorBreakdown ?? []).filter(notQuota);
         const realRecent = (sf.recentErrorBreakdown ?? []).filter(notQuota);
         const realCountAll    = realAll.reduce((s, e) => s + e.count, 0);
@@ -492,7 +474,7 @@ export default function AdminPanel() {
         );
       })()}
 
-      {/* ── Self-test: prove a real (non-admin) user can save a booklet ───────── */}
+      {/* ── Self-test ───────── */}
       <div className={`rounded-2xl p-4 border-2 shadow-sm ${
         selftestResult == null ? "bg-magic/5 border-magic/25"
         : selftestResult.ok ? "bg-grow/5 border-grow/30" : "bg-red-50 border-red-300"
@@ -590,7 +572,7 @@ export default function AdminPanel() {
         )}
       </div>
 
-      {/* Upgrade funnel (last 7 days) — the conversion step that was previously invisible */}
+      {/* Upgrade funnel */}
       <div className="bg-white rounded-2xl p-4 border border-ink/5 shadow-sm">
         <h3 className="font-bold text-ink mb-3 text-sm">💰 משפך שדרוג — 7 ימים</h3>
         {(fs.upgradeOpened ?? 0) === 0 && (fs.ctaClicked ?? 0) === 0 && (fs.leads ?? 0) === 0 ? (
@@ -622,10 +604,9 @@ export default function AdminPanel() {
         )}
       </div>
 
-      {/* ── FULL FUNNEL ANALYTICS (last 7 days) ─────────────────────────── */}
+      {/* FULL FUNNEL ANALYTICS */}
       {an.totalEvents > 0 ? (
         <div className="space-y-4">
-          {/* Acquisition → activation */}
           <div className="bg-white rounded-2xl p-4 border border-ink/5 shadow-sm">
             <h3 className="font-bold text-ink mb-3 text-sm">🚀 משפך רכישה מלא — 7 ימים</h3>
             <div className="flex items-center gap-2">
@@ -648,9 +629,7 @@ export default function AdminPanel() {
             <p className="text-[10px] text-ink/30 mt-2 text-center">{an.totalEvents.toLocaleString("he-IL")} אירועים נמדדו · מבקר→הרשמה {convVisitSignup}% · הרשמה→חוברת {convSignupActive}%</p>
           </div>
 
-          {/* Traffic sources + virality/engagement side by side */}
           <div className="grid sm:grid-cols-2 gap-4">
-            {/* Traffic sources */}
             <div className="bg-white rounded-2xl p-4 border border-ink/5 shadow-sm">
               <h3 className="font-bold text-ink mb-3 text-sm">🌐 מקורות תנועה</h3>
               {(an.sources ?? []).length === 0 ? (
@@ -667,7 +646,6 @@ export default function AdminPanel() {
               )}
             </div>
 
-            {/* Virality + engagement */}
             <div className="bg-white rounded-2xl p-4 border border-ink/5 shadow-sm">
               <h3 className="font-bold text-ink mb-3 text-sm">📣 הפצה ומעורבות</h3>
               <div className="grid grid-cols-2 gap-2 text-center">
@@ -688,7 +666,6 @@ export default function AdminPanel() {
             </div>
           </div>
 
-          {/* Generation reliability — errors by type */}
           {errorTotal > 0 && (
             <div className="bg-white rounded-2xl p-4 border border-ink/5 shadow-sm">
               <h3 className="font-bold text-ink mb-3 text-sm">⚠️ תקלות ייצור — {errorTotal} ב-7 ימים</h3>
@@ -750,7 +727,7 @@ export default function AdminPanel() {
         </div>
       )}
 
-      {/* Dormant users — created booklets but stopped: highest-value retention targets */}
+      {/* Dormant users */}
       {(data.dormantCount ?? 0) > 0 && (
         <div className="bg-white rounded-2xl p-4 border border-amber-200 shadow-sm">
           <div className="flex items-center justify-between mb-2">
@@ -934,7 +911,7 @@ export default function AdminPanel() {
         )}
       </div>
 
-      {/* Plan breakdown + conversion rate */}
+      {/* Plan breakdown */}
       <div className="bg-white rounded-2xl p-4 border border-ink/5 shadow-sm">
         <div className="flex items-center justify-between mb-3">
           <h3 className="font-bold text-ink text-sm">פילוח תוכניות</h3>
@@ -996,7 +973,6 @@ export default function AdminPanel() {
 
       {/* Automation triggers */}
       <div className="grid grid-cols-2 gap-3">
-        {/* 📢 Blast to all users */}
         <div className="bg-magic/5 rounded-2xl p-4 border-2 border-magic/30 col-span-2">
           <div className="flex items-start gap-2 mb-1">
             <span className="text-lg flex-shrink-0">📢</span>
@@ -1012,7 +988,6 @@ export default function AdminPanel() {
           {blastResult && <p className="text-xs text-magic font-semibold mt-2">{blastResult}</p>}
         </div>
 
-        {/* 🚨 Emergency blast — full-width, prominent */}
         <div className="bg-red-50 rounded-2xl p-4 border-2 border-red-300 col-span-2">
           <div className="flex items-start gap-2 mb-1">
             <span className="text-lg flex-shrink-0">🚨</span>
@@ -1057,7 +1032,7 @@ export default function AdminPanel() {
                   </div>
                 ))}
                 <div className="flex justify-between text-xs border-t border-ink/10 pt-1 mt-1">
-                  <span className="font-semibold text-ink/60">סה״כ נשלחו</span>
+                  <span className="font-semibold text-ink/60">סה׳כ נשלחו</span>
                   <span className="font-bold text-ink">{s.total}</span>
                 </div>
               </div>
@@ -1119,7 +1094,7 @@ export default function AdminPanel() {
         </div>
       </div>
 
-      {/* Unsubscribe a user by email (honor opt-out requests) */}
+      {/* Unsubscribe */}
       <div className="bg-white rounded-2xl p-4 border border-ink/5 shadow-sm">
         <h3 className="font-bold text-ink mb-1 text-sm">✉️ הסרה מרשימת תפוצה</h3>
         <p className="text-[11px] text-ink/40 mb-3">הזן מייל של מי שביקש/ה להפסיק לקבל מיילים — היא לא תקבל יותר.</p>
@@ -1144,7 +1119,7 @@ export default function AdminPanel() {
         {unsubResult && <p className={`text-xs mt-2 font-medium ${unsubResult.startsWith("✓") ? "text-grow" : "text-red-500"}`}>{unsubResult}</p>}
       </div>
 
-      {/* User search — find ANY user by email (recent-users only shows newest 30) */}
+      {/* User search */}
       <div className="bg-white rounded-2xl p-4 border border-ink/5 shadow-sm">
         <h3 className="font-bold text-ink mb-1 text-sm">🔍 חיפוש משתמש לפי מייל</h3>
         <p className="text-xs text-ink/40 mb-3">מצא כל משתמש (גם ותיק) — חוברות, פעילות אחרונה ושגיאות</p>
