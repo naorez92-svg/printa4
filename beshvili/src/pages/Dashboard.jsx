@@ -5,6 +5,7 @@ import History from "../components/History";
 import UpgradeModal from "../components/UpgradeModal";
 import FeedbackWidget from "../components/FeedbackWidget";
 import OnboardingModal from "../components/OnboardingModal";
+import SurveyModal from "../components/SurveyModal";
 import { useProfile, FREE_LIMIT } from "../hooks/useProfile";
 import InstallPWA from "../components/InstallPWA";
 import Logo from "../components/Logo";
@@ -48,6 +49,7 @@ function QuotaBar({ loading, isPro, monthlyBookletCount, monthlyLimit, bookletCo
 export default function Dashboard() {
   const [tab, setTab]             = useState("create");
   const [showUpgrade, setShowUpgrade] = useState(false);
+  const [showSurvey, setShowSurvey]   = useState(false);
   const [pendingStarter, setPendingStarter] = useState(null);
   const [onboarded, setOnboarded] = useState(() => {
     try { return !!localStorage.getItem("beshvili_onboarded"); } catch { return true; }
@@ -69,6 +71,14 @@ export default function Dashboard() {
     }
     prevBookletCountRef.current = bookletCount;
   }, [bookletCount, remaining, isPro, loading]);
+
+  // Show survey after 2nd booklet — once per user, 2s delay so the happy moment isn't interrupted
+  useEffect(() => {
+    if (loading || bookletCount < 2) return;
+    try { if (localStorage.getItem("survey_use_case_done")) return; } catch {}
+    const t = setTimeout(() => setShowSurvey(true), 2000);
+    return () => clearTimeout(t);
+  }, [bookletCount, loading]);
 
   const tabs = [
     ...NAV,
@@ -263,6 +273,7 @@ export default function Dashboard() {
       </div>
 
       {showUpgrade && <UpgradeModal onClose={() => setShowUpgrade(false)} bookletCount={bookletCount} source="dashboard" />}
+      {showSurvey && <SurveyModal questionKey="use_case" onClose={() => setShowSurvey(false)} />}
       {!loading && !isPro && bookletCount === 0 && !onboarded && tab === "create" && (
         <OnboardingModal
           onPick={(s) => { setPendingStarter(s); finishOnboarding(); track("onboarding_starter_picked", { label: s.label }); }}

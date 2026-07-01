@@ -1064,6 +1064,50 @@ export default function AdminPanel() {
             );
           })()}
         </div>
+        <div className="bg-canvas rounded-2xl p-4 border border-magic/20">
+          <h3 className="font-bold text-ink mb-1 text-sm">📋 סקר משתמשות — תשובות</h3>
+          <p className="text-[11px] text-ink/40 mb-2">לחיצה אחת — מה הן אמרו</p>
+          {(() => {
+            const sb = data.surveyBreakdown ?? {};
+            const LABELS = {
+              use_case: { q: "לאיזה מצב משתמשת?", answers: { private_lessons: "שיעורים פרטיים", full_class: "כיתה שלמה", homework: "שיעורי בית" } },
+              barrier:  { q: "מה עצר אותך?",      answers: { no_time: "לא היה זמן", didnt_understand: "לא הבנתי", no_topic: "לא מצאתי נושא" } },
+              monthly_need: { q: "כמה חוברות בחודש?", answers: { up_to_5: "עד 5", five_to_15: "5–15", twenty_plus: "20+" } },
+            };
+            return (
+              <div className="space-y-3">
+                {Object.entries(LABELS).map(([qKey, meta]) => {
+                  const answers = sb[qKey] ?? {};
+                  const total = Object.values(answers).reduce((s, n) => s + n, 0);
+                  if (total === 0) return (
+                    <div key={qKey}>
+                      <p className="text-[11px] font-semibold text-ink/50 mb-0.5">{meta.q}</p>
+                      <p className="text-[10px] text-ink/30">טרם נאספו תשובות</p>
+                    </div>
+                  );
+                  return (
+                    <div key={qKey}>
+                      <p className="text-[11px] font-semibold text-ink/50 mb-1">{meta.q} ({total})</p>
+                      {Object.entries(meta.answers).map(([val, label]) => {
+                        const count = answers[val] ?? 0;
+                        const pct = total > 0 ? Math.round((count / total) * 100) : 0;
+                        return (
+                          <div key={val} className="flex items-center gap-1.5 mb-0.5">
+                            <div className="w-16 h-1.5 bg-white rounded-full overflow-hidden">
+                              <div className="h-full bg-magic rounded-full" style={{ width: `${pct}%` }} />
+                            </div>
+                            <span className="text-[10px] text-ink/60 flex-1">{label}</span>
+                            <span className="text-[10px] font-bold text-magic">{count} ({pct}%)</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })()}
+        </div>
         <div className="bg-canvas rounded-2xl p-4 border border-ink/5 col-span-2">
           <h3 className="font-bold text-ink mb-1 text-sm">תזכורת חידוש D+25</h3>
           <p className="text-xs text-ink/40 mb-3">מזכיר לפרו לחדש 5 ימים לפני הסוף.</p>
