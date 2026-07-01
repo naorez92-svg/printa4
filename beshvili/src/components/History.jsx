@@ -62,7 +62,7 @@ function UpgradeNudge({ onUpgrade }) {
   );
 }
 
-export default function History({ isPro = false, onUpgrade, onCreateNew }) {
+export default function History({ isPro = false, onUpgrade, onCreateNew, onCreateSimilar }) {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
@@ -71,7 +71,7 @@ export default function History({ isPro = false, onUpgrade, onCreateNew }) {
   useEffect(() => {
     supabase
       .from("booklets")
-      .select("id, title, world, child_name, grade, created_at")
+      .select("id, title, world, child_name, grade, created_at, goal, level")
       .order("created_at", { ascending: false })
       .then(({ data, error }) => {
         if (error) { setLoadError(true); track("history_load_failed", {}); }
@@ -125,15 +125,13 @@ export default function History({ isPro = false, onUpgrade, onCreateNew }) {
 
       {/* Total time saved summary */}
       {!loading && items.length > 0 && (
-        <div className="bg-gradient-to-l from-grow/10 to-magic/8 border border-grow/20 rounded-2xl px-4 py-3 flex items-center justify-between">
+        <div className="bg-gradient-to-l from-grow/12 to-grow/5 border border-grow/25 rounded-2xl px-4 py-4 flex items-center justify-between">
           <div>
-            <span className="text-sm font-semibold text-ink">סה"כ חסכת</span>
-            <span className="text-xs text-ink/45 mr-1.5">בהכנת חומרי לימוד</span>
+            <div className="text-[11px] font-semibold text-grow/70 mb-0.5">⏱ סה״כ חסכת בהכנות</div>
+            <div className="text-2xl font-bold text-grow font-display leading-none">~{totalSavedStr}</div>
+            <div className="text-[10px] text-ink/35 mt-1">{items.length} חוברות × ~45 דק׳ ממוצע</div>
           </div>
-          <div className="text-right">
-            <div className="text-lg font-bold text-grow font-display">⏱ ~{totalSavedStr}</div>
-            <div className="text-[10px] text-ink/35">{items.length} חוברות × ~45 דק' ממוצע</div>
-          </div>
+          <div className="text-5xl">🏆</div>
         </div>
       )}
 
@@ -164,7 +162,7 @@ export default function History({ isPro = false, onUpgrade, onCreateNew }) {
         <p className="text-ink/40 text-sm text-center py-4">לא נמצאו תוצאות עבור "{search}"</p>
       )}
       {filtered.map((b, i) => (
-        <BookletRow key={b.id} booklet={b} onDelete={onDelete} index={i} />
+        <BookletRow key={b.id} booklet={b} onDelete={onDelete} index={i} onCreateSimilar={onCreateSimilar} />
       ))}
       {!loading && items.length >= 2 && !isPro && onUpgrade && (
         <UpgradeNudge onUpgrade={onUpgrade} />
@@ -173,7 +171,7 @@ export default function History({ isPro = false, onUpgrade, onCreateNew }) {
   );
 }
 
-function BookletRow({ booklet: b, onDelete, index = 0 }) {
+function BookletRow({ booklet: b, onDelete, index = 0, onCreateSimilar }) {
   const [html, setHtml] = useState(null);
   const [shareToken, setShareToken] = useState(null);
   const [loadingHtml, setLoadingHtml] = useState(false);
@@ -215,7 +213,7 @@ function BookletRow({ booklet: b, onDelete, index = 0 }) {
 
   return (
     <div
-      className={`animate-fade-up bg-white rounded-xl ${accentClass} border border-ink/5 overflow-hidden shadow-sm`}
+      className={`animate-fade-up bg-white rounded-xl ${accentClass} border ${today ? "border-brand/25 shadow-md shadow-brand/8" : "border-ink/5 shadow-sm"} overflow-hidden`}
       style={{ animationDelay: `${Math.min(index * 0.06, 0.4)}s` }}
     >
       <div className="p-4 flex items-center gap-3">
@@ -238,7 +236,16 @@ function BookletRow({ booklet: b, onDelete, index = 0 }) {
         </div>
 
         {/* Actions */}
-        <div className="flex gap-2 flex-shrink-0">
+        <div className="flex gap-2 flex-shrink-0 items-center">
+          {onCreateSimilar && (
+            <button
+              onClick={() => onCreateSimilar(b)}
+              className="text-[11px] bg-brand/10 text-brand font-semibold rounded-full px-2.5 py-1 hover:bg-brand/20 transition-colors whitespace-nowrap"
+              title="צור חוברת דומה"
+            >
+              ✦ דומה
+            </button>
+          )}
           <button
             onClick={toggle}
             className="text-magic text-sm font-medium hover:underline"

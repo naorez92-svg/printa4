@@ -14,6 +14,11 @@ const LEVEL_COLORS = {
   medium:   "bg-brand/10 text-brand",
   advanced: "bg-magic/10 text-magic",
 };
+const LEVEL_BORDER = {
+  basic:    "border-r-4 border-grow",
+  medium:   "border-r-4 border-brand",
+  advanced: "border-r-4 border-magic",
+};
 const WORLDS = ["כדורגל", "גיימינג", "חיות", "חלל", "בישול", "מוזיקה", "סוסים", "נינג'ה", "פוקימון", "מינקראפט"];
 const WORLD_EMOJI = {
   "כדורגל": "⚽", "גיימינג": "🎮", "חיות": "🐾",
@@ -87,10 +92,11 @@ function StudentCard({ student, onQuickCreate, onEdit, onHistory, onDelete }) {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const world = student.worlds?.[0];
   const worldEmoji = world ? (WORLD_EMOJI[world] ?? "📚") : null;
-  const lvlColor = LEVEL_COLORS[student.level] ?? "bg-ink/8 text-ink/50";
+  const lvlColor  = LEVEL_COLORS[student.level] ?? "bg-ink/8 text-ink/50";
+  const lvlBorder = LEVEL_BORDER[student.level] ?? "border-r-4 border-ink/15";
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-ink/5 overflow-hidden">
+    <div className={`bg-white rounded-2xl shadow-sm border border-ink/5 overflow-hidden ${lvlBorder}`}>
       {/* Main row */}
       <div className="px-4 py-3.5 flex items-center gap-3">
         {/* Avatar */}
@@ -331,7 +337,7 @@ export default function Students({ onBookletSaved, remaining, isPro, bookletCoun
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-xl font-semibold text-ink flex items-center gap-2">
+          <h2 className="text-xl font-bold font-display text-ink flex items-center gap-2">
             👥 התלמידים שלי
           </h2>
           {!loading && students.length > 0 && (
@@ -341,7 +347,7 @@ export default function Students({ onBookletSaved, remaining, isPro, bookletCoun
         {!showAdd && (
           <button
             onClick={() => setShowAdd(true)}
-            className="bg-magic text-white rounded-xl px-4 py-2.5 text-sm font-semibold hover:opacity-90 active:scale-95 transition-all shadow-sm"
+            className="bg-gradient-to-l from-brand to-magic text-white rounded-xl px-4 py-2.5 text-sm font-semibold hover:opacity-90 active:scale-95 transition-all shadow-sm shadow-magic/20"
           >
             + הוסף תלמיד
           </button>
@@ -463,10 +469,12 @@ export default function Students({ onBookletSaved, remaining, isPro, bookletCoun
       {!loading && Object.entries(byGrade).map(([grade, list]) => (
         <div key={grade} className="space-y-2">
           {/* Grade divider */}
-          <div className="flex items-center gap-2 px-1 py-0.5">
-            <span className="text-xs font-semibold text-ink/50 whitespace-nowrap">{grade}</span>
+          <div className="flex items-center gap-2 px-1 py-1">
+            <div className="flex items-center gap-1.5 bg-magic/8 text-magic text-xs font-bold rounded-full px-3 py-1 whitespace-nowrap">
+              🎓 {grade}
+            </div>
             <div className="flex-1 h-px bg-ink/8" />
-            <span className="text-xs text-ink/30">{list.length} תלמידים</span>
+            <span className="text-[11px] text-ink/35 bg-white border border-ink/8 rounded-full px-2 py-0.5">{list.length}</span>
           </div>
 
           {list.map(student => (
