@@ -62,7 +62,7 @@ function UpgradeNudge({ onUpgrade }) {
   );
 }
 
-export default function History({ isPro = false, onUpgrade, onCreateNew }) {
+export default function History({ isPro = false, onUpgrade, onCreateNew, onCreateSimilar }) {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
@@ -71,7 +71,7 @@ export default function History({ isPro = false, onUpgrade, onCreateNew }) {
   useEffect(() => {
     supabase
       .from("booklets")
-      .select("id, title, world, child_name, grade, created_at")
+      .select("id, title, world, child_name, grade, created_at, goal, level")
       .order("created_at", { ascending: false })
       .then(({ data, error }) => {
         if (error) { setLoadError(true); track("history_load_failed", {}); }
@@ -164,7 +164,7 @@ export default function History({ isPro = false, onUpgrade, onCreateNew }) {
         <p className="text-ink/40 text-sm text-center py-4">לא נמצאו תוצאות עבור "{search}"</p>
       )}
       {filtered.map((b, i) => (
-        <BookletRow key={b.id} booklet={b} onDelete={onDelete} index={i} />
+        <BookletRow key={b.id} booklet={b} onDelete={onDelete} index={i} onCreateSimilar={onCreateSimilar} />
       ))}
       {!loading && items.length >= 2 && !isPro && onUpgrade && (
         <UpgradeNudge onUpgrade={onUpgrade} />
@@ -173,7 +173,7 @@ export default function History({ isPro = false, onUpgrade, onCreateNew }) {
   );
 }
 
-function BookletRow({ booklet: b, onDelete, index = 0 }) {
+function BookletRow({ booklet: b, onDelete, index = 0, onCreateSimilar }) {
   const [html, setHtml] = useState(null);
   const [shareToken, setShareToken] = useState(null);
   const [loadingHtml, setLoadingHtml] = useState(false);
@@ -238,7 +238,16 @@ function BookletRow({ booklet: b, onDelete, index = 0 }) {
         </div>
 
         {/* Actions */}
-        <div className="flex gap-2 flex-shrink-0">
+        <div className="flex gap-2 flex-shrink-0 items-center">
+          {onCreateSimilar && (
+            <button
+              onClick={() => onCreateSimilar(b)}
+              className="text-xs text-brand font-medium hover:underline"
+              title="צור חוברת דומה"
+            >
+              צור דומה
+            </button>
+          )}
           <button
             onClick={toggle}
             className="text-magic text-sm font-medium hover:underline"
