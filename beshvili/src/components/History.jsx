@@ -125,15 +125,13 @@ export default function History({ isPro = false, onUpgrade, onCreateNew, onCreat
 
       {/* Total time saved summary */}
       {!loading && items.length > 0 && (
-        <div className="bg-gradient-to-l from-grow/10 to-magic/8 border border-grow/20 rounded-2xl px-4 py-3 flex items-center justify-between">
+        <div className="bg-gradient-to-l from-grow/12 to-grow/5 border border-grow/25 rounded-2xl px-4 py-4 flex items-center justify-between">
           <div>
-            <span className="text-sm font-semibold text-ink">סה"כ חסכת</span>
-            <span className="text-xs text-ink/45 mr-1.5">בהכנת חומרי לימוד</span>
+            <div className="text-[11px] font-semibold text-grow/70 mb-0.5">⏱ סה״כ חסכת בהכנות</div>
+            <div className="text-2xl font-bold text-grow font-display leading-none">~{totalSavedStr}</div>
+            <div className="text-[10px] text-ink/35 mt-1">{items.length} חוברות × ~45 דק׳ ממוצע</div>
           </div>
-          <div className="text-right">
-            <div className="text-lg font-bold text-grow font-display">⏱ ~{totalSavedStr}</div>
-            <div className="text-[10px] text-ink/35">{items.length} חוברות × ~45 דק' ממוצע</div>
-          </div>
+          <div className="text-5xl">🏆</div>
         </div>
       )}
 
@@ -215,7 +213,7 @@ function BookletRow({ booklet: b, onDelete, index = 0, onCreateSimilar }) {
 
   return (
     <div
-      className={`animate-fade-up bg-white rounded-xl ${accentClass} border border-ink/5 overflow-hidden shadow-sm`}
+      className={`animate-fade-up bg-white rounded-xl ${accentClass} border ${today ? "border-brand/25 shadow-md shadow-brand/8" : "border-ink/5 shadow-sm"} overflow-hidden`}
       style={{ animationDelay: `${Math.min(index * 0.06, 0.4)}s` }}
     >
       <div className="p-4 flex items-center gap-3">
@@ -242,10 +240,10 @@ function BookletRow({ booklet: b, onDelete, index = 0, onCreateSimilar }) {
           {onCreateSimilar && (
             <button
               onClick={() => onCreateSimilar(b)}
-              className="text-xs text-brand font-medium hover:underline"
+              className="text-[11px] bg-brand/10 text-brand font-semibold rounded-full px-2.5 py-1 hover:bg-brand/20 transition-colors whitespace-nowrap"
               title="צור חוברת דומה"
             >
-              צור דומה
+              ✦ דומה
             </button>
           )}
           <button
