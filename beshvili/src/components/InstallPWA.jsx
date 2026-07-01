@@ -46,7 +46,7 @@ export default function InstallPWA({ variant = "banner" }) {
   // Default: floating bottom banner (mobile)
   return (
     <>
-      <div className="fixed bottom-4 inset-x-4 z-50 flex items-center gap-3 bg-ink text-white rounded-2xl shadow-2xl px-4 py-3 lg:hidden">
+      <div className="fixed bottom-20 inset-x-4 z-50 flex items-center gap-3 bg-ink text-white rounded-2xl shadow-2xl px-4 py-3 lg:hidden">
         <span className="text-2xl flex-shrink-0">📲</span>
         <div className="flex-1 min-w-0">
           <p className="text-sm font-bold font-display leading-tight">הורד כאפליקציה</p>

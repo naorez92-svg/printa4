@@ -37,7 +37,7 @@ export default function FeedbackWidget() {
     return (
       <button
         onClick={() => { track("feedback_opened", {}); setOpen(true); }}
-        className="fixed bottom-6 left-4 z-40 bg-white border border-ink/10 shadow-lg rounded-full px-4 py-2.5 text-sm font-medium text-ink/50 hover:text-ink hover:shadow-xl transition-all flex items-center gap-2"
+        className="fixed bottom-20 left-4 lg:bottom-6 z-40 bg-white border border-ink/10 shadow-lg rounded-full px-4 py-2.5 text-sm font-medium text-ink/50 hover:text-ink hover:shadow-xl transition-all flex items-center gap-2"
       >
         <span>💬</span> פידבק
       </button>
