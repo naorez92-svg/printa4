@@ -651,7 +651,33 @@ export default function JewishCreate({ onSaved, remaining, isPro, bookletCount =
         </div>
       )}
 
-      {/* Speed vs depth toggle */}
+      {/* Live generation progress — a 60–90s generation needs real feedback, not
+          just a spinner in the button. Mirrors Create.jsx: progress bar keyed to
+          streamed chars, elapsed seconds, and a value tip. role=status so screen
+          readers hear progress instead of silence. */}
+      {loading && (
+        <div className="bg-magic/5 border border-magic/15 rounded-2xl p-4 space-y-3" role="status" aria-live="polite">
+          <p className="text-center font-display font-bold text-ink text-sm">
+            ✡️ {LOADING_MSGS[loadingMsgIdx]}
+          </p>
+          <div className="w-full bg-white rounded-full h-2.5 overflow-hidden">
+            {streamChars > 0
+              ? <div className="h-full bg-gradient-to-l from-brand via-magic to-grow rounded-full transition-all duration-500"
+                  style={{ width: `${Math.min(97, (streamChars / (pageCount * 3200)) * 100)}%` }} />
+              : <div className="h-full bg-gradient-to-l from-brand via-magic to-grow rounded-full animate-shimmer" />}
+          </div>
+          <div className="flex justify-between text-xs text-ink/35">
+            <span>{streamChars > 0 ? `${streamChars.toLocaleString("he-IL")} תווים` : `${pageCount} עמודי A4`}</span>
+            <span>⏱ {loadingElapsed}s</span>
+          </div>
+          <p className="text-center text-[11px] text-ink/50 leading-relaxed">
+            💡 חומרים עם מקורות מדויקים מהמפמ"ר לוקחים קצת יותר זמן — שווה את ההמתנה
+          </p>
+        </div>
+      )}
+
+      {/* Speed vs depth toggle — hidden mid-generation (choice already locked in) */}
+      {!loading && (
       <button
         type="button"
         onClick={() => setFastMode(v => !v)}
@@ -667,6 +693,7 @@ export default function JewishCreate({ onSaved, remaining, isPro, bookletCount =
           {fastMode ? "מהיר" : "מלא"}
         </span>
       </button>
+      )}
 
       {/* Generate button */}
       <button
@@ -680,9 +707,8 @@ export default function JewishCreate({ onSaved, remaining, isPro, bookletCount =
       >
         {loading ? (
           <span className="flex items-center justify-center gap-2">
-            <span className="inline-block w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-            {LOADING_MSGS[loadingMsgIdx]}
-            {streamChars > 100 && <span className="text-white/60 text-xs">({streamChars.toLocaleString()} תווים)</span>}
+            <span className="inline-block w-4 h-4 border-2 border-ink/20 border-t-magic rounded-full animate-spin" />
+            יוצר...
           </span>
         ) : (
           `✨ צור ${OUTPUT_TYPES.find(o => o.id === outputType)?.label ?? "חומר"}`
@@ -695,12 +721,6 @@ export default function JewishCreate({ onSaved, remaining, isPro, bookletCount =
             : !grade ? "👆 בחר/י כיתה כדי להמשיך"
             : effectiveTopic.length <= 2 ? "👆 בחר/י נושא (או כתוב/כתבי נושא חופשי) כדי ליצור"
             : ""}
-        </p>
-      )}
-
-      {loading && loadingElapsed > 10 && (
-        <p className="text-center text-xs text-ink/35">
-          יוצר חומרי יהדות איכותיים... {loadingElapsed}s{loadingElapsed > 30 ? " — חומרים עם מקורות לוקחים קצת יותר זמן" : ""}
         </p>
       )}
     </div>
