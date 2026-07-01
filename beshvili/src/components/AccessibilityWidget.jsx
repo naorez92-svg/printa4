@@ -80,7 +80,7 @@ export default function AccessibilityWidget() {
         onClick={() => setOpen((o) => !o)}
         aria-label="אפשרויות נגישות"
         aria-expanded={open}
-        className="fixed bottom-6 right-4 z-[60] w-12 h-12 rounded-full bg-ink text-white shadow-lg flex items-center justify-center text-2xl hover:scale-105 transition-transform focus:outline-none focus-visible:ring-2 focus-visible:ring-magic"
+        className="fixed bottom-20 right-4 lg:bottom-6 z-[60] w-12 h-12 rounded-full bg-ink text-white shadow-lg flex items-center justify-center text-2xl hover:scale-105 transition-transform focus:outline-none focus-visible:ring-2 focus-visible:ring-magic"
         style={{ fontSize: "1.5rem" }}
       >
         ♿
@@ -91,7 +91,7 @@ export default function AccessibilityWidget() {
           ref={panelRef}
           role="dialog"
           aria-label="תפריט נגישות"
-          className="fixed bottom-24 right-4 z-[60] w-72 max-w-[calc(100vw-2rem)] bg-canvas rounded-2xl shadow-2xl border border-ink/10 p-4 space-y-2"
+          className="fixed bottom-36 right-4 lg:bottom-24 z-[60] w-72 max-w-[calc(100vw-2rem)] bg-canvas rounded-2xl shadow-2xl border border-ink/10 p-4 space-y-2"
         >
           <div className="flex items-center justify-between mb-1">
             <h2 className="font-bold text-ink text-sm">♿ נגישות</h2>
