@@ -165,10 +165,15 @@ Deno.serve(async (req) => {
     }
 
     const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString();
-    const [{ data: profile }, { count: monthlyCount }] = await Promise.all([
+    const [profileResult, { count: monthlyCount }] = await Promise.all([
       admin.from("profiles").select("plan, total_booklets_created").eq("id", user.id).single(),
       admin.from("booklets").select("*", { count: "exact", head: true }).eq("user_id", user.id).gte("created_at", startOfMonth),
     ]);
+    // PGRST116 = no row found (new user) — treat as free. Any other error = 503.
+    if (profileResult.error && profileResult.error.code !== "PGRST116") {
+      return new Response(JSON.stringify({ error: "internal_error" }), { status: 503, headers: cors });
+    }
+    const profile = profileResult.data;
 
     const plan      = profile?.plan ?? "free";
     const isAdmin   = plan === "admin";
@@ -233,9 +238,11 @@ Deno.serve(async (req) => {
     const rawOutputType = clean(body.outputType, 50);
 
     if (!VALID_SUBJECTS.includes(rawSubject)) {
+      await releaseLock();
       return new Response(JSON.stringify({ error: "invalid_subject" }), { status: 400, headers: cors });
     }
     if (!VALID_OUTPUT_TYPES.includes(rawOutputType)) {
+      await releaseLock();
       return new Response(JSON.stringify({ error: "invalid_output_type" }), { status: 400, headers: cors });
     }
 
@@ -255,6 +262,7 @@ Deno.serve(async (req) => {
     const effPages = noStream ? Math.min(pageCount, 3) : pageCount;
 
     if (!topic) {
+      await releaseLock();
       return new Response(JSON.stringify({ error: "topic required" }), { status: 400, headers: cors });
     }
 
@@ -424,11 +432,17 @@ ${notes ? `הוראות נוספות מהמורה: ${esc(notes)}` : ""}
         if (!anthropicResp) { releaseLock(); clearInterval(hb); await w.close(); return; }
 
         const reader = anthropicResp.body!.getReader();
+        const streamDecoder = new TextDecoder();
+        let receivedMessageStop = false;
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
+          if (value && streamDecoder.decode(value, { stream: true }).includes('"message_stop"')) {
+            receivedMessageStop = true;
+          }
           await w.write(value);
         }
+        if (!receivedMessageStop) releaseLock(); // client disconnected mid-gen
         clearInterval(hb);
         await w.close();
       } catch (e) {
