@@ -8,7 +8,7 @@
 
 const UA = typeof navigator !== "undefined" ? navigator.userAgent || "" : "";
 
-export const IS_INAPP = /FBAN|FBAV|Instagram|Line\/|WhatsApp|MicroMessenger|Snapchat|Pinterest|TikTok|musical_ly|; wv\)/i.test(UA);
+export const IS_INAPP = /FBAN|FBAV|FBIOS|FB_IAB|Instagram|Line\/|WhatsApp|MicroMessenger|Snapchat|Pinterest|TikTok|musical_ly|Twitter|Threads|GSA\/|; wv\)/i.test(UA);
 export const IS_ANDROID = /Android/i.test(UA);
 
 // Open `url` in the device's real browser, escaping the in-app webview.

@@ -7,6 +7,7 @@ import UpgradeModal from "./UpgradeModal";
 import { FREE_LIMIT } from "../hooks/useProfile";
 import { useChildren } from "../hooks/useChildren";
 import { track } from "../hooks/useEvents";
+import { IS_INAPP } from "../lib/inapp";
 
 const WORLDS = [
   "כדורגל", "כדורסל", "גיימינג", "מינקראפט", "פוקימון",
@@ -164,7 +165,7 @@ export default function Create({ onSaved, remaining, isPro, active = true, bookl
     return () => clearTimeout(t);
   }, [rateCountdown]);
 
-  const canSubmit = !loading && (
+  const canSubmit = !loading && !rateCountdown && (
     mode === "free"  ? freeText.trim().length > 5 :
     mode === "quick" ? f.goal.trim().length > 2 :
     mode === "exam"  ? (examSubject.trim().length > 0 && examTopic.trim().length > 1) :
@@ -193,7 +194,7 @@ export default function Create({ onSaved, remaining, isPro, active = true, bookl
     // their fetch fails as "network". Detect them and request a single non-stream
     // JSON response instead, so generation works without leaving the in-app browser.
     const ua = navigator.userAgent || "";
-    const inApp = /FBAN|FBAV|Instagram|Line\/|WhatsApp|MicroMessenger|Snapchat|Pinterest|TikTok|musical_ly|; wv\)/i.test(ua);
+    const inApp = IS_INAPP;
     const useNoStream = inApp;
 
     const body = mode === "free"
@@ -243,8 +244,9 @@ export default function Create({ onSaved, remaining, isPro, active = true, bookl
         conn: navigator.connection?.effectiveType || null,
         ua: ua.slice(0, 180),
       };
-      // Auto-retry once for a genuinely transient blip (keep the spinner up).
-      if (netRetryRef.current < 1) {
+      // Auto-retry once for a genuinely transient blip, but not in-app browsers
+      // (their SSE failure is structural, not transient — retrying loops forever).
+      if (netRetryRef.current < 1 && !inApp) {
         netRetryRef.current++;
         trackError("network_retrying", diag);
         retryTimerRef.current = setTimeout(() => createRef.current?.(), 2000);
@@ -311,14 +313,25 @@ export default function Create({ onSaved, remaining, isPro, active = true, bookl
 
     if (useNoStream) {
       // In-app browser path: the server returns the whole booklet in one JSON.
+      // Guard against the platform wall-clock limit (130s server-side) — abort
+      // at 125s on the client so we can show a meaningful error instead of hanging.
+      let noStreamTimedOut = false;
+      const noStreamTimeoutId = setTimeout(() => { noStreamTimedOut = true; ctrl.abort(); }, 125_000);
       try {
         const j = await resp.json();
+        clearTimeout(noStreamTimeoutId);
         htmlAccumulated = j?.html ?? "";
         if (j?.capped) setCappedPages(j.pages ?? 3); // FB cap shortened the booklet
       } catch (e) {
+        clearTimeout(noStreamTimeoutId);
         wakeLock?.release().catch(() => {});
-        if (ctrl.signal.aborted) { creatingRef.current = false; return; }
+        if (ctrl.signal.aborted && !noStreamTimedOut) { creatingRef.current = false; return; } // unmounted
         setLoading(false); creatingRef.current = false;
+        if (noStreamTimedOut) {
+          trackError("nostream_timeout", { pages: pageCount });
+          setError("generic:הייצור ארוך מדי — נסי עם פחות עמודים, או פתחי בדפדפן רגיל (הכפתור למעלה) 🙏");
+          return;
+        }
         trackError("nostream_parse_failed", { msg: String(e).slice(0, 120) });
         setError("generic:לא הצלחנו לקבל את החוברת — נסי שוב 🙏");
         return;
@@ -397,13 +410,16 @@ export default function Create({ onSaved, remaining, isPro, active = true, bookl
         streamAborted = true;
         // Fall through to save the partial booklet below
       } else if (retryCountRef.current < 1) {
-        // Auto-retry once — keep spinner visible, reset progress, retry after 2s
+        // Auto-retry once after a dropped stream. Clear loading so canSubmit becomes
+        // true when the setTimeout fires — without this, create() exits immediately
+        // because !loading is false and the spinner freezes forever.
         retryCountRef.current++;
         trackError("stream_dropped_retrying");
         setStreamChars(0);
         setLoadingElapsed(0);
         setLoadingMsgIdx(0);
         creatingRef.current = false;
+        setLoading(false);
         retryTimerRef.current = setTimeout(() => createRef.current?.(), 2000);
         return;
       } else {
@@ -463,6 +479,14 @@ export default function Create({ onSaved, remaining, isPro, active = true, bookl
       if (attempt === 0) await new Promise((r) => setTimeout(r, 1200));
     }
     if (insertErr) {
+      // DB trigger enforce_booklet_quota fires AFTER the Edge Function quota check
+      // passes (race window). Surface it as the real paywall instead of a save-failure
+      // warning, which would confuse the user ("I thought I had quota?").
+      if (insertErr.message?.includes("quota_exceeded")) {
+        trackError("quota_exceeded_db");
+        setError("quota");
+        return;
+      }
       // A save failure must NOT discard a ~90s generation — show the booklet so the
       // user can still print / download it, and stash it locally as a recovery
       // buffer so closing the tab doesn't lose it entirely.

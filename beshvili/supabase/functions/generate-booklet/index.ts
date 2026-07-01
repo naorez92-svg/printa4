@@ -385,10 +385,17 @@ Deno.serve(async (req) => {
     // ── 2. Plan check + quota (server-enforced, cannot be bypassed) ───────────
     // usedTotal = lifetime booklets ever created (not current rows) — immune to deletion gaming
     const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString();
-    const [{ data: profile }, { count: monthlyCount }] = await Promise.all([
+    const [profileResult, { count: monthlyCount }] = await Promise.all([
       admin.from("profiles").select("plan, total_booklets_created, teacher_display_name, teacher_tagline, teacher_phone, teacher_logo_url, teacher_color").eq("id", user.id).single(),
       admin.from("booklets").select("*", { count: "exact", head: true }).eq("user_id", user.id).gte("created_at", startOfMonth),
     ]);
+    // PGRST116 = "no rows found" — a new user who hasn't been profiled yet; treat as free.
+    // Any other DB error is a real infrastructure problem — return 503 to avoid silently
+    // treating a failed read as a free user (quota bypass).
+    if (profileResult.error && profileResult.error.code !== "PGRST116") {
+      return new Response(JSON.stringify({ error: "internal_error" }), { status: 503, headers: cors });
+    }
+    const profile = profileResult.data;
 
     const plan = profile?.plan ?? "free";
     const isAdmin   = plan === "admin";
@@ -491,6 +498,7 @@ Deno.serve(async (req) => {
     const safeTeacherLogo = ((profile?.teacher_logo_url ?? "").startsWith(teacherLogoPrefix)) ? (profile?.teacher_logo_url ?? "") : "";
 
     if (examMode ? (!examSubject && !examTopic) : (!freeText && !goal)) {
+      await releaseLock();
       return new Response(JSON.stringify({ error: "goal required" }), { status: 400, headers: cors });
     }
 
@@ -691,11 +699,20 @@ Deno.serve(async (req) => {
         if (!anthropicResp) { releaseLock(); clearInterval(hb); await w.close(); return; }
 
         const reader = anthropicResp.body!.getReader();
+        const streamDecoder = new TextDecoder();
+        let receivedMessageStop = false;
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
+          // Scan for terminal event — if stream ends without it the client
+          // disconnected mid-generation; release the lock so the next attempt
+          // isn't rejected with a 60s rate-limit lockout.
+          if (value && streamDecoder.decode(value, { stream: true }).includes('"message_stop"')) {
+            receivedMessageStop = true;
+          }
           await w.write(value);
         }
+        if (!receivedMessageStop) releaseLock(); // client disconnected mid-gen
         clearInterval(hb);
         await w.close();
       } catch (e) {

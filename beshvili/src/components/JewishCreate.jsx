@@ -3,6 +3,7 @@ import { supabase } from "../lib/supabase";
 import { sanitizeBookletHtml } from "../lib/sanitize";
 import Preview from "./Preview";
 import { track } from "../hooks/useEvents";
+import { IS_INAPP } from "../lib/inapp";
 
 // ── Curriculum map (מפמ"ר) ───────────────────────────────────────────────────
 const CURRICULUM = {
@@ -220,7 +221,7 @@ export default function JewishCreate({ onSaved, remaining, isPro, bookletCount =
 
     // In-app browsers (Facebook/Instagram webview) can't read SSE — request a
     // single non-stream JSON response so generation works inside the in-app browser.
-    const useNoStream = /FBAN|FBAV|Instagram|Line\/|WhatsApp|MicroMessenger|Snapchat|Pinterest|TikTok|musical_ly|; wv\)/i.test(navigator.userAgent || "");
+    const useNoStream = IS_INAPP;
     const fnUrl = `${import.meta.env.VITE_SUPABASE_URL ?? "https://gywpdzkvkdisonuzhsib.supabase.co"}/functions/v1/generate-jewish`;
     let resp;
     try {
@@ -238,10 +239,9 @@ export default function JewishCreate({ onSaved, remaining, isPro, bookletCount =
       setLoading(false);
       creatingRef.current = false;
       if (ctrl.signal.aborted) return;
-      const inApp = /FBAN|FBAV|Instagram|Line\/|WhatsApp|MicroMessenger|; wv\)/i.test(navigator.userAgent || "");
       // Instrument: capture network failures so the admin panel shows what broke.
-      track("jewish_error", { kind: "network", inapp: inApp, noStream: useNoStream, msg: String(e?.message ?? e).slice(0, 120) });
-      setError(inApp
+      track("jewish_error", { kind: "network", inapp: IS_INAPP, noStream: useNoStream, msg: String(e?.message ?? e).slice(0, 120) });
+      setError(IS_INAPP
         ? "generic:כדי ליצור חומר, פתחי את הדף בדפדפן רגיל (Chrome/Safari) — לא מתוך אפליקציה כמו וואטסאפ/אינסטגרם 🙏"
         : `generic:שגיאת רשת — בדקי את החיבור ונסי שוב`);
       return;
@@ -347,9 +347,12 @@ export default function JewishCreate({ onSaved, remaining, isPro, bookletCount =
         if (!partial.includes("</html>")) htmlAccumulated = partial + "\n</body></html>";
         streamAborted = true;
       } else if (retryCountRef.current < 1) {
+        // Clear loading so canSubmit=true when the retry fires (otherwise the
+        // retry's create() exits immediately and the spinner freezes forever).
         retryCountRef.current++;
         setStreamChars(0); setLoadingElapsed(0); setLoadingMsgIdx(0);
         creatingRef.current = false;
+        setLoading(false);
         retryTimerRef.current = setTimeout(() => createRef.current?.(), 2000);
         return;
       } else {
