@@ -249,7 +249,7 @@ export default function Dashboard() {
             <Create active={tab === "create"} onSaved={() => refresh()} remaining={remaining} isPro={isPro} bookletCount={bookletCount} onUpgrade={() => setShowUpgrade(true)}
               pendingStarter={pendingStarter} onStarterConsumed={() => setPendingStarter(null)} />
           </div>
-          {tab === "history" && <History isPro={isPro} onUpgrade={() => setShowUpgrade(true)} />}
+          {tab === "history" && <History isPro={isPro} onUpgrade={() => setShowUpgrade(true)} onCreateNew={() => setTab("create")} />}
           <Suspense fallback={<div className="py-12 text-center text-ink/40 text-sm">טוען…</div>}>
             {tab === "jewish" && <JewishCreate onSaved={() => refresh()} remaining={remaining} isPro={isPro} bookletCount={bookletCount} onUpgrade={() => setShowUpgrade(true)} />}
             {tab === "students" && <Students onBookletSaved={() => { refresh(); setTab("history"); }} remaining={remaining} isPro={isPro} bookletCount={bookletCount} />}

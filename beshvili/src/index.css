@@ -55,3 +55,25 @@ h1, h2, h3 {
   animation: fade-up 0.32s ease forwards;
   opacity: 0;
 }
+
+/* Reduced motion (WCAG 2.3.3 / IS 5568). Two triggers, one effect:
+   the OS-level `prefers-reduced-motion: reduce` setting, and the manual
+   "הפחתת אנימציות" toggle in the accessibility widget (adds .a11y-reduce-motion
+   to #root). Both collapse every animation/transition to ~instant. `forwards`
+   fill states still apply, so a faded-in card lands on opacity:1 (visible) rather
+   than getting stuck at its opacity:0 start — motion is removed, content is not. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+#root.a11y-reduce-motion *,
+#root.a11y-reduce-motion *::before,
+#root.a11y-reduce-motion *::after {
+  animation-duration: 0.001ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.001ms !important;
+}
