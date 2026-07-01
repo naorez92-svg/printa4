@@ -561,7 +561,7 @@ Deno.serve(async (req) => {
 
     // ── 6. Generate (streaming — client receives SSE, sees HTML in real time) ──
     //
-    // Model: claude-sonnet-4-6, thinking DISABLED.
+    // Model: claude-opus-4-8, thinking DISABLED.
     // Root-cause of persistent "לא התקבל HTML תקין" errors: adaptive thinking consumed
     // the ENTIRE token budget (20-33K tokens) on reasoning before generating any HTML,
     // leaving htmlAccumulated empty on the client. For structured HTML generation with
@@ -595,7 +595,7 @@ Deno.serve(async (req) => {
             signal: AbortSignal.timeout(130_000),
             headers: { "content-type": "application/json", "x-api-key": apiKey, "anthropic-version": "2023-06-01", "anthropic-beta": "prompt-caching-2024-07-31" },
             body: JSON.stringify({
-              model: "claude-sonnet-4-6",
+              model: "claude-opus-4-8",
               max_tokens: maxTokens,
               system: [{ type: "text", text: activeSystem, cache_control: { type: "ephemeral" } }],
               messages: [{ role: "user", content: activeUserMsg }],
@@ -649,7 +649,7 @@ Deno.serve(async (req) => {
     (async () => {
       try {
         const ANTHROPIC_BODY = JSON.stringify({
-          model: "claude-sonnet-4-6",
+          model: "claude-opus-4-8",
           max_tokens: maxTokens,
           stream: true,
           system: [{ type: "text", text: activeSystem, cache_control: { type: "ephemeral" } }],

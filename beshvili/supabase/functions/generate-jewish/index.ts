@@ -339,7 +339,7 @@ ${notes ? `הוראות נוספות מהמורה: ${esc(notes)}` : ""}
             signal: AbortSignal.timeout(130_000),
             headers: { "content-type": "application/json", "x-api-key": apiKey, "anthropic-version": "2023-06-01", "anthropic-beta": "prompt-caching-2024-07-31" },
             body: JSON.stringify({
-              model: "claude-sonnet-4-6",
+              model: "claude-opus-4-8",
               max_tokens: maxTokens,
               system: [{ type: "text", text: JEWISH_SYSTEM, cache_control: { type: "ephemeral" } }],
               messages: [{ role: "user", content: userMsg }],
@@ -385,7 +385,7 @@ ${notes ? `הוראות נוספות מהמורה: ${esc(notes)}` : ""}
     (async () => {
       try {
         const ANTHROPIC_BODY = JSON.stringify({
-          model: "claude-sonnet-4-6",
+          model: "claude-opus-4-8",
           max_tokens: maxTokens,
           stream: true,
           system: [{ type: "text", text: JEWISH_SYSTEM, cache_control: { type: "ephemeral" } }],
