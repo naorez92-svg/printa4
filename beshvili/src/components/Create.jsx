@@ -62,7 +62,7 @@ const GOAL_PICKS = [
   { icon: "🔡", label: "קריאה בניקוד",     goal: "קריאה בניקוד: פענוח, הבנת המילה, קריאת משפטים" },
   { icon: "🔢", label: "חיבור וחיסור",     goal: "חיבור וחיסור: אלגוריתמים, מעבר עשרת, בעיות" },
 ];
-const EMPTY = { childName: "", grade: "", world: "כדורגל", goal: "", level: "medium" };
+const EMPTY = { childName: "", grade: "", world: "כדורגל", goal: "", level: "medium", weaknesses: "" };
 const PAGE_OPTIONS = [2, 5, 7, 10];
 const LOADING_MSGS = [
   "מכינה את החוברת... ✍️",
@@ -152,10 +152,14 @@ export default function Create({ onSaved, remaining, isPro, active = true, bookl
     if (!pendingStarter) return;
     setF(p => ({
       ...p,
+      childName: pendingStarter.childName ?? p.childName,
       grade: pendingStarter.grade ?? p.grade,
       world: pendingStarter.world ?? p.world,
       goal:  pendingStarter.goal  ?? p.goal,
       level: pendingStarter.level ?? p.level,
+      // Corrective booklet: results reported via the printed QR become a
+      // targeted-practice hint the server prompt already knows how to use.
+      weaknesses: pendingStarter.weaknesses ?? p.weaknesses ?? "",
     }));
     if (pendingStarter.mode) { setMode(pendingStarter.mode); try { localStorage.setItem("beshvili_mode", pendingStarter.mode); } catch {} }
     onStarterConsumed?.();
@@ -1020,6 +1024,16 @@ export default function Create({ onSaved, remaining, isPro, active = true, bookl
               )}
             </div>
             <div>
+              {f.weaknesses && (
+                <div className="flex items-start gap-2 bg-magic/8 border border-magic/25 rounded-xl px-3 py-2 mb-2">
+                  <span className="text-base leading-none mt-0.5">🎯</span>
+                  <p className="flex-1 text-xs text-magic font-medium leading-relaxed">
+                    חוברת תיקון — תתמקד ב: <span className="font-semibold">{f.weaknesses}</span>
+                  </p>
+                  <button type="button" onClick={() => setF(p => ({ ...p, weaknesses: "" }))} aria-label="בטל מיקוד"
+                    className="text-magic/50 hover:text-magic text-lg leading-none flex-shrink-0">×</button>
+                </div>
+              )}
               <textarea id="inp-goal" className="w-full border border-ink/20 rounded-xl p-3 outline-none focus:border-magic text-right resize-none bg-canvas/50" placeholder="מה לתרגל? * — למשל: חיבור וחיסור עד 100, הבנת הנקרא..." rows={2} value={f.goal} onChange={set("goal")} disabled={loading} />
               <div className="flex flex-wrap gap-1.5 mt-2">
                 {GOAL_PICKS.map(({ icon, label, goal }) => (

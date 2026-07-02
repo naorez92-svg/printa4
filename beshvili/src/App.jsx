@@ -11,9 +11,12 @@ import { track, pageView, identify } from "./hooks/useEvents";
 const Login = lazy(() => import("./pages/Login"));
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const PublicBooklet = lazy(() => import("./pages/PublicBooklet"));
+const BookletFeedback = lazy(() => import("./pages/BookletFeedback"));
 
 // /b/:token — public booklet share page (no auth needed)
 const shareMatch = window.location.pathname.match(/^\/b\/([0-9a-f-]{36})$/i);
+// /f/:token — printed-booklet feedback form, reached via the QR on the page
+const feedbackMatch = window.location.pathname.match(/^\/f\/([0-9a-f-]{36})$/i);
 
 // Full-screen loading spinner — reused for the session check AND the lazy-chunk
 // fetch so there's no second, differently-styled flash between the two.
@@ -108,6 +111,10 @@ export default function App() {
       {shareMatch ? (
         <Suspense fallback={PageSpinner}>
           <PublicBooklet token={shareMatch[1]} />
+        </Suspense>
+      ) : feedbackMatch ? (
+        <Suspense fallback={PageSpinner}>
+          <BookletFeedback token={feedbackMatch[1]} />
         </Suspense>
       ) : (
         <AuthApp />
