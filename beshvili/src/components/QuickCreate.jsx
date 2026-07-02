@@ -72,7 +72,10 @@ export default function QuickCreate({ student, onClose, onSaved, remaining, isPr
   // Abort any in-flight SSE stream on unmount
   useEffect(() => () => streamAbortRef.current?.abort(), []);
 
-  const canSubmit = !loading && subject.length > 0;
+  // Gate at render time — a free user with 0 remaining shouldn't fill the whole
+  // form only to get the server's quota error after a round-trip.
+  const quotaExhausted = !isPro && typeof remaining === "number" && remaining <= 0;
+  const canSubmit = !loading && subject.length > 0 && !quotaExhausted;
 
   const create = useCallback(async () => {
     if (!canSubmit || creatingRef.current) return;
@@ -108,7 +111,7 @@ export default function QuickCreate({ student, onClose, onSaved, remaining, isPr
       return;
     }
 
-    const fnUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-booklet`;
+    const fnUrl = `${import.meta.env.VITE_SUPABASE_URL ?? "https://gywpdzkvkdisonuzhsib.supabase.co"}/functions/v1/generate-booklet`;
     const ctrl = new AbortController();
     streamAbortRef.current = ctrl;
     let resp;
@@ -127,8 +130,8 @@ export default function QuickCreate({ student, onClose, onSaved, remaining, isPr
       setLoading(false);
       creatingRef.current = false;
       if (ctrl.signal.aborted) return;
-      trackError("network");
-      setError(`שגיאת רשת — ${String(e)}`);
+      trackError("network", { message: String(e?.message ?? e).slice(0, 120) });
+      setError("בעיית תקשורת — בדקי את החיבור לאינטרנט ונסי שוב 🙏");
       return;
     }
 
@@ -156,6 +159,8 @@ export default function QuickCreate({ student, onClose, onSaved, remaining, isPr
     let htmlAccumulated = "";
     let streamHadError = false;
     let streamErrorMsg = null;
+    let stopReason = null;
+    let streamAborted = false;
 
     if (IS_INAPP) {
       // In-app browser (WhatsApp/Instagram) can't read SSE — the server returns the
@@ -205,6 +210,8 @@ export default function QuickCreate({ student, onClose, onSaved, remaining, isPr
                 htmlAccumulated += ev.delta.text;
                 const now = Date.now();
                 if (now - updateTimer > 100) { setStreamChars(htmlAccumulated.length); updateTimer = now; }
+              } else if (ev.type === "message_delta" && ev.delta?.stop_reason) {
+                stopReason = ev.delta.stop_reason;
               } else if (ev.type === "error") {
                 streamHadError = true;
                 streamErrorMsg = ev.error?.type === "overloaded_error"
@@ -220,9 +227,13 @@ export default function QuickCreate({ student, onClose, onSaved, remaining, isPr
         }
       } catch {
         if (ctrl.signal.aborted) { creatingRef.current = false; return; } // unmounted/closed mid-stream
+        // Kill the zombie connection — otherwise the server-side generation keeps
+        // running (double API cost) and contends with the per-user rate limit.
+        ctrl.abort();
         const partial = htmlAccumulated.trim();
         if (partial.length > 8000 && (partial.includes("<!DOCTYPE") || partial.includes("<html"))) {
           if (!partial.includes("</html>")) htmlAccumulated = partial + "\n</body></html>";
+          streamAborted = true;
           // Fall through to save the partial booklet
         } else {
           setLoading(false);
@@ -242,6 +253,13 @@ export default function QuickCreate({ student, onClose, onSaved, remaining, isPr
       return;
     }
 
+    // Token-budget truncation ends the stream "normally" but the booklet is
+    // incomplete — close the tags and mark it partial like a dropped stream.
+    if (stopReason === "max_tokens") {
+      streamAborted = true;
+      if (!htmlAccumulated.includes("</html>")) htmlAccumulated = htmlAccumulated.trim() + "\n</body></html>";
+    }
+
     setLoading(false);
     creatingRef.current = false;
     const rawHtml = htmlAccumulated.trim();
@@ -257,7 +275,7 @@ export default function QuickCreate({ student, onClose, onSaved, remaining, isPr
     const { data: inserted, error: insertErr } = await supabase.from("booklets").insert({
       user_id: userId,
       child_id: student.id,
-      title: `${student.name} — ${goal}`,
+      title: `${student.name} — ${goal}${streamAborted ? " (חלקי)" : ""}`,
       child_name: student.name,
       grade: student.grade,
       world,
@@ -277,6 +295,7 @@ export default function QuickCreate({ student, onClose, onSaved, remaining, isPr
 
     setBookletId(inserted?.id ?? null);
     setShareToken(inserted?.share_token ?? null);
+    if (streamAborted) setSaveWarning(true);
     setShowRating(true);
     setHtml(finalHtml);
     track("booklet_completed", { booklet_id: inserted?.id, pages: pageCount, mode: "student_quick", child_id: student?.id, booklet_index: bookletCount + 1 });
@@ -413,10 +432,10 @@ export default function QuickCreate({ student, onClose, onSaved, remaining, isPr
             ⏳ יש להמתין עוד {rateCountdown} שניות לפני יצירה נוספת
           </div>
         )}
-        {error && error !== "quota" && !rateCountdown && (
+        {error && error !== "quota" && error !== "quota_monthly" && !rateCountdown && (
           <div role="alert" className="bg-red-50 border border-red-200 rounded-xl p-3 text-red-600 text-sm">{error.replace(/^generic:/, "")}</div>
         )}
-        {error === "quota" && (
+        {(error === "quota" || (quotaExhausted && !error)) && (
           <div className="space-y-3">
             <p className="text-ink/60 text-sm text-center">ניצלת את {FREE_LIMIT} החוברות החינמיות</p>
             <button
@@ -465,7 +484,7 @@ export default function QuickCreate({ student, onClose, onSaved, remaining, isPr
         )}
 
         {/* Submit */}
-        {!loading && error !== "quota" && (
+        {!loading && error !== "quota" && !quotaExhausted && (
           <button
             onClick={create}
             disabled={!canSubmit}

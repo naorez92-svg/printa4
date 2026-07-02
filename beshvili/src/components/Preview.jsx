@@ -195,7 +195,9 @@ export default function Preview({ html, onReset, shareToken, title, active = tru
 
   useEffect(() => {
     if (!active) return;
-    const h = (e) => { if ((e.ctrlKey || e.metaKey) && e.key === "p") { e.preventDefault(); handlePrint(); } };
+    // defaultPrevented guard: History mounts a Preview per expanded row — without
+    // this, Ctrl+P fires handlePrint() on every mounted Preview at once.
+    const h = (e) => { if ((e.ctrlKey || e.metaKey) && e.key === "p" && !e.defaultPrevented) { e.preventDefault(); handlePrint(); } };
     window.addEventListener("keydown", h);
     return () => window.removeEventListener("keydown", h);
   }, [html, active, handlePrint]);
@@ -251,7 +253,11 @@ export default function Preview({ html, onReset, shareToken, title, active = tru
 
   const shareWhatsApp = () => {
     track("booklet_shared_whatsapp", { context, has_share_token: !!shareToken });
-    markPublic();
+    // Fire inside the click gesture (popup-safe), but warn if the publish failed —
+    // otherwise every recipient of the WhatsApp link gets a 404.
+    markPublic().then((pubErr) => {
+      if (pubErr) alert("הקישור ששיתפת עדיין לא פעיל — נסי לשתף שוב 🙏");
+    });
     const link = shareToken
       ? `${window.location.origin}/b/${shareToken}`
       : window.location.origin;
@@ -262,7 +268,9 @@ export default function Preview({ html, onReset, shareToken, title, active = tru
       `${link}\n\n` +
       `אפשר ליצור חוברת מותאמת אישית לכל ילד — חינם, תוך דקה 🎯`
     );
-    window.open("https://wa.me/?text=" + msg, "_blank");
+    // In-app browsers return null from window.open — fall back to same-tab nav.
+    const w = window.open("https://wa.me/?text=" + msg, "_blank");
+    if (!w) location.href = "https://wa.me/?text=" + msg;
   };
 
   const copyShareLink = useCallback(async () => {

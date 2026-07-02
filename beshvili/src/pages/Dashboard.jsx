@@ -64,7 +64,9 @@ export default function Dashboard() {
   useEffect(() => {
     if (loading) return;
     if (prevBookletCountRef.current === null) { prevBookletCountRef.current = bookletCount; return; }
-    if (!isPro && bookletCount > prevBookletCountRef.current && remaining === 1) {
+    // remaining <= 1 also fires when the LAST free booklet is consumed — the
+    // conversion peak; previously that moment showed the survey instead of the offer.
+    if (!isPro && bookletCount > prevBookletCountRef.current && remaining <= 1) {
       prevBookletCountRef.current = bookletCount;
       const t = setTimeout(() => setShowUpgrade(true), 1800);
       return () => clearTimeout(t);
@@ -75,10 +77,11 @@ export default function Dashboard() {
   // Show survey after 2nd booklet — once per user, 2s delay so the happy moment isn't interrupted
   useEffect(() => {
     if (loading || bookletCount < 2) return;
+    if (showUpgrade) return; // don't stack the survey on top of the upgrade offer
     try { if (localStorage.getItem("survey_use_case_done")) return; } catch {}
     const t = setTimeout(() => setShowSurvey(true), 2000);
     return () => clearTimeout(t);
-  }, [bookletCount, loading]);
+  }, [bookletCount, loading, showUpgrade]);
 
   const tabs = [
     ...NAV,

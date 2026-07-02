@@ -78,13 +78,16 @@ Deno.serve(async (req) => {
       .eq("user_id", user.id).gte("created_at", fiveMinAgo);
 
     // 1. Persist the lead server-side (immune to client RLS silent-failure).
-    //    supabase-js returns { error } instead of throwing, so check it explicitly.
-    const { error: insertErr } = await admin.from("leads").insert({
-      user_id: user.id,
-      name:    name || null,
-      phone,
-    });
-    if (insertErr) console.error("notify-lead insert error:", insertErr.message);
+    //    Cap at 3 rows per 5 minutes: a genuine correction (fixed phone number,
+    //    switched plan) still lands, but unbounded flooding doesn't.
+    if ((recentLeadCount ?? 0) < 3) {
+      const { error: insertErr } = await admin.from("leads").insert({
+        user_id: user.id,
+        name:    name || null,
+        phone,
+      });
+      if (insertErr) console.error("notify-lead insert error:", insertErr.message);
+    }
 
     // 2. Email the owner immediately (unless rate-limited).
     const resendKey = Deno.env.get("RESEND_API_KEY");

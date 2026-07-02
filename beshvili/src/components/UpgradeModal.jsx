@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { supabase } from "../lib/supabase";
 import { track } from "../hooks/useEvents";
 
@@ -64,6 +64,7 @@ export default function UpgradeModal({ onClose, bookletCount = 0, source = "unkn
   const [sent, setSent]   = useState(false);
   const [secondsLeft, setSecondsLeft] = useState(getSecondsLeft);
   const [lockedPrice, setLockedPrice] = useState(null);
+  const dialogRef = useRef(null);
 
   const plan = PLANS.find(p => p.id === selectedPlan);
   const saleActive = secondsLeft > 0;
@@ -85,6 +86,35 @@ export default function UpgradeModal({ onClose, bookletCount = 0, source = "unkn
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
+
+  // Trap focus inside the dialog: keyboard/screen-reader users otherwise Tab
+  // into the page behind the overlay and never reach the payment buttons.
+  useEffect(() => {
+    const opener = document.activeElement;
+    dialogRef.current?.focus();
+    const onTab = (e) => {
+      if (e.key !== "Tab" || !dialogRef.current) return;
+      const focusables = dialogRef.current.querySelectorAll(
+        'button, a[href], input, [tabindex]:not([tabindex="-1"])'
+      );
+      if (!focusables.length) return;
+      const first = focusables[0], last = focusables[focusables.length - 1];
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    };
+    window.addEventListener("keydown", onTab);
+    return () => {
+      window.removeEventListener("keydown", onTab);
+      opener?.focus?.();
+    };
+  }, []);
+
+  // In-app browsers (Instagram/Facebook webview) return null from window.open —
+  // fall back to same-tab navigation so the payment funnel never dies silently.
+  const openWhatsApp = (url) => {
+    const w = window.open(url, "_blank");
+    if (!w) location.href = url;
+  };
 
   const saveLead = (method) => {
     track("upgrade_cta_clicked", { method, plan: plan.id, price: effectivePrice, sale_active: saleActive, source, bookletCount });
@@ -109,10 +139,10 @@ export default function UpgradeModal({ onClose, bookletCount = 0, source = "unkn
     const msg = encodeURIComponent(
       `שלום! אני רוצה לשדרג לתוכנית ${planLabel} בבשבילי ${plan.icon}\nשלחתי ${effectivePrice} ₪ בביט${saleNote}${name.trim() ? `\nשם: ${name.trim()}` : ""}`
     );
-    window.open(`https://wa.me/${WA}?text=${msg}`, "_blank");
     setLockedPrice(effectivePrice);
     saveLead("bit");
     setSent(true);
+    openWhatsApp(`https://wa.me/${WA}?text=${msg}`);
   };
 
   const sendWhatsApp = () => {
@@ -120,10 +150,10 @@ export default function UpgradeModal({ onClose, bookletCount = 0, source = "unkn
     const parts = [`שלום! אני רוצה לשדרג לתוכנית ${planLabel} בבשבילי ${plan.icon}`];
     if (saleActive) parts.push(`(ראיתי את מחיר המבצע — ₪${effectivePrice} לחודש ראשון)`);
     if (name.trim()) parts.push(`שם: ${name.trim()}`);
-    window.open(`https://wa.me/${WA}?text=${encodeURIComponent(parts.join("\n"))}`, "_blank");
     setLockedPrice(effectivePrice);
     saveLead("whatsapp");
     setSent(true);
+    openWhatsApp(`https://wa.me/${WA}?text=${encodeURIComponent(parts.join("\n"))}`);
   };
 
   return (
@@ -131,7 +161,7 @@ export default function UpgradeModal({ onClose, bookletCount = 0, source = "unkn
       className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-ink/40 backdrop-blur-sm"
       onClick={e => e.target === e.currentTarget && onClose()}
     >
-      <div className="bg-white rounded-3xl w-full max-w-sm shadow-2xl max-h-[95vh] flex flex-col overflow-hidden" role="dialog" aria-modal="true" aria-labelledby="upgrade-modal-title">
+      <div ref={dialogRef} tabIndex={-1} className="bg-white rounded-3xl w-full max-w-sm shadow-2xl max-h-[95vh] flex flex-col overflow-hidden outline-none" role="dialog" aria-modal="true" aria-labelledby="upgrade-modal-title">
 
         {/* Scrollable content area */}
         <div className="flex-1 overflow-y-auto p-6 pb-3 space-y-4">
@@ -190,6 +220,7 @@ export default function UpgradeModal({ onClose, bookletCount = 0, source = "unkn
             <button
               key={p.id}
               onClick={() => setSelectedPlan(p.id)}
+              aria-pressed={selectedPlan === p.id}
               className={`relative rounded-2xl border-2 p-3 text-right transition-all ${
                 selectedPlan === p.id
                   ? p.color === "purple"

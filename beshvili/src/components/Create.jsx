@@ -190,6 +190,31 @@ export default function Create({ onSaved, remaining, isPro, active = true, bookl
     !!(f.childName.trim() && f.goal.trim())
   );
 
+  // Recover a booklet whose cloud save failed in a previous session: silently
+  // re-insert the local stash so the ~90s generation isn't lost after tab close.
+  useEffect(() => {
+    (async () => {
+      let stash = null;
+      try { stash = JSON.parse(localStorage.getItem("beshvili_unsaved_booklet") || "null"); } catch {}
+      if (!stash) return;
+      // Claim the stash SYNCHRONOUSLY before the async insert — StrictMode runs
+      // this effect twice and a second tab races it; removing first means only
+      // one runner inserts (the loser reads null and bails).
+      try { localStorage.removeItem("beshvili_unsaved_booklet"); } catch {}
+      if (!stash.html || !stash.title || Date.now() - (stash.at ?? 0) > 24 * 3600 * 1000) return;
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+      const { error: err } = await supabase.from("booklets").insert({
+        user_id: session.user.id, title: stash.title, html: stash.html,
+      });
+      if (err && !err.message?.includes("quota_exceeded")) {
+        // Transient failure — put the stash back for the next mount to retry.
+        try { localStorage.setItem("beshvili_unsaved_booklet", JSON.stringify(stash)); } catch {}
+      }
+      if (!err) { track("booklet_recovered_from_stash", {}); onSaved?.(); }
+    })();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   const create = useCallback(async () => {
     if (!canSubmit || creatingRef.current) return;
     creatingRef.current = true;
@@ -268,6 +293,10 @@ export default function Create({ onSaved, remaining, isPro, active = true, bookl
       if (netRetryRef.current < 1 && !inApp) {
         netRetryRef.current++;
         trackError("network_retrying", diag);
+        // Clear loading so canSubmit=true when the retry fires — otherwise the
+        // retried create() bails at the canSubmit guard and the spinner freezes forever.
+        setLoading(false);
+        setStreamChars(0); setLoadingElapsed(0); setLoadingMsgIdx(0);
         retryTimerRef.current = setTimeout(() => createRef.current?.(), 2000);
         return;
       }
@@ -430,6 +459,9 @@ export default function Create({ onSaved, remaining, isPro, active = true, bookl
       // Unmounted / navigated away mid-stream: don't setState or save a booklet
       // the user abandoned.
       if (ctrl.signal.aborted) { creatingRef.current = false; return; }
+      // Kill the zombie connection — a stalled stream left open keeps the server-side
+      // generation running (double API cost) and contends with the per-user rate limit.
+      ctrl.abort();
       // Save partial booklet if we got substantial HTML (e.g. connection dropped mid-stream)
       const partial = htmlAccumulated.trim();
       if (partial.length > 8000 && (partial.includes("<!DOCTYPE") || partial.includes("<html"))) {
@@ -463,6 +495,9 @@ export default function Create({ onSaved, remaining, isPro, active = true, bookl
     wakeLock?.release().catch(() => {});
     setLoading(false);
     creatingRef.current = false;
+    // Successful stream — restore the auto-retry budget for the next booklet.
+    retryCountRef.current = 0;
+    netRetryRef.current = 0;
 
     if (streamHadError) { trackError("stream_error", { errType: streamErrType }); setError(streamErrorMsg); return; }
 
@@ -550,10 +585,12 @@ export default function Create({ onSaved, remaining, isPro, active = true, bookl
 
   useEffect(() => {
     if (!active) return;
-    const h = (e) => { if ((e.ctrlKey || e.metaKey) && e.key === "Enter") create(); };
+    // !html guard: on the success screen canSubmit is still true, so Ctrl+Enter
+    // would silently regenerate, discard the booklet view, and burn quota.
+    const h = (e) => { if ((e.ctrlKey || e.metaKey) && e.key === "Enter" && !html) create(); };
     window.addEventListener("keydown", h);
     return () => window.removeEventListener("keydown", h);
-  }, [create, active]);
+  }, [create, active, html]);
 
   const handlePhotoUpload = useCallback(async (e) => {
     const file = e.target.files?.[0];
@@ -1302,7 +1339,7 @@ export default function Create({ onSaved, remaining, isPro, active = true, bookl
               <div className="w-full bg-canvas rounded-full h-2.5 overflow-hidden">
                 {streamChars > 0
                   ? <div className="h-full bg-gradient-to-l from-brand via-magic to-grow rounded-full transition-all duration-500"
-                      style={{ width: `${Math.min(97, (streamChars / (pageCount * 3200)) * 100)}%` }} />
+                      style={{ width: `${Math.min(97, (streamChars / ((mode === "quick" ? 1 : pageCount) * 3200)) * 100)}%` }} />
                   : <div className="h-full bg-gradient-to-l from-brand via-magic to-grow rounded-full animate-shimmer" />
                 }
               </div>

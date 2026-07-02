@@ -48,7 +48,11 @@ async function uploadPhoto(file) {
   const rand = (crypto?.randomUUID?.() ?? `${Date.now()}-${Math.round(Math.random() * 1e9)}`);
   const path = `${user.id}/${rand}.${ext}`;
   const { error } = await supabase.storage.from("child-photos").upload(path, file, { upsert: true });
-  if (error) { console.error("photo upload:", error); return null; }
+  if (error) {
+    console.error("photo upload:", error);
+    alert("העלאת התמונה נכשלה — ודאי שהקובץ הוא תמונה תקינה (JPG/PNG) עד 5MB");
+    return null;
+  }
   const { data: { publicUrl } } = supabase.storage.from("child-photos").getPublicUrl(path);
   return publicUrl;
 }

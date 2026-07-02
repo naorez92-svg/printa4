@@ -158,6 +158,9 @@ export default function Login() {
     setStep("email");
     track("auth_redirect_error", { code: errCode });
     try { window.history.replaceState(null, "", window.location.pathname); } catch { /* ignore */ }
+    // The error renders inside #login-form at the bottom of a long landing page —
+    // scroll to it, or the user who clicked an expired link sees nothing at all.
+    setTimeout(() => scrollTo("login-form"), 150);
   }, []);
 
   useEffect(() => {
@@ -196,6 +199,9 @@ export default function Login() {
   const goToLoginForm = (location) => {
     track("cta_click", { location });
     scrollTo("login-form");
+    // Focus after the smooth scroll settles (autoFocus on mount fights the
+    // scroll-to-top effect and pops the keyboard over the hero on Android).
+    setTimeout(() => document.querySelector('#login-form input[type="email"]')?.focus({ preventScroll: true }), 600);
   };
 
   const signInWithGoogle = async () => {
@@ -702,13 +708,15 @@ export default function Login() {
               <div key={i} className="bg-white rounded-2xl border border-ink/8 overflow-hidden shadow-sm">
                 <button
                   onClick={() => setOpenFaq(openFaq === i ? null : i)}
+                  aria-expanded={openFaq === i}
+                  aria-controls={`faq-panel-${i}`}
                   className="w-full text-right px-5 py-4 flex items-center justify-between gap-3 hover:bg-canvas/50 transition-colors"
                 >
                   <span className="font-semibold text-ink text-sm leading-snug">{q}</span>
                   <span className={`text-magic flex-shrink-0 text-lg transition-transform duration-200 ${openFaq === i ? "rotate-45" : ""}`}>+</span>
                 </button>
                 {openFaq === i && (
-                  <div className="px-5 pb-5 text-sm text-ink/65 leading-relaxed border-t border-ink/5 pt-4">
+                  <div id={`faq-panel-${i}`} role="region" className="px-5 pb-5 text-sm text-ink/65 leading-relaxed border-t border-ink/5 pt-4">
                     {typeof a === "string" ? <p>{a}</p> : a}
                   </div>
                 )}
@@ -837,7 +845,6 @@ export default function Login() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && send()}
-                  autoFocus
                 />
                 {error && <p className="text-red-500 text-sm text-center">{error}</p>}
                 <button onClick={send} disabled={loading || !email.trim()}
