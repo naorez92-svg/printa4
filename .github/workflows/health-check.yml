@@ -83,34 +83,40 @@ jobs:
               });
             }
 
+            // Build the body from joined lines — a raw multiline template literal
+            // dropped to column 1 and broke the YAML block scalar (every push
+            // produced a zero-job "failure" run because the file didn't parse).
+            const bodyLines = [
+              '## בדיקת תקינות אוטומטית — נכשלה',
+              '',
+              `### ❌ כשלים (${failed.length})`,
+              failLines || '(אין כשלים ספציפיים)',
+              '',
+              `### ✅ תקין (${passed.length})`,
+              passLines || '(אין)',
+              '',
+              '### פעולות נדרשות',
+              actionLines || '- [ ] בדוק את הלוגים',
+              '',
+              '---',
+              '',
+              '<details>',
+              '<summary>תגובה מלאה (JSON)</summary>',
+              '',
+              '```json',
+              JSON.stringify(result, null, 2),
+              '```',
+              '',
+              '</details>',
+              '',
+              `> HTTP Status: ${httpCode} · נזוהה ב-${timeIL}`,
+            ];
             await github.rest.issues.create({
               owner: context.repo.owner,
               repo: context.repo.repo,
               title: `🚨 בשבילי — תקלה זוהתה ${timeIL}`,
               labels: ['health-check-alert'],
-              body: `## בדיקת תקינות אוטומטית — נכשלה
-
-### ❌ כשלים (${failed.length})
-${failLines || '(אין כשלים ספציפיים)'}
-
-### ✅ תקין (${passed.length})
-${passLines || '(אין)'}
-
-### פעולות נדרשות
-${actionLines || '- [ ] בדוק את הלוגים'}
-
----
-
-<details>
-<summary>תגובה מלאה (JSON)</summary>
-
-\`\`\`json
-${JSON.stringify(result, null, 2)}
-\`\`\`
-
-</details>
-
-> HTTP Status: ${httpCode} · נזוהה ב-${timeIL}`,
+              body: bodyLines.join('\n'),
             });
 
       - name: Fail workflow if health check failed
