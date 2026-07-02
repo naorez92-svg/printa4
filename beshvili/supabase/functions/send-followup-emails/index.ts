@@ -129,12 +129,12 @@ Deno.serve(async (req) => {
     return new Response(JSON.stringify({ error: "method_not_allowed" }), { status: 405 });
   }
 
+  // Fail CLOSED: this endpoint is deployed with --no-verify-jwt and can mass-email
+  // every user. If CRON_SECRET is unset/renamed, refuse — don't skip the check.
   const cronSecret = Deno.env.get("CRON_SECRET");
-  if (cronSecret) {
-    const auth = req.headers.get("authorization") ?? "";
-    if (auth !== `Bearer ${cronSecret}`) {
-      return new Response(JSON.stringify({ error: "unauthorized" }), { status: 401 });
-    }
+  const auth = req.headers.get("authorization") ?? "";
+  if (!cronSecret || auth !== `Bearer ${cronSecret}`) {
+    return new Response(JSON.stringify({ error: "unauthorized" }), { status: 401 });
   }
 
   const resendKey = Deno.env.get("RESEND_API_KEY");

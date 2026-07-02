@@ -78,13 +78,16 @@ Deno.serve(async (req) => {
       .eq("user_id", user.id).gte("created_at", fiveMinAgo);
 
     // 1. Persist the lead server-side (immune to client RLS silent-failure).
-    //    supabase-js returns { error } instead of throwing, so check it explicitly.
-    const { error: insertErr } = await admin.from("leads").insert({
-      user_id: user.id,
-      name:    name || null,
-      phone,
-    });
-    if (insertErr) console.error("notify-lead insert error:", insertErr.message);
+    //    Skip the insert too when rate-limited — otherwise any authenticated user
+    //    can flood the leads table (one row per request, unbounded).
+    if ((recentLeadCount ?? 0) === 0) {
+      const { error: insertErr } = await admin.from("leads").insert({
+        user_id: user.id,
+        name:    name || null,
+        phone,
+      });
+      if (insertErr) console.error("notify-lead insert error:", insertErr.message);
+    }
 
     // 2. Email the owner immediately (unless rate-limited).
     const resendKey = Deno.env.get("RESEND_API_KEY");

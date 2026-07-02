@@ -175,6 +175,7 @@ function BookletRow({ booklet: b, onDelete, index = 0, onCreateSimilar }) {
   const [html, setHtml] = useState(null);
   const [shareToken, setShareToken] = useState(null);
   const [loadingHtml, setLoadingHtml] = useState(false);
+  const [loadError, setLoadError] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [delError, setDelError] = useState(false);
 
@@ -183,10 +184,17 @@ function BookletRow({ booklet: b, onDelete, index = 0, onCreateSimilar }) {
     if (loadingHtml) return;
     track("history_booklet_opened", { booklet_id: b.id, world: b.world });
     setLoadingHtml(true);
-    const { data } = await supabase.from("booklets").select("html, share_token").eq("id", b.id).single();
-    setHtml(data?.html ?? null);
-    setShareToken(data?.share_token ?? null);
+    setLoadError(false);
+    const { data, error } = await supabase.from("booklets").select("html, share_token").eq("id", b.id).single();
     setLoadingHtml(false);
+    if (error || !data?.html) {
+      // Without this the row silently snaps back to "פתח" and looks broken.
+      setLoadError(true);
+      track("history_open_failed", { booklet_id: b.id });
+      return;
+    }
+    setHtml(data.html);
+    setShareToken(data.share_token ?? null);
   };
 
   const del = async () => {
@@ -248,14 +256,15 @@ function BookletRow({ booklet: b, onDelete, index = 0, onCreateSimilar }) {
           )}
           <button
             onClick={toggle}
-            className="text-magic text-sm font-medium hover:underline"
+            className={`text-sm font-medium hover:underline min-w-[44px] min-h-[44px] px-2 -mx-1 flex items-center justify-center ${loadError ? "text-red-500" : "text-magic"}`}
           >
-            {loadingHtml ? "…" : html ? "סגור" : "פתח"}
+            {loadingHtml ? "…" : html ? "סגור" : loadError ? "נסי שוב" : "פתח"}
           </button>
           <button
             onClick={del}
             disabled={deleting}
-            className={`text-sm ${delError ? "text-red-600 font-medium" : "text-red-400 hover:text-red-600"} disabled:opacity-40`}
+            aria-label={`מחק את ${b.title}`}
+            className={`text-sm min-w-[44px] min-h-[44px] px-2 -mx-1 flex items-center justify-center ${delError ? "text-red-600 font-medium" : "text-red-400 hover:text-red-600"} disabled:opacity-40`}
             title={delError ? "מחיקה נכשלה — לחץ לנסות שוב" : "מחק"}
           >
             {deleting ? "…" : delError ? "✕ שגיאה" : "✕"}

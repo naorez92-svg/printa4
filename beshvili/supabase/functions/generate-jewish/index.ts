@@ -227,6 +227,40 @@ Deno.serve(async (req) => {
     const releaseLock = () =>
       admin.from("profiles").update({ last_generation_at: null }).eq("id", user.id).then(() => {}, () => {});
 
+    // Count the generation itself (not just the saved booklet) — calling this
+    // endpoint directly and never inserting was unlimited free usage. See
+    // migration 0035; falls back to the booklet-count gate if not applied yet.
+    let genCounted = false;
+    // Refund a counted generation that never produced output (validation reject,
+    // quota reject, transient Anthropic error) — it must not burn quota.
+    const refundGeneration = () => {
+      if (genCounted) admin.rpc("record_generation_failure", { p_user_id: user.id }).then(() => {}, () => {});
+    };
+    const { data: genData, error: genErr } = await admin.rpc("record_generation_start", { p_user_id: user.id });
+    if (!genErr && genData) {
+      genCounted = true;
+      const genRow = Array.isArray(genData) ? genData[0] : genData;
+      const gTotal   = genRow?.total_gens ?? 0;
+      const gMonthly = genRow?.monthly_gens ?? 0;
+      if (!isPaid && gTotal > FREE_BOOKLET_LIMIT) {
+        await releaseLock();
+        refundGeneration(); // rejected — don't let retries inflate the counter
+        return new Response(
+          JSON.stringify({ error: "quota_exceeded", used: gTotal - 1, limit: FREE_BOOKLET_LIMIT }),
+          { status: 403, headers: cors }
+        );
+      }
+      const gMonthlyLimit = isTeacher ? TEACHER_MONTHLY_LIMIT : isParent ? PARENT_MONTHLY_LIMIT : 0;
+      if (isPaid && !isAdmin && gMonthly > gMonthlyLimit) {
+        await releaseLock();
+        refundGeneration();
+        return new Response(
+          JSON.stringify({ error: "quota_exceeded", used: gMonthly - 1, limit: gMonthlyLimit, period: "monthly" }),
+          { status: 403, headers: cors }
+        );
+      }
+    }
+
     const body = await req.json();
     const clean = (val: unknown, max = MAX_FIELD_LEN): string =>
       String(val ?? "").trim().substring(0, max);
@@ -239,10 +273,12 @@ Deno.serve(async (req) => {
 
     if (!VALID_SUBJECTS.includes(rawSubject)) {
       await releaseLock();
+      refundGeneration();
       return new Response(JSON.stringify({ error: "invalid_subject" }), { status: 400, headers: cors });
     }
     if (!VALID_OUTPUT_TYPES.includes(rawOutputType)) {
       await releaseLock();
+      refundGeneration();
       return new Response(JSON.stringify({ error: "invalid_output_type" }), { status: 400, headers: cors });
     }
 
@@ -263,6 +299,7 @@ Deno.serve(async (req) => {
 
     if (!topic) {
       await releaseLock();
+      refundGeneration();
       return new Response(JSON.stringify({ error: "topic required" }), { status: 400, headers: cors });
     }
 
@@ -348,7 +385,7 @@ ${notes ? `הוראות נוספות מהמורה: ${esc(notes)}` : ""}
           if (r.ok) {
             const data = await r.json();
             const html = (data?.content ?? []).filter((b: { type: string }) => b.type === "text").map((b: { text: string }) => b.text).join("");
-            if (!html || !html.includes("<")) { await releaseLock(); return new Response(JSON.stringify({ error: "empty_html" }), { status: 502, headers: cors }); }
+            if (!html || !html.includes("<")) { await releaseLock(); refundGeneration(); return new Response(JSON.stringify({ error: "empty_html" }), { status: 502, headers: cors }); }
             return new Response(JSON.stringify({ html, remaining, pages: effPages, capped: pageCount > effPages }), { status: 200, headers: cors });
           }
           if ((r.status === 529 || r.status === 503 || r.status === 429) && attempt < 3) {
@@ -358,12 +395,15 @@ ${notes ? `הוראות נוספות מהמורה: ${esc(notes)}` : ""}
           }
           console.error(`[generate-jewish] no-stream Anthropic ${r.status}`);
           await releaseLock();
+          refundGeneration();
           return new Response(JSON.stringify({ error: r.status === 529 || r.status === 503 ? "ai_overloaded" : "ai_error" }), { status: 503, headers: cors });
         }
         await releaseLock();
+        refundGeneration();
         return new Response(JSON.stringify({ error: "ai_overloaded" }), { status: 503, headers: cors });
       } catch (e) {
         await releaseLock();
+        refundGeneration();
         const code = e instanceof Error && e.name === "TimeoutError" ? "ai_timeout" : "internal_error";
         return new Response(JSON.stringify({ error: code }), { status: 500, headers: cors });
       }
@@ -383,6 +423,7 @@ ${notes ? `הוראות נוספות מהמורה: ${esc(notes)}` : ""}
     const hb = setInterval(() => { w.write(KEEP_ALIVE).catch(() => {}); }, 8000);
 
     (async () => {
+      let streamedChars = 0; // hoisted: the catch block gates release/refund on it
       try {
         const ANTHROPIC_BODY = JSON.stringify({
           model: "claude-opus-4-8",
@@ -418,6 +459,7 @@ ${notes ? `הוראות נוספות מהמורה: ${esc(notes)}` : ""}
             }
             console.error(`[generate-jewish] Anthropic ${r.status}`);
             releaseLock();
+            refundGeneration();
             await w.write(sseError(r.status === 529 || r.status === 503 || r.status === 429 ? "overloaded_error" : "api_error"));
             clearInterval(hb); await w.close(); return;
           } catch (fetchErr) {
@@ -429,26 +471,34 @@ ${notes ? `הוראות נוספות מהמורה: ${esc(notes)}` : ""}
             throw fetchErr;
           }
         }
-        if (!anthropicResp) { releaseLock(); clearInterval(hb); await w.close(); return; }
+        if (!anthropicResp) { releaseLock(); refundGeneration(); clearInterval(hb); await w.close(); return; }
 
         const reader = anthropicResp.body!.getReader();
         const streamDecoder = new TextDecoder();
         let receivedMessageStop = false;
+        let tail = ""; // rolling tail so "message_stop" split across chunks is still seen
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
-          if (value && streamDecoder.decode(value, { stream: true }).includes('"message_stop"')) {
-            receivedMessageStop = true;
+          if (value) {
+            const chunk = streamDecoder.decode(value, { stream: true });
+            streamedChars += chunk.length;
+            if ((tail + chunk).includes('"message_stop"')) receivedMessageStop = true;
+            tail = chunk.slice(-20);
           }
           await w.write(value);
         }
-        if (!receivedMessageStop) releaseLock(); // client disconnected mid-gen
+        // Client disconnected mid-gen: release the 60s lock ONLY for early failures.
+        // Aborting just before message_stop must not hand out a free rate-limit
+        // reset after a full generation; the quota unit stays counted either way.
+        if (!receivedMessageStop && streamedChars < 2000) releaseLock();
         clearInterval(hb);
         await w.close();
       } catch (e) {
         clearInterval(hb);
         console.error("[generate-jewish] stream error:", String(e));
-        releaseLock();
+        // Release/refund only for genuine early failures (see generate-booklet).
+        if (streamedChars < 2000) { releaseLock(); refundGeneration(); }
         const type = e instanceof Error && e.name === "TimeoutError" ? "timeout_error" : "overloaded_error";
         try { await w.write(sseError(type)); } catch { /* writer already closed */ }
         try { await w.close(); } catch {}

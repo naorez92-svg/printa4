@@ -332,6 +332,9 @@ export default function JewishCreate({ onSaved, remaining, isPro, bookletCount =
       }
     } catch (streamErr) {
       if (ctrl.signal.aborted) { creatingRef.current = false; return; }
+      // Kill the zombie connection — a stalled stream left open keeps the server-side
+      // generation running (double API cost) and contends with the per-user rate limit.
+      ctrl.abort();
       const partial = htmlAccumulated.trim();
       if (partial.length > 6000 && (partial.includes("<!DOCTYPE") || partial.includes("<html"))) {
         if (!partial.includes("</html>")) htmlAccumulated = partial + "\n</body></html>";
@@ -357,25 +360,43 @@ export default function JewishCreate({ onSaved, remaining, isPro, bookletCount =
 
     setLoading(false);
     creatingRef.current = false;
+    // Successful stream — restore the auto-retry budget for the next generation.
+    retryCountRef.current = 0;
     if (streamHadError) { setError(streamErrorMsg); return; }
 
     const generatedHtml = sanitizeBookletHtml(htmlAccumulated.trim());
     if (!generatedHtml || !generatedHtml.includes("<")) { setError("generic:לא התקבל HTML תקין מהשרת"); return; }
 
-    setHtml(generatedHtml);
-
     const outputLabel = OUTPUT_TYPES.find(o => o.id === outputType)?.label ?? outputType;
     const title = `${subject} כיתה ${grade} — ${effectiveTopic.substring(0, 50)}${streamAborted ? " (חלקי)" : ""} (${outputLabel})`;
 
     setBookletTitle(title);
-    const { data: inserted, error: insertErr } = await supabase.from("booklets").insert({
-      user_id: session.user.id,
-      title,
-      goal: effectiveTopic.substring(0, 200),
-      world: subject,
-      level,
-      html: generatedHtml,
-    }).select("id, share_token").single();
+    // Retry the save once on a transient failure — a ~90s generation shouldn't be
+    // lost to a momentary network/DB blip (mirrors Create.jsx).
+    let inserted = null, insertErr = null;
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const res = await supabase.from("booklets").insert({
+        user_id: session.user.id,
+        title,
+        goal: effectiveTopic.substring(0, 200),
+        world: subject,
+        level,
+        html: generatedHtml,
+      }).select("id, share_token").single();
+      inserted = res.data; insertErr = res.error;
+      if (!insertErr) break;
+      if (attempt === 0) await new Promise((r) => setTimeout(r, 1200));
+    }
+
+    if (insertErr?.message?.includes("quota_exceeded")) {
+      // DB quota trigger fired after the Edge Function check passed (race window) —
+      // show the real paywall, not a confusing "created but not saved" warning.
+      track("jewish_error", { kind: "quota_db" });
+      setError("quota");
+      return;
+    }
+
+    setHtml(generatedHtml);
 
     if (insertErr) {
       setSaveWarning(true);
@@ -413,7 +434,9 @@ export default function JewishCreate({ onSaved, remaining, isPro, bookletCount =
   }
 
   return (
-    <div className="space-y-5">
+    // pb-28 on mobile: the sticky CTA (fixed bottom-16) otherwise permanently
+    // covers the last form controls — they can never scroll clear of it.
+    <div className="space-y-5 pb-28 lg:pb-0">
       {/* Header */}
       <div className="flex items-start gap-3">
         <span className="text-3xl">✡️</span>

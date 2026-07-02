@@ -50,6 +50,21 @@ Deno.serve(async (req) => {
         : new Response(JSON.stringify({ error: "missing fields" }), { status: 400, headers: CORS });
     }
 
+    // Validate before the service-role write: the GET path is unauthenticated
+    // (one-click from email), so without these checks anyone can write arbitrary
+    // unbounded strings into survey_responses for any uid.
+    const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    const VALID_QUESTIONS: Record<string, string[]> = {
+      use_case: ["private_lessons", "full_class", "homework"],
+    };
+    const validAnswers = VALID_QUESTIONS[questionKey];
+    if (!UUID_RE.test(userId) || !validAnswers || !validAnswers.includes(answer)) {
+      return isGet
+        ? Response.redirect(SITE_URL, 302)
+        : new Response(JSON.stringify({ error: "invalid fields" }), { status: 400, headers: CORS });
+    }
+    if (triggerContext) triggerContext = String(triggerContext).slice(0, 100);
+
     // Upsert: one answer per user per question (UNIQUE constraint on user_id, question_key)
     const { error: upsertErr } = await admin.from("survey_responses").upsert(
       { user_id: userId, question_key: questionKey, answer, trigger_context: triggerContext },

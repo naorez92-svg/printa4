@@ -741,9 +741,11 @@ Deno.serve(async (req) => {
     surveyBreakdown,
   }), { headers: { ...cors, "content-type": "application/json" } });
   } catch (e) {
+    // Generic error only — this catch wraps pre-auth code too, so returning
+    // e.message would leak internals to unauthenticated callers.
     console.error("admin-stats fatal:", e);
     return new Response(
-      JSON.stringify({ error: "admin_stats_failed", detail: String(e instanceof Error ? e.message : e).slice(0, 300) }),
+      JSON.stringify({ error: "admin_stats_failed" }),
       { status: 500, headers: { ...cors, "content-type": "application/json" } }
     );
   }
