@@ -384,19 +384,21 @@ export default function JewishCreate({ onSaved, remaining, isPro, bookletCount =
         html: generatedHtml,
       }).select("id, share_token").single();
       inserted = res.data; insertErr = res.error;
-      if (!insertErr) break;
+      // Quota-trigger rejection is permanent — retrying it just wastes 1.2s.
+      if (!insertErr || insertErr.message?.includes("quota_exceeded")) break;
       if (attempt === 0) await new Promise((r) => setTimeout(r, 1200));
     }
 
+    // ALWAYS show the finished booklet — even when the DB quota trigger rejected
+    // the save (race window): the user watched a ~90s generation succeed and must
+    // be able to print it. The save warning below covers the "not in cloud" part.
+    setHtml(generatedHtml);
     if (insertErr?.message?.includes("quota_exceeded")) {
-      // DB quota trigger fired after the Edge Function check passed (race window) —
-      // show the real paywall, not a confusing "created but not saved" warning.
       track("jewish_error", { kind: "quota_db" });
-      setError("quota");
+      setSaveWarning(true);
+      onSaved?.();
       return;
     }
-
-    setHtml(generatedHtml);
 
     if (insertErr) {
       setSaveWarning(true);

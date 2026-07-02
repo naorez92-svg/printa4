@@ -471,6 +471,13 @@ Deno.serve(async (req) => {
     const refundGeneration = () => {
       if (genCounted) admin.rpc("record_generation_failure", { p_user_id: user.id }).then(() => {}, () => {});
     };
+    // Parse the body BEFORE counting: a truncated/malformed request (flaky mobile
+    // upload) must not burn a quota unit or hold the 60s lock via the outer catch.
+    const body = await req.json().catch(() => null);
+    if (!body || typeof body !== "object") {
+      await releaseLock();
+      return new Response(JSON.stringify({ error: "bad_request" }), { status: 400, headers: cors });
+    }
     const { data: genData, error: genErr } = await admin.rpc("record_generation_start", { p_user_id: user.id });
     if (!genErr && genData) {
       genCounted = true;
@@ -496,8 +503,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    // ── 4. Parse + sanitize input ────────────────────────────────────────────
-    const body = await req.json();
+    // ── 4. Sanitize input (body parsed above, before the generation count) ────
     const clean = (val: unknown, max = MAX_FIELD_LEN): string =>
       String(val ?? "").trim().substring(0, max);
 
@@ -690,6 +696,7 @@ Deno.serve(async (req) => {
 
     (async () => {
       let streamedChars = 0; // hoisted: the catch block gates release/refund on it
+      let clientGone = false; // w.write failed → the CLIENT disconnected (not Anthropic)
       try {
         const ANTHROPIC_BODY = JSON.stringify({
           model: "claude-opus-4-8",
@@ -755,25 +762,31 @@ Deno.serve(async (req) => {
             if ((tail + chunk).includes('"message_stop"')) receivedMessageStop = true;
             tail = chunk.slice(-20);
           }
-          await w.write(value);
+          try { await w.write(value); } catch (we) { clientGone = true; throw we; }
         }
         // Stream ended without the terminal event = client disconnected mid-gen.
         // Release the 60s lock ONLY if the generation produced little output —
         // otherwise aborting the fetch just before message_stop hands out a free
-        // rate-limit reset after receiving a full booklet (abuse loop). The
-        // generation itself stays counted against quota either way.
+        // rate-limit reset after receiving a full booklet (abuse loop).
         if (!receivedMessageStop && streamedChars < 2000) releaseLock();
+        // Refund the quota unit when the stream ended without delivering a
+        // usable booklet. 30000 SSE bytes ≈ the client's 8000-HTML-char salvage
+        // threshold (SSE JSON framing inflates content ~3x) — below it the user
+        // got nothing they could keep. Abuse stays bounded: the 60s stamp holds.
+        if (!receivedMessageStop && streamedChars < 30000) refundGeneration();
         clearInterval(hb);
         await w.close();
       } catch (e) {
         clearInterval(hb);
         console.error("[generate-booklet] stream error:", String(e));
-        // Refund quota only when nothing meaningful was generated, but KEEP the
-        // 60s rate-limit stamp: this catch also fires on client abort (w.write
-        // throws), and refund+release together would let an attacker loop
-        // request → read a little → abort → immediate free retry, burning
-        // Anthropic spend unthrottled. Legit early failures wait ≤60s.
-        if (streamedChars < 2000) refundGeneration();
+        // Refund when no usable booklet was delivered. Release the 60s lock only
+        // for genuine upstream failures (timeout/overload) so the client's 2s
+        // auto-retry works — NOT on client abort (w.write threw), where
+        // refund+release together would allow an unthrottled request→abort loop.
+        if (streamedChars < 30000) {
+          refundGeneration();
+          if (!clientGone) releaseLock();
+        }
         const type = e instanceof Error && e.name === "TimeoutError" ? "timeout_error" : "overloaded_error";
         try { await w.write(sseError(type)); } catch { /* writer already closed */ }
         try { await w.close(); } catch {}

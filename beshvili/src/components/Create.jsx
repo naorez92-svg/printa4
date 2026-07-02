@@ -197,18 +197,19 @@ export default function Create({ onSaved, remaining, isPro, active = true, bookl
       let stash = null;
       try { stash = JSON.parse(localStorage.getItem("beshvili_unsaved_booklet") || "null"); } catch {}
       if (!stash) return;
-      if (!stash.html || !stash.title || Date.now() - (stash.at ?? 0) > 24 * 3600 * 1000) {
-        try { localStorage.removeItem("beshvili_unsaved_booklet"); } catch {}
-        return;
-      }
+      // Claim the stash SYNCHRONOUSLY before the async insert — StrictMode runs
+      // this effect twice and a second tab races it; removing first means only
+      // one runner inserts (the loser reads null and bails).
+      try { localStorage.removeItem("beshvili_unsaved_booklet"); } catch {}
+      if (!stash.html || !stash.title || Date.now() - (stash.at ?? 0) > 24 * 3600 * 1000) return;
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
       const { error: err } = await supabase.from("booklets").insert({
         user_id: session.user.id, title: stash.title, html: stash.html,
       });
-      if (!err || err.message?.includes("quota_exceeded")) {
-        // Saved — or unsavable forever (quota); either way stop retrying each mount.
-        try { localStorage.removeItem("beshvili_unsaved_booklet"); } catch {}
+      if (err && !err.message?.includes("quota_exceeded")) {
+        // Transient failure — put the stash back for the next mount to retry.
+        try { localStorage.setItem("beshvili_unsaved_booklet", JSON.stringify(stash)); } catch {}
       }
       if (!err) { track("booklet_recovered_from_stash", {}); onSaved?.(); }
     })();

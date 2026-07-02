@@ -78,9 +78,9 @@ Deno.serve(async (req) => {
       .eq("user_id", user.id).gte("created_at", fiveMinAgo);
 
     // 1. Persist the lead server-side (immune to client RLS silent-failure).
-    //    Skip the insert too when rate-limited — otherwise any authenticated user
-    //    can flood the leads table (one row per request, unbounded).
-    if ((recentLeadCount ?? 0) === 0) {
+    //    Cap at 3 rows per 5 minutes: a genuine correction (fixed phone number,
+    //    switched plan) still lands, but unbounded flooding doesn't.
+    if ((recentLeadCount ?? 0) < 3) {
       const { error: insertErr } = await admin.from("leads").insert({
         user_id: user.id,
         name:    name || null,

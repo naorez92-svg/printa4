@@ -67,6 +67,9 @@ export default function History({ isPro = false, onUpgrade, onCreateNew, onCreat
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [search, setSearch] = useState("");
+  // Most recently opened row — only its Preview listens for Ctrl+P, so the
+  // shortcut prints the booklet the user is actually looking at.
+  const [lastOpenedId, setLastOpenedId] = useState(null);
 
   useEffect(() => {
     supabase
@@ -162,7 +165,8 @@ export default function History({ isPro = false, onUpgrade, onCreateNew, onCreat
         <p className="text-ink/40 text-sm text-center py-4">לא נמצאו תוצאות עבור "{search}"</p>
       )}
       {filtered.map((b, i) => (
-        <BookletRow key={b.id} booklet={b} onDelete={onDelete} index={i} onCreateSimilar={onCreateSimilar} />
+        <BookletRow key={b.id} booklet={b} onDelete={onDelete} index={i} onCreateSimilar={onCreateSimilar}
+          printActive={lastOpenedId === b.id} onOpened={setLastOpenedId} />
       ))}
       {!loading && items.length >= 2 && !isPro && onUpgrade && (
         <UpgradeNudge onUpgrade={onUpgrade} />
@@ -171,7 +175,7 @@ export default function History({ isPro = false, onUpgrade, onCreateNew, onCreat
   );
 }
 
-function BookletRow({ booklet: b, onDelete, index = 0, onCreateSimilar }) {
+function BookletRow({ booklet: b, onDelete, index = 0, onCreateSimilar, printActive = true, onOpened }) {
   const [html, setHtml] = useState(null);
   const [shareToken, setShareToken] = useState(null);
   const [loadingHtml, setLoadingHtml] = useState(false);
@@ -195,6 +199,7 @@ function BookletRow({ booklet: b, onDelete, index = 0, onCreateSimilar }) {
     }
     setHtml(data.html);
     setShareToken(data.share_token ?? null);
+    onOpened?.(b.id);
   };
 
   const del = async () => {
@@ -273,7 +278,7 @@ function BookletRow({ booklet: b, onDelete, index = 0, onCreateSimilar }) {
       </div>
       {html && (
         <div className="border-t border-ink/5 p-4">
-          <Preview html={html} shareToken={shareToken} title={b.title} context="history" bookletId={b.id} />
+          <Preview html={html} shareToken={shareToken} title={b.title} context="history" bookletId={b.id} active={printActive} />
         </div>
       )}
     </div>

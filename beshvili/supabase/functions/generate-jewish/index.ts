@@ -236,6 +236,13 @@ Deno.serve(async (req) => {
     const refundGeneration = () => {
       if (genCounted) admin.rpc("record_generation_failure", { p_user_id: user.id }).then(() => {}, () => {});
     };
+    // Parse the body BEFORE counting: a truncated/malformed request must not
+    // burn a quota unit or hold the 60s lock via the outer catch.
+    const body = await req.json().catch(() => null);
+    if (!body || typeof body !== "object") {
+      await releaseLock();
+      return new Response(JSON.stringify({ error: "bad_request" }), { status: 400, headers: cors });
+    }
     const { data: genData, error: genErr } = await admin.rpc("record_generation_start", { p_user_id: user.id });
     if (!genErr && genData) {
       genCounted = true;
@@ -261,7 +268,6 @@ Deno.serve(async (req) => {
       }
     }
 
-    const body = await req.json();
     const clean = (val: unknown, max = MAX_FIELD_LEN): string =>
       String(val ?? "").trim().substring(0, max);
 
@@ -424,6 +430,7 @@ ${notes ? `הוראות נוספות מהמורה: ${esc(notes)}` : ""}
 
     (async () => {
       let streamedChars = 0; // hoisted: the catch block gates release/refund on it
+      let clientGone = false; // w.write failed → the CLIENT disconnected (not Anthropic)
       try {
         const ANTHROPIC_BODY = JSON.stringify({
           model: "claude-opus-4-8",
@@ -486,21 +493,26 @@ ${notes ? `הוראות נוספות מהמורה: ${esc(notes)}` : ""}
             if ((tail + chunk).includes('"message_stop"')) receivedMessageStop = true;
             tail = chunk.slice(-20);
           }
-          await w.write(value);
+          try { await w.write(value); } catch (we) { clientGone = true; throw we; }
         }
         // Client disconnected mid-gen: release the 60s lock ONLY for early failures.
         // Aborting just before message_stop must not hand out a free rate-limit
-        // reset after a full generation; the quota unit stays counted either way.
+        // reset after a full generation.
         if (!receivedMessageStop && streamedChars < 2000) releaseLock();
+        // Refund the quota unit when no usable booklet was delivered (30000 SSE
+        // bytes ≈ the client's salvage threshold; see generate-booklet).
+        if (!receivedMessageStop && streamedChars < 30000) refundGeneration();
         clearInterval(hb);
         await w.close();
       } catch (e) {
         clearInterval(hb);
         console.error("[generate-jewish] stream error:", String(e));
-        // Refund quota but KEEP the rate-limit stamp — this catch also fires on
-        // client abort; refund+release together enables an unthrottled abuse
-        // loop (see generate-booklet).
-        if (streamedChars < 2000) refundGeneration();
+        // Refund when no usable booklet was delivered; release the lock only for
+        // genuine upstream failures — not client aborts (see generate-booklet).
+        if (streamedChars < 30000) {
+          refundGeneration();
+          if (!clientGone) releaseLock();
+        }
         const type = e instanceof Error && e.name === "TimeoutError" ? "timeout_error" : "overloaded_error";
         try { await w.write(sseError(type)); } catch { /* writer already closed */ }
         try { await w.close(); } catch {}
