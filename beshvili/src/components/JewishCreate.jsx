@@ -132,20 +132,17 @@ const countPages = (html) => (html.match(/296mm/g) || []).length;
 export default function JewishCreate({ onSaved, remaining, isPro, bookletCount = 0, onUpgrade }) {
   const [subject, setSubject] = useState("הלכה");
   const [grade,   setGrade]   = useState("ה");
-  // Default to the first curriculum topic so the "create" button is usable
-  // immediately — otherwise it sits disabled and looks broken until the user
-  // scrolls back up and notices they must pick a topic.
   const [topic,   setTopic]   = useState(CURRICULUM["הלכה"]?.["ה"]?.[0] ?? "");
   const [customTopic, setCustomTopic] = useState("");
   const [outputType, setOutputType]   = useState("דף_עבודה");
   const [level,   setLevel]   = useState("medium");
   const [notes,   setNotes]   = useState("");
   const [pageCount, setPageCount] = useState(2);
-  const [fastMode, setFastMode]   = useState(false); // ⚡ faster, lighter generation
+  const [fastMode, setFastMode]   = useState(false);
   const [loading, setLoading] = useState(false);
   const [loadingMsgIdx, setLoadingMsgIdx] = useState(0);
   const [streamChars, setStreamChars] = useState(0);
-  const [previewHtml, setPreviewHtml] = useState(""); // live build snapshot (display only)
+  const [previewHtml, setPreviewHtml] = useState("");
   const [loadingElapsed, setLoadingElapsed] = useState(0);
   const [html,    setHtml]    = useState(null);
   const [error,   setError]   = useState(null);
@@ -161,20 +158,14 @@ export default function JewishCreate({ onSaved, remaining, isPro, bookletCount =
   const retryTimerRef  = useRef(null);
   const createRef      = useRef(null);
 
-  // Available grades for current subject
   const availableGrades = CURRICULUM[subject] ? Object.keys(CURRICULUM[subject]) : GRADES;
-
-  // Auto-suggest topics for the selected subject+grade
   const suggestedTopics = (CURRICULUM[subject]?.[grade] ?? []);
 
-  // When subject or grade changes, default to the first suggested topic (keeps
-  // the create button enabled); fall back to empty if that combo has no topics.
   useEffect(() => {
     setTopic(CURRICULUM[subject]?.[grade]?.[0] ?? "");
     setCustomTopic("");
   }, [subject, grade]);
 
-  // Loading message rotation + elapsed timer
   useEffect(() => {
     if (!loading) { setLoadingMsgIdx(0); setStreamChars(0); setLoadingElapsed(0); setPreviewHtml(""); return; }
     const msgId = setInterval(() => setLoadingMsgIdx(i => (i + 1) % LOADING_MSGS.length), 3500);
@@ -187,7 +178,6 @@ export default function JewishCreate({ onSaved, remaining, isPro, bookletCount =
     clearTimeout(retryTimerRef.current);
   }, []);
 
-  // Rate limit countdown
   useEffect(() => {
     const match = error?.match(/^rate:(\d+)$/);
     setRateCountdown(match ? parseInt(match[1]) : null);
@@ -226,8 +216,6 @@ export default function JewishCreate({ onSaved, remaining, isPro, bookletCount =
     const ctrl = new AbortController();
     streamAbortRef.current = ctrl;
 
-    // In-app browsers (Facebook/Instagram webview) can't read SSE — request a
-    // single non-stream JSON response so generation works inside the in-app browser.
     const useNoStream = IS_INAPP;
     const fnUrl = `${import.meta.env.VITE_SUPABASE_URL ?? "https://gywpdzkvkdisonuzhsib.supabase.co"}/functions/v1/generate-jewish`;
     let resp;
@@ -246,7 +234,6 @@ export default function JewishCreate({ onSaved, remaining, isPro, bookletCount =
       setLoading(false);
       creatingRef.current = false;
       if (ctrl.signal.aborted) return;
-      // Instrument: capture network failures so the admin panel shows what broke.
       track("jewish_error", { kind: "network", inapp: IS_INAPP, noStream: useNoStream, msg: String(e?.message ?? e).slice(0, 120) });
       setError(IS_INAPP
         ? "generic:כדי ליצור חומר, פתחי את הדף בדפדפן רגיל (Chrome/Safari) — לא מתוך אפליקציה כמו וואטסאפ/אינסטגרם 🙏"
@@ -261,8 +248,6 @@ export default function JewishCreate({ onSaved, remaining, isPro, bookletCount =
       const code = errData?.error;
       setLoading(false);
       creatingRef.current = false;
-      // Instrument: exact status + server code + whether the user was in-app, so
-      // "שגיאת שרת" reports become diagnosable in the admin panel.
       track("jewish_error", { kind: "server", status: resp.status, code: code ?? null, inapp: useNoStream });
       if (code === "quota_exceeded") { const monthly = errData?.period === "monthly"; setError(monthly ? "quota_monthly" : "quota"); return; }
       if (code === "rate_limited") { setError(`rate:${errData?.wait ?? 60}`); return; }
@@ -285,7 +270,6 @@ export default function JewishCreate({ onSaved, remaining, isPro, bookletCount =
     let streamAborted = false;
 
     if (useNoStream) {
-      // In-app browser path: one JSON response, no SSE.
       try {
         const j = await resp.json();
         htmlAccumulated = j?.html ?? "";
@@ -297,20 +281,17 @@ export default function JewishCreate({ onSaved, remaining, isPro, bookletCount =
         return;
       }
     } else {
-    // Read SSE stream
     const reader = resp.body.getReader();
     const decoder = new TextDecoder();
     let buffer = "";
     let updateTimer = 0;
-    let previewTimer = 0; // throttles the live-build iframe
+    let previewTimer = 0;
 
     let wakeLock = null;
     try { wakeLock = await navigator.wakeLock?.request("screen"); } catch {}
 
-    // Stall guards — same rationale as Create.jsx: heartbeats keep a hung stream
-    // "alive", so bail out instead of letting the user wait minutes with no output.
     const DEAD_CONN_MS     = 30000;
-    const CONTENT_STALL_MS = 90000; // headroom for a slow first token under load (avoid false abort + double cost)
+    const CONTENT_STALL_MS = 90000;
     let lastContentAt = Date.now();
     try {
       while (true) {
@@ -356,8 +337,6 @@ export default function JewishCreate({ onSaved, remaining, isPro, bookletCount =
         if (!partial.includes("</html>")) htmlAccumulated = partial + "\n</body></html>";
         streamAborted = true;
       } else if (retryCountRef.current < 1) {
-        // Clear loading so canSubmit=true when the retry fires (otherwise the
-        // retry's create() exits immediately and the spinner freezes forever).
         retryCountRef.current++;
         setStreamChars(0); setLoadingElapsed(0); setLoadingMsgIdx(0);
         creatingRef.current = false;
@@ -374,7 +353,7 @@ export default function JewishCreate({ onSaved, remaining, isPro, bookletCount =
     } finally {
       wakeLock?.release().catch(() => {});
     }
-    } // end streaming branch
+    }
 
     setLoading(false);
     creatingRef.current = false;
@@ -385,7 +364,6 @@ export default function JewishCreate({ onSaved, remaining, isPro, bookletCount =
 
     setHtml(generatedHtml);
 
-    // Save to booklets table
     const outputLabel = OUTPUT_TYPES.find(o => o.id === outputType)?.label ?? outputType;
     const title = `${subject} כיתה ${grade} — ${effectiveTopic.substring(0, 50)}${streamAborted ? " (חלקי)" : ""} (${outputLabel})`;
 
@@ -403,8 +381,6 @@ export default function JewishCreate({ onSaved, remaining, isPro, bookletCount =
       setSaveWarning(true);
       track("jewish_save_failed", { message: insertErr.message });
     } else {
-      // Capture id + share_token so Preview's print/share (incl. the in-app
-      // browser escape to a real browser) can reach this booklet.
       setBookletId(inserted?.id ?? null);
       setShareToken(inserted?.share_token ?? null);
       if (streamAborted) setSaveWarning(true);
@@ -660,10 +636,6 @@ export default function JewishCreate({ onSaved, remaining, isPro, bookletCount =
         </div>
       )}
 
-      {/* Live generation progress — a 60–90s generation needs real feedback, not
-          just a spinner in the button. Mirrors Create.jsx: progress bar keyed to
-          streamed chars, elapsed seconds, and a value tip. role=status so screen
-          readers hear progress instead of silence. */}
       {loading && (
         <div className="bg-magic/5 border border-magic/15 rounded-2xl p-4 space-y-3" role="status" aria-live="polite">
           <p className="text-center font-display font-bold text-ink text-sm">
@@ -685,7 +657,7 @@ export default function JewishCreate({ onSaved, remaining, isPro, bookletCount =
         </div>
       )}
 
-      {/* Speed vs depth toggle — hidden mid-generation (choice already locked in) */}
+      {/* Speed vs depth toggle */}
       {!loading && (
       <button
         type="button"
@@ -704,9 +676,7 @@ export default function JewishCreate({ onSaved, remaining, isPro, bookletCount =
       </button>
       )}
 
-      {/* Live build preview — watch the material take shape while it generates,
-          instead of a bare spinner. Display only; mirrors Preview.jsx's sandboxed
-          srcDoc scaling and touches nothing in the generation engine. */}
+      {/* Live build preview */}
       {loading && (previewHtml.includes("</style>") || previewHtml.includes("</head>")) && (
         <div className="space-y-2 mb-2">
           <div className="flex justify-center">
@@ -746,11 +716,13 @@ export default function JewishCreate({ onSaved, remaining, isPro, bookletCount =
         </div>
       )}
 
-      {/* Generate button */}
+      {/* Generate button — hidden on mobile when not loading (sticky CTA below covers that) */}
       <button
         onClick={create}
         disabled={!canSubmit}
         className={`w-full py-4 rounded-2xl font-bold text-base transition-all ${
+          loading ? "" : "hidden lg:block"
+        } ${
           canSubmit
             ? "bg-gradient-to-l from-magic to-brand text-white shadow-lg hover:opacity-90 active:scale-98"
             : "bg-ink/8 text-ink/25 cursor-not-allowed"
@@ -765,9 +737,8 @@ export default function JewishCreate({ onSaved, remaining, isPro, bookletCount =
           `✨ צור ${OUTPUT_TYPES.find(o => o.id === outputType)?.label ?? "חומר"}`
         )}
       </button>
-      {/* Tell the user exactly what's missing instead of a silently-disabled button */}
       {!canSubmit && !loading && (
-        <p className="text-center text-xs text-magic/70 mt-2 font-medium">
+        <p className="text-center text-xs text-magic/70 mt-2 font-medium hidden lg:block">
           {!subject ? "👆 בחר/י מקצוע כדי להמשיך"
             : !grade ? "👆 בחר/י כיתה כדי להמשיך"
             : effectiveTopic.length <= 2 ? "👆 בחר/י נושא (או כתוב/כתבי נושא חופשי) כדי ליצור"
