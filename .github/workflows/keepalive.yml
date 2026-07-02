@@ -1,10 +1,11 @@
 name: Keep Render Alive
 
+# DISABLED: the legacy Flask prototype on Render (printa4.onrender.com) is no
+# longer deployed — the ping failed every 10 minutes (connection refused) and
+# only burned Actions minutes. The active product runs on Vercel + Supabase.
+# Manual trigger kept in case the Render service is ever revived.
 on:
-  schedule:
-    # Every 10 minutes — prevents Render free-tier spin-down
-    - cron: '*/10 * * * *'
-  workflow_dispatch: # allow manual trigger too
+  workflow_dispatch:
 
 jobs:
   ping:

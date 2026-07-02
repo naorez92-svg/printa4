@@ -74,41 +74,46 @@ jobs:
               .map(l => `- ${l.name || 'ללא שם'} · ${l.phone || '—'}`)
               .join('\n') || '_אין לידים חדשים_';
 
-            const body = `## 📊 דוח יומי — ${dateStr} בשעה ${timeStr}
-
-### משתמשים
-| מדד | ערך |
-|---|---|
-| סה"כ משתמשים | **${s.totalUsers ?? '—'}** |
-| חדשים היום | **${s.usersToday ?? '—'}** |
-| חדשים השבוע | ${s.usersThisWeek ?? '—'} |
-| 😴 רדומים (4+ ימים ללא פעולה) | ${s.dormantCount ?? '—'} |
-| ⚠️ סיכון נטישה (0 חוברות, 3+ ימים) | ${s.churnRiskCount ?? '—'} |
-
-### חוברות
-| מדד | ערך |
-|---|---|
-| סה"כ | **${s.totalBooklets ?? '—'}** |
-| היום | **${s.bookletsToday ?? '—'}** |
-| השבוע | ${s.bookletsThisWeek ?? '—'} |
-| החודש | ${s.bookletsThisMonth ?? '—'} |
-
-### פילוח תוכניות
-| תוכנית | משתמשים |
-|---|---|
-${planLines || '_אין נתונים_'}
-
-### 5 הנושאים הפופולריים
-${topicLines || '_אין נתונים_'}
-
-### פידבק אחרון
-${feedbackLines}
-
-### לידים אחרונים
-${leadLines}
-
----
-_נוצר אוטומטית על ידי GitHub Actions · [admin panel](https://beshvili.com)_`;
+            // Build the body from joined lines — a raw multiline template literal
+            // dropped to column 1 and broke the YAML block scalar (every push
+            // produced a zero-job "failure" run because the file didn't parse).
+            const body = [
+              `## 📊 דוח יומי — ${dateStr} בשעה ${timeStr}`,
+              '',
+              '### משתמשים',
+              '| מדד | ערך |',
+              '|---|---|',
+              `| סה"כ משתמשים | **${s.totalUsers ?? '—'}** |`,
+              `| חדשים היום | **${s.usersToday ?? '—'}** |`,
+              `| חדשים השבוע | ${s.usersThisWeek ?? '—'} |`,
+              `| 😴 רדומים (4+ ימים ללא פעולה) | ${s.dormantCount ?? '—'} |`,
+              `| ⚠️ סיכון נטישה (0 חוברות, 3+ ימים) | ${s.churnRiskCount ?? '—'} |`,
+              '',
+              '### חוברות',
+              '| מדד | ערך |',
+              '|---|---|',
+              `| סה"כ | **${s.totalBooklets ?? '—'}** |`,
+              `| היום | **${s.bookletsToday ?? '—'}** |`,
+              `| השבוע | ${s.bookletsThisWeek ?? '—'} |`,
+              `| החודש | ${s.bookletsThisMonth ?? '—'} |`,
+              '',
+              '### פילוח תוכניות',
+              '| תוכנית | משתמשים |',
+              '|---|---|',
+              planLines || '_אין נתונים_',
+              '',
+              '### 5 הנושאים הפופולריים',
+              topicLines || '_אין נתונים_',
+              '',
+              '### פידבק אחרון',
+              feedbackLines,
+              '',
+              '### לידים אחרונים',
+              leadLines,
+              '',
+              '---',
+              '_נוצר אוטומטית על ידי GitHub Actions · [admin panel](https://beshvili.com)_',
+            ].join('\n');
 
             await github.rest.issues.create({
               owner: context.repo.owner,
