@@ -59,22 +59,38 @@ $$;
 revoke all on function public.record_generation_start(uuid)   from public, anon, authenticated;
 revoke all on function public.record_generation_failure(uuid) from public, anon, authenticated;
 
--- ── Protect the new columns from self-update (mirrors 0024) ─────────────────
+-- ── Protect the new columns from self-update ────────────────────────────────
+-- Body copied verbatim from 0027 (which itself preserves the 0026 nested-trigger
+-- exemption — REQUIRED, or the lifetime-counter trigger fails every booklet
+-- insert) with ONLY the generation-counter checks appended at the end.
 create or replace function public.prevent_plan_self_update()
 returns trigger language plpgsql security definer
 set search_path = public as $$
 declare
   is_admin boolean;
 begin
+  -- Service role (edge functions): no user JWT → allowed.
   if auth.uid() is null then
-    return new; -- service role (edge functions / triggers): allowed
+    return new;
   end if;
+
+  -- Nested write from another trigger (e.g. the lifetime-counter increment).
+  if pg_trigger_depth() > 1 then
+    return new;
+  end if;
+
+  -- Admins may change privileged fields.
   select (plan = 'admin') into is_admin from public.profiles where id = auth.uid();
   if coalesce(is_admin, false) then
-    return new; -- admins may change privileged fields
+    return new;
   end if;
+
+  -- Everyone else: privileged columns are read-only.
   if new.plan <> old.plan then
     raise exception 'permission denied: plan can only be changed by admin';
+  end if;
+  if new.role is distinct from old.role then
+    raise exception 'permission denied: role can only be changed by admin';
   end if;
   if new.total_booklets_created is distinct from old.total_booklets_created then
     raise exception 'permission denied: total_booklets_created is read-only';
@@ -90,6 +106,7 @@ begin
      or new.generations_month is distinct from old.generations_month then
     raise exception 'permission denied: generation counters are read-only';
   end if;
+
   return new;
 end;
 $$;

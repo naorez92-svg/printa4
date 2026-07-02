@@ -497,8 +497,10 @@ ${notes ? `הוראות נוספות מהמורה: ${esc(notes)}` : ""}
       } catch (e) {
         clearInterval(hb);
         console.error("[generate-jewish] stream error:", String(e));
-        // Release/refund only for genuine early failures (see generate-booklet).
-        if (streamedChars < 2000) { releaseLock(); refundGeneration(); }
+        // Refund quota but KEEP the rate-limit stamp — this catch also fires on
+        // client abort; refund+release together enables an unthrottled abuse
+        // loop (see generate-booklet).
+        if (streamedChars < 2000) refundGeneration();
         const type = e instanceof Error && e.name === "TimeoutError" ? "timeout_error" : "overloaded_error";
         try { await w.write(sseError(type)); } catch { /* writer already closed */ }
         try { await w.close(); } catch {}

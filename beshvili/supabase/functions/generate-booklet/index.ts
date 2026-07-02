@@ -768,11 +768,12 @@ Deno.serve(async (req) => {
       } catch (e) {
         clearInterval(hb);
         console.error("[generate-booklet] stream error:", String(e));
-        // Release/refund only when nothing meaningful was generated — a genuine
-        // early API failure. A late failure (incl. a client abort that makes
-        // w.write throw) already delivered content worth the quota unit, and
-        // releasing there would hand out free rate-limit resets on abort.
-        if (streamedChars < 2000) { releaseLock(); refundGeneration(); }
+        // Refund quota only when nothing meaningful was generated, but KEEP the
+        // 60s rate-limit stamp: this catch also fires on client abort (w.write
+        // throws), and refund+release together would let an attacker loop
+        // request → read a little → abort → immediate free retry, burning
+        // Anthropic spend unthrottled. Legit early failures wait ≤60s.
+        if (streamedChars < 2000) refundGeneration();
         const type = e instanceof Error && e.name === "TimeoutError" ? "timeout_error" : "overloaded_error";
         try { await w.write(sseError(type)); } catch { /* writer already closed */ }
         try { await w.close(); } catch {}
