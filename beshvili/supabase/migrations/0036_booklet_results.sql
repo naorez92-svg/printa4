@@ -29,3 +29,36 @@ create policy "owner_reads_own_booklet_results" on public.booklet_results
 
 -- No INSERT/UPDATE/DELETE policies for anon/authenticated: the edge function
 -- writes with the service role after validating the share token and rate caps.
+
+-- ── Abuse caps, enforced ATOMICALLY in the DB ────────────────────────────────
+-- The edge function's count-then-insert check is a TOCTOU race under concurrent
+-- POSTs; this trigger is the authoritative gate (pattern mirrors 0025).
+create or replace function public.enforce_booklet_result_caps()
+returns trigger language plpgsql security definer
+set search_path = public as $$
+declare
+  total_count  integer;
+  recent_count integer;
+begin
+  select count(*) into total_count
+    from public.booklet_results where booklet_id = new.booklet_id;
+  if total_count >= 60 then
+    raise exception 'too_many_results: booklet result cap reached';
+  end if;
+
+  select count(*) into recent_count
+    from public.booklet_results
+   where booklet_id = new.booklet_id
+     and created_at > now() - interval '1 minute';
+  if recent_count >= 10 then
+    raise exception 'rate_limited: too many results per minute';
+  end if;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists enforce_booklet_result_caps on public.booklet_results;
+create trigger enforce_booklet_result_caps
+  before insert on public.booklet_results
+  for each row execute function public.enforce_booklet_result_caps();

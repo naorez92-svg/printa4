@@ -40,24 +40,19 @@ Deno.serve(async (req) => {
       const token = new URL(req.url).searchParams.get("token") ?? "";
       if (!TOKEN_RE.test(token)) return json({ error: "invalid_token" }, 400);
 
-      const { data: booklet } = await admin
+      const { data: booklet, error: getErr } = await admin
         .from("booklets")
-        .select("id, title, world, goal")
+        .select("title")
         .eq("share_token", token)
         .single();
+      // PGRST116 = no rows → genuine 404; anything else is OUR failure, not a
+      // deleted booklet — don't tell the parent the booklet is gone.
+      if (getErr && getErr.code !== "PGRST116") return json({ error: "internal_error" }, 500);
       if (!booklet) return json({ error: "not_found" }, 404);
 
-      const { count } = await admin
-        .from("booklet_results")
-        .select("*", { count: "exact", head: true })
-        .eq("booklet_id", booklet.id);
-
-      return json({
-        title: booklet.title,
-        world: booklet.world,
-        goal: booklet.goal,
-        resultCount: count ?? 0,
-      });
+      // Title only — it's already printed on the sheet the scanner is holding.
+      // goal/world can carry owner-typed notes that never appear on the page.
+      return json({ title: booklet.title });
     }
 
     if (req.method !== "POST") return json({ error: "method_not_allowed" }, 405);
@@ -78,13 +73,16 @@ Deno.serve(async (req) => {
     // An empty report carries no signal — require at least one substantive field.
     if (difficulty === null && mistakes === null && !hardText) return json({ error: "empty_report" }, 400);
 
-    const { data: booklet } = await admin
+    const { data: booklet, error: lookupErr } = await admin
       .from("booklets")
       .select("id")
       .eq("share_token", token)
       .single();
+    if (lookupErr && lookupErr.code !== "PGRST116") return json({ error: "internal_error" }, 500);
     if (!booklet) return json({ error: "not_found" }, 404);
 
+    // Fast-path check; the AUTHORITATIVE cap is the DB trigger
+    // enforce_booklet_result_caps (atomic — count-then-insert here races).
     const { count } = await admin
       .from("booklet_results")
       .select("*", { count: "exact", head: true })
@@ -99,6 +97,9 @@ Deno.serve(async (req) => {
       hard_text: hardText,
     });
     if (insertErr) {
+      if (/too_many_results|rate_limited/.test(insertErr.message ?? "")) {
+        return json({ error: "too_many_results" }, 429);
+      }
       console.error("record-booklet-result insert:", insertErr.message);
       return json({ error: "insert_failed" }, 500);
     }

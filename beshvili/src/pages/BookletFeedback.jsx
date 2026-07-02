@@ -54,12 +54,16 @@ export default function BookletFeedback({ token }) {
   const [sent, setSent]         = useState(false);
   const [sendError, setSendError] = useState(null);
 
-  useEffect(() => {
+  const loadInfo = () => {
+    setLoadError(null);
     fetch(`${FN_BASE}?token=${token}`)
       .then(r => r.ok ? r.json() : Promise.reject(new Error(r.status === 404 ? "not_found" : "server")))
       .then(setInfo)
-      .catch(e => setLoadError(e.message));
-  }, [token]);
+      // "not_found" is terminal; anything else (flaky phone network — the QR's
+      // main environment — or a 5xx) gets a retry, not a "was deleted" dead end.
+      .catch(e => setLoadError(e.message === "not_found" ? "not_found" : "retry"));
+  };
+  useEffect(loadInfo, [token]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (info) track("feedback_form_view", { token });
@@ -83,12 +87,21 @@ export default function BookletFeedback({ token }) {
           hard_text: hardText.trim() || null,
         }),
       });
-      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      if (!r.ok) {
+        const code = (await r.json().catch(() => ({})))?.error;
+        throw new Error(code || `HTTP ${r.status}`);
+      }
       track("feedback_form_submitted", { token, filledBy, difficulty, mistakes, hasText: !!hardText.trim() });
       setSent(true);
     } catch (e) {
-      track("feedback_form_failed", { token, message: String(e?.message ?? e).slice(0, 100) });
-      setSendError("לא הצלחנו לשלוח — בדקו את החיבור ונסו שוב 🙏");
+      const code = String(e?.message ?? e);
+      track("feedback_form_failed", { token, message: code.slice(0, 100) });
+      // Terminal errors get an honest message — "try again" would never succeed.
+      setSendError(
+        code === "too_many_results" ? "קיבלנו כבר הרבה עדכונים על החוברת הזו — תודה רבה! 🙏"
+        : code === "not_found" ? "החוברת כבר לא קיימת במערכת"
+        : "לא הצלחנו לשלוח — בדקו את החיבור ונסו שוב 🙏"
+      );
     } finally {
       setSending(false);
     }
@@ -103,12 +116,20 @@ export default function BookletFeedback({ token }) {
           <span className="font-bold text-ink text-lg font-display">בשבילי<span className="text-brand">·</span></span>
         </div>
 
-        {loadError && (
+        {loadError === "not_found" && (
           <div className="bg-white rounded-3xl p-8 shadow-sm border border-ink/5 text-center space-y-3">
             <div className="text-5xl">🔍</div>
             <h1 className="font-bold text-ink text-lg">החוברת לא נמצאה</h1>
             <p className="text-sm text-ink/50">יכול להיות שהיא נמחקה. אפשר ליצור חוברת חדשה בחינם:</p>
             <a href="/" className="inline-block bg-gradient-to-l from-magic to-brand text-white rounded-xl px-6 py-3 font-semibold text-sm">✨ לבשבילי</a>
+          </div>
+        )}
+        {loadError === "retry" && (
+          <div className="bg-white rounded-3xl p-8 shadow-sm border border-ink/5 text-center space-y-3">
+            <div className="text-5xl">📶</div>
+            <h1 className="font-bold text-ink text-lg">בעיית תקשורת</h1>
+            <p className="text-sm text-ink/50">בדקו את החיבור לאינטרנט ונסו שוב</p>
+            <button onClick={loadInfo} className="inline-block bg-gradient-to-l from-magic to-brand text-white rounded-xl px-6 py-3 font-semibold text-sm">🔄 נסו שוב</button>
           </div>
         )}
 
