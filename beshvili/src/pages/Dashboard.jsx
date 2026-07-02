@@ -242,7 +242,7 @@ export default function Dashboard() {
               pendingStarter={pendingStarter} onStarterConsumed={() => setPendingStarter(null)} />
           </div>
           {tab === "history" && <History isPro={isPro} onUpgrade={() => setShowUpgrade(true)} onCreateNew={() => setTab("create")}
-            onCreateSimilar={(b) => { setPendingStarter({ childName: b.child_name || "", grade: b.grade || "", world: b.world || "כדורגל", goal: b.goal || "", level: b.level || "medium" }); setTab("create"); }}
+            onCreateSimilar={(b, extras = {}) => { setPendingStarter({ childName: b.child_name || "", grade: b.grade || "", world: b.world || "כדורגל", goal: b.goal || "", level: b.level || "medium", weaknesses: extras.weaknesses || "", ...(extras.weaknesses ? { mode: "form" } : {}) }); setTab("create"); }}
           />}
           <Suspense fallback={<div className="py-12 text-center text-ink/40 text-sm">טוען…</div>}>
             {tab === "jewish" && <JewishCreate onSaved={() => refresh()} remaining={remaining} isPro={isPro} bookletCount={bookletCount} onUpgrade={() => setShowUpgrade(true)} />}

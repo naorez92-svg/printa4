@@ -39,6 +39,36 @@ const WORLD_EMOJI = {
   "מינקראפט": "🧱", "כללי": "📚",
 };
 
+const DIFFICULTY_LABEL = { too_hard: "קשה מדי 🥵", just_right: "בדיוק ברמה 🎯", too_easy: "קל מדי 🥱" };
+const MISTAKES_LABEL   = { none: "בלי טעויות 🏆", few: "כמה טעויות ✏️", many: "הרבה טעויות 🔁" };
+const FILLED_BY_LABEL  = { parent: "הורה", teacher: "מורה", student: "תלמיד/ה" };
+
+// Turn reported results into a `weaknesses` hint for the corrective booklet.
+function weaknessesFromResults(results) {
+  const texts = [...new Set(results.map(r => r.hard_text).filter(Boolean))].slice(0, 3);
+  if (texts.length) return texts.join("; ").slice(0, 300);
+  if (results.some(r => r.mistakes === "many"))       return "בחוברת הקודמת היו הרבה טעויות — לחזור על הבסיס בהדרגה עם הרבה דוגמאות פתורות";
+  if (results.some(r => r.difficulty === "too_hard")) return "החוברת הקודמת הייתה קשה מדי — להתחיל קל יותר ולעלות בהדרגה";
+  if (results.some(r => r.difficulty === "too_easy")) return "החוברת הקודמת הייתה קלה מדי — להעלות רמת אתגר";
+  return "";
+}
+
+// Ready-to-send WhatsApp progress report — the private teacher's "why I'm
+// worth ₪120/hour" message to the paying parent, generated in one tap.
+function parentReportText(b, results) {
+  const latest = results[0];
+  const hard = results.map(r => r.hard_text).filter(Boolean)[0];
+  const lines = [
+    `שלום! עדכון קצר על ${b.child_name || "הילד/ה"} 📚`,
+    `תרגלנו: ${b.goal || b.title}`,
+  ];
+  if (latest?.mistakes)   lines.push(`ביצוע: ${MISTAKES_LABEL[latest.mistakes]}`);
+  if (latest?.difficulty) lines.push(`רמת קושי: ${DIFFICULTY_LABEL[latest.difficulty]}`);
+  if (hard) lines.push(`בפעם הבאה נחזק: ${hard}`);
+  lines.push("", "החוברות נוצרות אישית עבורו/ה עם בשבילי ✨ beshvili.com");
+  return lines.join("\n");
+}
+
 function isToday(ts) {
   const d = new Date(ts);
   const now = new Date();
@@ -70,6 +100,8 @@ export default function History({ isPro = false, onUpgrade, onCreateNew, onCreat
   // Most recently opened row — only its Preview listens for Ctrl+P, so the
   // shortcut prints the booklet the user is actually looking at.
   const [lastOpenedId, setLastOpenedId] = useState(null);
+  // Feedback-loop results (scanned QR → /f/ form), grouped by booklet.
+  const [resultsByBooklet, setResultsByBooklet] = useState({});
 
   useEffect(() => {
     supabase
@@ -80,6 +112,17 @@ export default function History({ isPro = false, onUpgrade, onCreateNew, onCreat
         if (error) { setLoadError(true); track("history_load_failed", {}); }
         setItems(data ?? []);
         setLoading(false);
+      });
+    // RLS returns only results for the user's own booklets. Failure here is
+    // non-fatal — the history list works without badges (e.g. pre-migration).
+    supabase
+      .from("booklet_results")
+      .select("booklet_id, filled_by, difficulty, mistakes, hard_text, created_at")
+      .order("created_at", { ascending: false })
+      .then(({ data }) => {
+        const map = {};
+        for (const r of data ?? []) (map[r.booklet_id] ??= []).push(r);
+        setResultsByBooklet(map);
       });
   }, []);
 
@@ -166,7 +209,7 @@ export default function History({ isPro = false, onUpgrade, onCreateNew, onCreat
       )}
       {filtered.map((b, i) => (
         <BookletRow key={b.id} booklet={b} onDelete={onDelete} index={i} onCreateSimilar={onCreateSimilar}
-          printActive={lastOpenedId === b.id} onOpened={setLastOpenedId} />
+          results={resultsByBooklet[b.id]} printActive={lastOpenedId === b.id} onOpened={setLastOpenedId} />
       ))}
       {!loading && items.length >= 2 && !isPro && onUpgrade && (
         <UpgradeNudge onUpgrade={onUpgrade} />
@@ -175,7 +218,7 @@ export default function History({ isPro = false, onUpgrade, onCreateNew, onCreat
   );
 }
 
-function BookletRow({ booklet: b, onDelete, index = 0, onCreateSimilar, printActive = true, onOpened }) {
+function BookletRow({ booklet: b, onDelete, index = 0, onCreateSimilar, results, printActive = true, onOpened }) {
   const [html, setHtml] = useState(null);
   const [shareToken, setShareToken] = useState(null);
   const [loadingHtml, setLoadingHtml] = useState(false);
@@ -276,6 +319,45 @@ function BookletRow({ booklet: b, onDelete, index = 0, onCreateSimilar, printAct
           </button>
         </div>
       </div>
+      {/* Feedback-loop strip: someone scanned the printed QR and reported back */}
+      {results?.length > 0 && (
+        <div className="border-t border-ink/5 bg-grow/[0.04] px-4 py-2.5 flex items-center gap-2 flex-wrap">
+          <span className="text-[11px] font-semibold text-grow whitespace-nowrap">
+            📬 {results.length === 1 ? "עדכון אחד" : `${results.length} עדכונים`}
+            {results[0].mistakes && ` · ${MISTAKES_LABEL[results[0].mistakes]}`}
+            {!results[0].mistakes && results[0].difficulty && ` · ${DIFFICULTY_LABEL[results[0].difficulty]}`}
+            {` (${FILLED_BY_LABEL[results[0].filled_by] ?? ""})`}
+          </span>
+          {results[0].hard_text && (
+            <span className="text-[11px] text-ink/45 truncate max-w-[220px]" title={results[0].hard_text}>
+              „{results[0].hard_text}”
+            </span>
+          )}
+          <span className="flex-1" />
+          {onCreateSimilar && (
+            <button
+              onClick={() => {
+                track("corrective_booklet_clicked", { booklet_id: b.id, results: results.length });
+                onCreateSimilar(b, { weaknesses: weaknessesFromResults(results) });
+              }}
+              className="text-[11px] bg-magic text-white font-semibold rounded-full px-3 py-1.5 hover:opacity-90 transition-opacity whitespace-nowrap shadow-sm"
+            >
+              🎯 חוברת תיקון
+            </button>
+          )}
+          <button
+            onClick={() => {
+              track("parent_report_clicked", { booklet_id: b.id });
+              const url = "https://wa.me/?text=" + encodeURIComponent(parentReportText(b, results));
+              const w = window.open(url, "_blank");
+              if (!w) location.href = url;
+            }}
+            className="text-[11px] border border-[#25D366] text-[#128C7E] font-semibold rounded-full px-3 py-1.5 hover:bg-[#25D366]/5 transition-colors whitespace-nowrap"
+          >
+            📋 דו״ח להורה
+          </button>
+        </div>
+      )}
       {html && (
         <div className="border-t border-ink/5 p-4">
           <Preview html={html} shareToken={shareToken} title={b.title} context="history" bookletId={b.id} active={printActive} />

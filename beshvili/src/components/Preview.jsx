@@ -79,6 +79,21 @@ export default function Preview({ html, onReset, shareToken, title, active = tru
           "</head>",
           "<style>@page{size:A4;margin:0}*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}</style></head>"
         );
+    // The feedback loop: a small print-only QR pinned to the bottom-left corner
+    // of every printed sheet, linking to /f/{share_token} — whoever holds the
+    // page (parent/teacher/kid) scans and reports how it went in 10 seconds.
+    // That report feeds the dashboard and the corrective-booklet generator.
+    if (shareToken && !h.includes("bsv-feedback-qr")) {
+      const fUrl = `${window.location.origin}/f/${shareToken}`;
+      const qrImg = `https://api.qrserver.com/v1/create-qr-code/?size=120x120&margin=1&data=${encodeURIComponent(fUrl)}`;
+      const qrBlock =
+        '<div id="bsv-feedback-qr" style="display:none">' +
+          `<img src="${qrImg}" alt="" style="width:13mm;height:13mm;display:block"/>` +
+          '<span style="font-size:6.5px;color:#9ca3af;display:block;text-align:center;line-height:1.25;margin-top:0.5mm">סרקו —<br/>איך הלך?</span>' +
+        '</div>' +
+        '<style>@media print{#bsv-feedback-qr{display:block!important;position:fixed;bottom:4mm;left:5mm;z-index:9999;width:14mm}}</style>';
+      h = h.includes("</body>") ? h.replace("</body>", qrBlock + "</body>") : h + qrBlock;
+    }
     // Flow-type worksheets (e.g. Jewish-studies materials) lay each page out with
     // `.page{min-height:296mm}`. When a page's content is taller than A4 it overflows
     // onto a second physical sheet, leaving a big gap and an awkward mid-content split
@@ -301,7 +316,8 @@ export default function Preview({ html, onReset, shareToken, title, active = tru
 
   const downloadHtml = () => {
     track("booklet_html_downloaded", { context });
-    const url = URL.createObjectURL(new Blob([html], { type: "text/html;charset=utf-8" }));
+    // Use the print HTML so the downloaded file carries the feedback QR too.
+    const url = URL.createObjectURL(new Blob([getPrintHtml()], { type: "text/html;charset=utf-8" }));
     const a = document.createElement("a");
     a.href = url;
     a.download = "חוברת-בשבילי.html";
