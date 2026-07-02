@@ -79,6 +79,18 @@ export default function Preview({ html, onReset, shareToken, title, active = tru
           "</head>",
           "<style>@page{size:A4;margin:0}*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}</style></head>"
         );
+    // The generator often emits page-break-after on EVERY .page including the
+    // last one — printing then appends a blank trailing sheet (users see an
+    // empty page with just the footer/QR stamped on it). Neutralize the break
+    // on the last page; body margins are another blank-page source.
+    const lastPageFix =
+      '<style id="bsv-last-page-fix">@media print{' +
+      '.page:last-of-type,.page:last-child{page-break-after:auto!important;break-after:auto!important}' +
+      'body{margin:0!important;padding:0!important}' +
+      '}</style>';
+    if (!h.includes("bsv-last-page-fix")) {
+      h = h.includes("</head>") ? h.replace("</head>", lastPageFix + "</head>") : lastPageFix + h;
+    }
     // The feedback loop: a small print-only QR pinned to the bottom-left corner
     // of every printed sheet, linking to /f/{share_token} — whoever holds the
     // page (parent/teacher/kid) scans and reports how it went in 10 seconds.
@@ -92,7 +104,10 @@ export default function Preview({ html, onReset, shareToken, title, active = tru
           '<span style="font-size:6.5px;color:#9ca3af;display:block;text-align:center;line-height:1.25;margin-top:0.5mm">סרקו —<br/>איך הלך?</span>' +
         '</div>' +
         '<style>@media print{#bsv-feedback-qr{display:block!important;position:fixed;bottom:4mm;left:5mm;z-index:9999;width:14mm}}</style>';
-      h = h.includes("</body>") ? h.replace("</body>", qrBlock + "</body>") : h + qrBlock;
+      // Inject at the START of <body>, never the end: appended trailing elements
+      // break the generator's `.page:last-child{page-break-after:avoid}` rule and
+      // print gains a blank final sheet. Position:fixed renders it regardless.
+      h = /<body[^>]*>/i.test(h) ? h.replace(/(<body[^>]*>)/i, `$1${qrBlock}`) : qrBlock + h;
     }
     // Flow-type worksheets (e.g. Jewish-studies materials) lay each page out with
     // `.page{min-height:296mm}`. When a page's content is taller than A4 it overflows
