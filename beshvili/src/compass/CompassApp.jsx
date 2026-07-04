@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabase";
+import { track, pageView, identify } from "../hooks/useEvents";
+import { STAGES } from "./data/questions";
 import { useJourney } from "./useJourney";
 import Journey from "./Journey";
 import Interview from "./Interview";
@@ -13,7 +15,9 @@ import { Shell, ProgressHeader, Btn, CompassMark } from "./ui";
 // for only when reaching the AI stages — the Edge Function requires a JWT and
 // the report is worth saving to an account anyway.
 
-const AI_STAGES = new Set(["interview", "analysis", "report"]);
+// Derived from the single STAGES config — adding a new AI stage there gates it
+// behind login automatically.
+const AI_STAGES = new Set(STAGES.filter((s) => s.ai).map((s) => s.id));
 
 export default function CompassApp() {
   const [session, setSession] = useState(null);
@@ -21,17 +25,35 @@ export default function CompassApp() {
   const { journey, update, ensureRow, goToStage, nextStage, saveSection, restart } = useJourney(session);
 
   useEffect(() => {
+    pageView("compass");
     supabase.auth.getSession()
       .then(({ data }) => { setSession(data.session); setAuthLoading(false); })
       .catch(() => { setSession(null); setAuthLoading(false); });
-    const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => setSession(s));
+    const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => {
+      setSession(s);
+      // Tie the compass funnel to the user identity (once per tab-session —
+      // SIGNED_IN also fires on token refresh / tab refocus).
+      if (_e === "SIGNED_IN" && s?.user) {
+        let counted = false;
+        try {
+          counted = sessionStorage.getItem("compass_session_counted") === s.user.id;
+          sessionStorage.setItem("compass_session_counted", s.user.id);
+        } catch { /* ignore */ }
+        if (!counted) {
+          identify(s.user.id);
+          track("compass_login_completed", { method: s.user.app_metadata?.provider ?? "magic_link" });
+        }
+      }
+    });
     return () => sub.subscription.unsubscribe();
   }, []);
 
   const { stage } = journey;
 
   if (stage === "welcome") {
-    return <Welcome hasProgress={Object.keys(journey.answers).length > 0} onStart={() => goToStage(Object.keys(journey.answers).length > 0 ? resumeStage(journey) : "background")} />;
+    // Resume happens in loadLocal (a returning user restores at their saved
+    // stage and never sees Welcome), so starting always means "background".
+    return <Welcome onStart={() => { track("compass_start", {}); goToStage("background"); }} />;
   }
 
   // AI stages require auth. Wait for the session check before deciding —
@@ -67,13 +89,8 @@ export default function CompassApp() {
   );
 }
 
-// If the user paused mid-journey, resume at the stage they left.
-function resumeStage(journey) {
-  return journey.stage !== "welcome" ? journey.stage : "background";
-}
-
 // ── Landing / welcome ──
-function Welcome({ hasProgress, onStart }) {
+function Welcome({ onStart }) {
   return (
     <Shell>
       <div className="flex-1 flex flex-col items-center justify-center text-center py-10">
@@ -102,7 +119,7 @@ function Welcome({ hasProgress, onStart }) {
         </div>
 
         <Btn onClick={onStart} className="text-lg px-10 py-4">
-          {hasProgress ? "ממשיכים מאיפה שעצרת ←" : "יוצאים למסע ←"}
+          יוצאים למסע ←
         </Btn>
         <p className="text-xs text-white/30 mt-4">
           ‏30–60 דקות · אפשר לעצור ולחזור מתי שרוצים · חינם
@@ -120,16 +137,21 @@ function CompassLogin() {
   const [error, setError] = useState("");
   const redirectTo = `${window.location.origin}/compass`;
 
+  // Same error map as friendlyAuthError in pages/Login.jsx, rephrased for the
+  // compass audience (neutral/masculine). Keep the two regexes in sync.
   const friendly = (err) => {
     const msg = (err && err.message) || "";
-    if (/failed to fetch|network|fetch/i.test(msg)) return "בעיית תקשורת — בדוק את החיבור ונסה שוב";
-    if (/invalid|valid email/i.test(msg)) return "כתובת המייל לא תקינה";
-    if (/rate limit|too many|after \d+ second/i.test(msg)) return "נשלחו יותר מדי בקשות — המתן רגע ונסה שוב";
-    return "שגיאה בשליחה — נסה שוב";
+    if (/failed to fetch|network ?request failed|networkerror|load failed|fetch/i.test(msg)) {
+      return "בעיית תקשורת — בדוק את החיבור לאינטרנט ונסה שוב";
+    }
+    if (/invalid|not a valid email|unable to validate email/i.test(msg)) return "כתובת המייל לא תקינה";
+    if (/rate limit|too many/i.test(msg)) return "נשלחו יותר מדי בקשות — המתן רגע ונסה שוב";
+    return /[֐-׿]/.test(msg) ? msg : "שגיאה בשליחה — נסה שוב";
   };
 
   const sendLink = async () => {
     if (!email.trim()) return;
+    track("compass_auth_email_submitted", {});
     setLoading(true);
     setError("");
     const { error: err } = await supabase.auth.signInWithOtp({
@@ -142,6 +164,7 @@ function CompassLogin() {
   };
 
   const google = async () => {
+    track("compass_auth_google_click", {});
     setError("");
     const { error: err } = await supabase.auth.signInWithOAuth({
       provider: "google",

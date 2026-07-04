@@ -234,24 +234,28 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: "bad_request" }), { status: 400, headers: cors });
     }
 
-    // 3. Journey ownership + abuse caps
-    const { data: journey, error: jErr } = await admin
-      .from("career_journeys")
-      .select("id, user_id, ai_calls, last_ai_call_at")
-      .eq("id", journeyId)
-      .single();
-    if (jErr || !journey || journey.user_id !== user.id) {
+    // 3. Journey ownership + abuse caps (independent reads — run concurrently)
+    const dayAgo = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
+    const [journeyResult, { count: journeysToday }] = await Promise.all([
+      admin.from("career_journeys")
+        .select("id, user_id, ai_calls, last_ai_call_at")
+        .eq("id", journeyId)
+        .single(),
+      admin.from("career_journeys")
+        .select("*", { count: "exact", head: true })
+        .eq("user_id", user.id)
+        .gte("created_at", dayAgo),
+    ]);
+    const journey = journeyResult.data;
+    if (journeyResult.error || !journey || journey.user_id !== user.id) {
       return new Response(JSON.stringify({ error: "not_found" }), { status: 404, headers: cors });
     }
     if (journey.ai_calls >= MAX_AI_CALLS_PER_JOURNEY) {
       return new Response(JSON.stringify({ error: "journey_quota_exceeded" }), { status: 403, headers: cors });
     }
-    const dayAgo = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
-    const { count: journeysToday } = await admin
-      .from("career_journeys")
-      .select("*", { count: "exact", head: true })
-      .eq("user_id", user.id)
-      .gte("created_at", dayAgo);
+    // Strict >: with N journeys existing, count === N — so ">" allows calls on
+    // up to MAX journeys and blocks once an (MAX+1)th row exists. ">=" would
+    // silently shrink the usable cap to MAX-1.
     if ((journeysToday ?? 0) > MAX_JOURNEYS_PER_DAY) {
       return new Response(JSON.stringify({ error: "daily_limit" }), { status: 403, headers: cors });
     }
@@ -274,10 +278,14 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: "rate_limited", wait: gap }), { status: 429, headers: cors });
     }
     // A failed AI call must not burn journey budget — refund on error paths.
+    // CAS-guarded like the increment: roll back ONLY if the counter still holds
+    // the value we wrote, so a concurrent call's increment is never clobbered
+    // (worst case a refund is skipped, which fails in the safe direction).
     const refund = () =>
       admin.from("career_journeys")
         .update({ ai_calls: journey.ai_calls })
         .eq("id", journey.id)
+        .eq("ai_calls", journey.ai_calls + 1)
         .then(() => {}, () => {});
 
     const apiKey = Deno.env.get("ANTHROPIC_API_KEY");

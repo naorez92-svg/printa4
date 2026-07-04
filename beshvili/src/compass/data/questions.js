@@ -12,9 +12,10 @@ export const STAGES = [
   { id: "bigfive",    label: "מי אתה באמת",        icon: "🪞", minutes: 4 },
   { id: "cognitive",  label: "אתגר המחשבה",        icon: "🧠", minutes: 6 },
   { id: "open",       label: "שאלות עומק",         icon: "✍️", minutes: 8 },
-  { id: "interview",  label: "ראיון אישי",          icon: "🎙️", minutes: 8 },
-  { id: "analysis",   label: "ניתוח",               icon: "🔮", minutes: 3 },
-  { id: "report",     label: "המצפן שלך" },
+  // ai: true → the stage calls the Edge Function and therefore requires login.
+  { id: "interview",  label: "ראיון אישי",          icon: "🎙️", minutes: 8, ai: true },
+  { id: "analysis",   label: "ניתוח",               icon: "🔮", minutes: 3, ai: true },
+  { id: "report",     label: "המצפן שלך", ai: true },
 ];
 
 export const STAGE_INTROS = {

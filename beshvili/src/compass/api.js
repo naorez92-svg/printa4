@@ -73,19 +73,26 @@ export async function streamAnalysis(journeyId, answers, interview, onEvent, sig
     for (const frame of frames) {
       const line = frame.split("\n").find((l) => l.startsWith("data: "));
       if (!line) continue; // keep-alive comment frames
+      let evt;
       try {
-        onEvent(JSON.parse(line.slice(6)));
-      } catch { /* malformed frame — skip */ }
+        evt = JSON.parse(line.slice(6));
+      } catch { continue; /* malformed frame — skip */ }
+      // Deliberately OUTSIDE the try: the caller throws from onEvent on server
+      // error events, and that error must propagate out of streamAnalysis.
+      onEvent(evt);
     }
   }
 }
 
 // Split the streamed report into named sections by the @@marker@@ lines.
+// Keys are normalized (whitespace → underscore) so a model writing
+// "@@מפת דרכים@@" still lands on the "מפת_דרכים" section.
 export function parseReport(raw) {
   const sections = {};
   const parts = raw.split(/@@([^@\n]+)@@/);
   for (let i = 1; i < parts.length; i += 2) {
-    sections[parts[i].trim()] = (parts[i + 1] || "").trim();
+    const key = parts[i].trim().replace(/[\s_]+/g, "_");
+    sections[key] = (parts[i + 1] || "").trim();
   }
   return sections;
 }

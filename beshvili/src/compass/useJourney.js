@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "../lib/supabase";
+import { track } from "../hooks/useEvents";
 import { STAGES } from "./data/questions";
 
 // מצפן journey state: a small state machine persisted to localStorage on every
@@ -9,7 +10,10 @@ import { STAGES } from "./data/questions";
 
 const LS_KEY = "compass_journey_v1";
 
+const SCHEMA_V = 1;
+
 const EMPTY = {
+  v: SCHEMA_V,
   rowId: null,
   stage: "welcome",
   answers: {},      // { background, riasec, values, bigfive, cognitive, open }
@@ -22,8 +26,9 @@ function loadLocal() {
     const raw = localStorage.getItem(LS_KEY);
     if (!raw) return { ...EMPTY };
     const parsed = JSON.parse(raw);
-    // Unknown stage (old version / tampering) → restart rather than crash.
-    if (!STAGES.some((s) => s.id === parsed.stage)) return { ...EMPTY };
+    // Wrong schema version or unknown stage (old build / tampering) → restart
+    // rather than feed a stale shape into scoring and crash mid-journey.
+    if (parsed.v !== SCHEMA_V || !STAGES.some((s) => s.id === parsed.stage)) return { ...EMPTY };
     return { ...EMPTY, ...parsed };
   } catch {
     return { ...EMPTY };
@@ -33,17 +38,40 @@ function loadLocal() {
 export function useJourney(session) {
   const [journey, setJourney] = useState(loadLocal);
   const syncTimer = useRef(null);
+  const lsTimer = useRef(null);
   const journeyRef = useRef(journey);
   journeyRef.current = journey;
 
-  // Persist locally on every change; mirror to Supabase debounced (2s) when
-  // logged in — the journey generates a burst of tiny updates per screen.
+  // Persist locally (debounced — textareas fire update() per keystroke and a
+  // full-journey JSON.stringify per character janks mobile typing); mirror to
+  // Supabase debounced when logged in.
   const update = useCallback((patch) => {
     setJourney((prev) => {
       const next = typeof patch === "function" ? patch(prev) : { ...prev, ...patch };
-      try { localStorage.setItem(LS_KEY, JSON.stringify(next)); } catch { /* storage full/blocked */ }
+      journeyRef.current = next;
+      clearTimeout(lsTimer.current);
+      lsTimer.current = setTimeout(() => {
+        try { localStorage.setItem(LS_KEY, JSON.stringify(next)); } catch { /* storage full/blocked */ }
+      }, 250);
       return next;
     });
+  }, []);
+
+  // Flush the pending localStorage write when the page goes to background /
+  // unloads, so the 250ms debounce can't lose the last keystrokes.
+  useEffect(() => {
+    const flush = () => {
+      clearTimeout(lsTimer.current);
+      try { localStorage.setItem(LS_KEY, JSON.stringify(journeyRef.current)); } catch { /* ignore */ }
+    };
+    const onVis = () => { if (document.visibilityState === "hidden") flush(); };
+    window.addEventListener("pagehide", flush);
+    document.addEventListener("visibilitychange", onVis);
+    return () => {
+      flush();
+      window.removeEventListener("pagehide", flush);
+      document.removeEventListener("visibilitychange", onVis);
+    };
   }, []);
 
   // Ensure a career_journeys row exists for this user (needed before any AI
@@ -62,9 +90,12 @@ export function useJourney(session) {
     return data.id;
   }, [session, update]);
 
-  // Debounced mirror of the current journey into its row.
+  // Debounced mirror of the current journey into its row. The completed report
+  // syncs immediately — it's the one write that must not be lost to the
+  // debounce window if the user closes the tab right after finishing.
   useEffect(() => {
     if (!session?.user || !journey.rowId) return;
+    const delay = journey.stage === "report" && journey.report ? 0 : 2000;
     clearTimeout(syncTimer.current);
     syncTimer.current = setTimeout(() => {
       supabase
@@ -79,7 +110,7 @@ export function useJourney(session) {
         })
         .eq("id", journey.rowId)
         .then(() => {}, () => {});
-    }, 2000);
+    }, delay);
     return () => clearTimeout(syncTimer.current);
   }, [session, journey]);
 
@@ -110,14 +141,16 @@ export function useJourney(session) {
       }, () => {});
   }, [session, update]);
 
-  const goToStage = useCallback((stageId) => update({ stage: stageId }), [update]);
+  const goToStage = useCallback((stageId) => {
+    track("compass_stage", { stage: stageId });
+    update({ stage: stageId });
+  }, [update]);
 
   const nextStage = useCallback(() => {
-    update((prev) => {
-      const idx = STAGES.findIndex((s) => s.id === prev.stage);
-      const next = STAGES[Math.min(idx + 1, STAGES.length - 1)];
-      return { ...prev, stage: next.id };
-    });
+    const idx = STAGES.findIndex((s) => s.id === journeyRef.current.stage);
+    const next = STAGES[Math.min(idx + 1, STAGES.length - 1)];
+    track("compass_stage", { stage: next.id });
+    update({ stage: next.id });
   }, [update]);
 
   const saveSection = useCallback((key, data) => {

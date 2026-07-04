@@ -4,13 +4,22 @@ import { Btn, CompassMark, Rich } from "./ui";
 // תמצית (essence) → פרופיל (portrait) → כיוונים (ranked directions) →
 // לימודים (studies) → מפת_דרכים (roadmap) → מכתב (personal letter).
 
-// "### שם הכיוון | התאמה: 87%" chunks → [{title, fit, body}]
+// Split "### heading\nbody…" text. parts[0] is preamble text BEFORE the first
+// ### — it must never become a card of its own (it renders separately).
+function splitH3(text = "") {
+  const parts = text.split(/^###\s*/m);
+  return {
+    preamble: (parts[0] || "").trim(),
+    chunks: parts.slice(1).map((c) => c.trim()).filter(Boolean),
+  };
+}
+
+// "### שם הכיוון | התאמה: 87%" chunks → {intro, items: [{title, fit, body}]}
 function parseDirections(text = "") {
-  return text
-    .split(/^###\s*/m)
-    .map((c) => c.trim())
-    .filter(Boolean)
-    .map((chunk) => {
+  const { preamble, chunks } = splitH3(text);
+  return {
+    intro: preamble,
+    items: chunks.map((chunk) => {
       const [head, ...rest] = chunk.split("\n");
       const fitMatch = head.match(/התאמה:\s*(\d{1,3})\s*%/);
       return {
@@ -18,19 +27,16 @@ function parseDirections(text = "") {
         fit: fitMatch ? Math.min(100, parseInt(fitMatch[1], 10)) : null,
         body: rest.join("\n").trim(),
       };
-    });
+    }),
+  };
 }
 
 // "### תקופה" chunks → [{period, body}]
 function parseRoadmap(text = "") {
-  return text
-    .split(/^###\s*/m)
-    .map((c) => c.trim())
-    .filter(Boolean)
-    .map((chunk) => {
-      const [head, ...rest] = chunk.split("\n");
-      return { period: head.trim(), body: rest.join("\n").trim() };
-    });
+  return splitH3(text).chunks.map((chunk) => {
+    const [head, ...rest] = chunk.split("\n");
+    return { period: head.trim(), body: rest.join("\n").trim() };
+  });
 }
 
 function SectionCard({ icon, title, children, accent = "border-white/10" }) {
@@ -49,8 +55,7 @@ export default function Report({ journey, restart }) {
   const name = journey.answers?.background?.name || "";
   const essence = sections["תמצית"];
   const profile = sections["פרופיל"];
-  const directions = parseDirections(sections["כיוונים"]);
-  const intro = (sections["כיוונים"] || "").split(/^###/m)[0].trim();
+  const { intro, items: directions } = parseDirections(sections["כיוונים"]);
   const studies = sections["לימודים"];
   const roadmap = parseRoadmap(sections["מפת_דרכים"]);
   const letter = sections["מכתב"];

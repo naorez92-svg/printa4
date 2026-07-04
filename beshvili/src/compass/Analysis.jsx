@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { track } from "../hooks/useEvents";
 import { streamAnalysis, parseReport } from "./api";
 import { Btn, CompassMark } from "./ui";
 
@@ -18,16 +19,23 @@ export default function Analysis({ journey, update, ensureRow, goToStage }) {
   const [phase, setPhase] = useState("starting");     // starting|agents|synthesis|error
   const [streamed, setStreamed] = useState("");
   const [error, setError] = useState("");
-  const startedRef = useRef(false);
   const rawRef = useRef("");
+  const doneRef = useRef(false);       // set only by the server's "done" event
+  const lastFlushRef = useRef(0);
+  const abortRef = useRef(null);
   const streamBoxRef = useRef(null);
 
   const run = async () => {
+    const controller = new AbortController();
+    abortRef.current?.abort();
+    abortRef.current = controller;
+    doneRef.current = false;
+    rawRef.current = "";
     setPhase("starting");
     setError("");
     setAgentState({});
-    rawRef.current = "";
     setStreamed("");
+    track("compass_analysis_started", {});
     try {
       const rowId = journey.rowId || (await ensureRow());
       if (!rowId) throw Object.assign(new Error("no_row"), { code: "no_row" });
@@ -41,25 +49,31 @@ export default function Analysis({ journey, update, ensureRow, goToStage }) {
           setPhase("synthesis");
         } else if (evt.type === "delta") {
           rawRef.current += evt.text;
-          setStreamed(rawRef.current);
+          // Throttle renders: deltas arrive many times per second and each
+          // render re-scans the visible tail — a few flushes/sec is plenty.
+          if (Date.now() - lastFlushRef.current > 150) {
+            lastFlushRef.current = Date.now();
+            setStreamed(rawRef.current);
+          }
         } else if (evt.type === "done") {
+          if (doneRef.current) return; // duplicate terminal event
+          doneRef.current = true;
           const raw = rawRef.current;
-          const sections = parseReport(raw);
-          update({ report: { raw, sections }, stage: "report" });
+          track("compass_report_ready", { chars: raw.length });
+          update({ report: { raw, sections: parseReport(raw) }, stage: "report" });
         } else if (evt.type === "error") {
+          // Propagates out of streamAnalysis (frame parsing is caught separately).
           throw Object.assign(new Error(evt.error), { code: evt.error });
         }
-      });
-      // Stream closed without a "done" event and without a stored report —
-      // treat whatever arrived as the report if it's substantial, else error.
-      if (!journey.report && rawRef.current.length > 400) {
-        const raw = rawRef.current;
-        update({ report: { raw, sections: parseReport(raw) }, stage: "report" });
-      } else if (rawRef.current.length <= 400) {
+      }, controller.signal);
+      // Stream closed without the terminal "done" — the report is untrustworthy
+      // (mid-synthesis drop). Surface a retry instead of storing a partial.
+      if (!doneRef.current) {
         setPhase("error");
         setError("הניתוח נקטע באמצע. נסה שוב 🙏");
       }
     } catch (e) {
+      if (controller.signal.aborted) return; // unmounted / superseded — stay silent
       setPhase("error");
       if (e.code === "rate_limited") setError(`המערכת עמוסה רגע — נסה שוב בעוד ${e.wait || 45} שניות`);
       else if (e.code === "journey_quota_exceeded" || e.code === "daily_limit") setError("הגעת למגבלת הניתוחים להיום. חזור מחר — ההתקדמות שלך שמורה.");
@@ -68,9 +82,10 @@ export default function Analysis({ journey, update, ensureRow, goToStage }) {
   };
 
   useEffect(() => {
-    if (startedRef.current) return; // guard StrictMode double-mount + re-renders
-    startedRef.current = true;
-    run();
+    // Deferred start: StrictMode's dev double-mount unmounts synchronously, so
+    // the first mount's timer is cleared before the (billable) request fires.
+    const t = setTimeout(run, 60);
+    return () => { clearTimeout(t); abortRef.current?.abort(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -122,7 +137,7 @@ export default function Analysis({ journey, update, ensureRow, goToStage }) {
           ref={streamBoxRef}
           className="bg-white/5 border border-white/10 rounded-2xl px-5 py-4 max-h-44 overflow-hidden text-sm text-white/50 leading-relaxed whitespace-pre-wrap"
         >
-          {streamed.replace(/@@[^@\n]+@@/g, "").slice(-1200) || "…"}
+          {streamed.slice(-1400).replace(/@@[^@\n]+@@/g, "").slice(-1200) || "…"}
         </div>
       )}
 
