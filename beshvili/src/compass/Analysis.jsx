@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { supabase } from "../lib/supabase";
 import { track } from "../hooks/useEvents";
 import { streamExperts, streamSynthesis, parseReport } from "./api";
 import { Btn, CompassMark } from "./ui";
@@ -26,10 +27,18 @@ export default function Analysis({ journey, update, ensureRow, goToStage }) {
   const abortRef = useRef(null);
   const streamBoxRef = useRef(null);
 
-  const finishWithReport = () => {
+  // The server persists the authoritative transcript to the journey row before
+  // sending "done" — prefer that copy (a streaming hiccup can gap the local
+  // accumulation); fall back to what we streamed.
+  const finishWithReport = async (rowId) => {
     if (doneRef.current) return;
     doneRef.current = true;
-    const raw = rawRef.current;
+    let raw = rawRef.current;
+    try {
+      const { data } = await supabase
+        .from("career_journeys").select("report").eq("id", rowId).maybeSingle();
+      if (data?.report?.raw && data.report.raw.length >= raw.length) raw = data.report.raw;
+    } catch { /* keep the streamed copy */ }
     track("compass_report_ready", { chars: raw.length });
     update({ report: { raw, sections: parseReport(raw) }, stage: "report" });
   };
@@ -70,6 +79,7 @@ export default function Analysis({ journey, update, ensureRow, goToStage }) {
 
       // ── Phase 2: synthesis (raw Anthropic SSE + our control events) ──
       setPhase("synthesis");
+      let serverDone = false;
       await streamSynthesis(rowId, journey.answers, journey.interview, (evt) => {
         if (evt.type === "content_block_delta" && evt.delta?.type === "text_delta") {
           rawRef.current += evt.delta.text;
@@ -78,12 +88,16 @@ export default function Analysis({ journey, update, ensureRow, goToStage }) {
             setStreamed(rawRef.current);
           }
         } else if (evt.type === "done") {
-          finishWithReport();
+          serverDone = true;
         } else if (evt.type === "error") {
-          throw Object.assign(new Error(evt.error), { code: evt.error, phase: "synthesis" });
+          // Our control events carry a string code; Anthropic's own mid-stream
+          // error frames carry an object — normalize those to a generic code.
+          const code = typeof evt.error === "string" ? evt.error : "ai_error";
+          throw Object.assign(new Error(code), { code, phase: "synthesis" });
         }
         // Other Anthropic events (message_start/stop, block start/stop) — ignore.
       }, controller.signal);
+      if (serverDone) await finishWithReport(rowId);
       // Stream closed without the server's "done" → the server didn't persist
       // a report; surface a retry (experts are cached, so it's cheap).
       if (!doneRef.current) {

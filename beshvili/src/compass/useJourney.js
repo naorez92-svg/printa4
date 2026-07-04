@@ -95,21 +95,31 @@ export function useJourney(session) {
   // Debounced mirror of the current journey into its row. The completed report
   // syncs immediately — it's the one write that must not be lost to the
   // debounce window if the user closes the tab right after finishing.
+  //
+  // Two guards protect the server-persisted report from stale clobbers:
+  //  • during "analysis" with no local report there is nothing new to mirror —
+  //    and the server may be writing the report to this row right now;
+  //  • report/status are included in the payload only when a report exists, so
+  //    a mirror can never overwrite a saved report with null.
   useEffect(() => {
     if (!session?.user || !journey.rowId) return;
+    if (journey.stage === "analysis" && !journey.report) return;
     const delay = journey.stage === "report" && journey.report ? 0 : 2000;
     clearTimeout(syncTimer.current);
     syncTimer.current = setTimeout(() => {
+      const payload = {
+        stage: journey.stage,
+        answers: journey.answers,
+        interview: journey.interview,
+        updated_at: new Date().toISOString(),
+      };
+      if (journey.report) {
+        payload.report = journey.report;
+        payload.status = journey.stage === "report" ? "completed" : "in_progress";
+      }
       supabase
         .from("career_journeys")
-        .update({
-          stage: journey.stage,
-          answers: journey.answers,
-          interview: journey.interview,
-          report: journey.report,
-          status: journey.stage === "report" ? "completed" : "in_progress",
-          updated_at: new Date().toISOString(),
-        })
+        .update(payload)
         .eq("id", journey.rowId)
         .then(() => {}, () => {});
     }, delay);

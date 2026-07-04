@@ -3,7 +3,6 @@ import { supabase } from "../lib/supabase";
 import { track } from "../hooks/useEvents";
 import { checkCompassPaid } from "./api";
 import { scoreRiasec, scoreValues } from "./scoring";
-import { RIASEC_TYPES } from "./data/questions";
 import { Btn, CompassMark } from "./ui";
 
 // מצפן — the paywall between the completed journey and the report.

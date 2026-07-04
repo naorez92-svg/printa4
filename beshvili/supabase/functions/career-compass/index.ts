@@ -409,9 +409,11 @@ Deno.serve(async (req) => {
             return { key: a.key, label: a.label, text };
           }));
           // Persist BEFORE reporting success — the whole point is durability.
+          // Also clear the rate-gap stamp: the client auto-chains straight into
+          // synthesize, which must not 429 just because the experts were fast.
           const { error: saveErr } = await admin
             .from("career_journeys")
-            .update({ analyses })
+            .update({ analyses, last_ai_call_at: null })
             .eq("id", journey.id);
           if (saveErr) throw new Error("analyses_save_failed");
           await send({ type: "done" });
@@ -441,23 +443,32 @@ Deno.serve(async (req) => {
             throw new Error(`synth_${synth.status}`);
           }
 
-          // RAW passthrough (client parses Anthropic events itself). We only
-          // append chunks to an array — no per-event JSON work — and watch a
-          // rolling tail for message_stop. This keeps server CPU near zero.
+          // RAW passthrough (client parses Anthropic events itself) with
+          // FRAME-ALIGNED writes: Anthropic frames can split across TCP reads,
+          // and the 8s heartbeat must never land inside a half-frame (that
+          // corrupted deltas client-side). We carry the incomplete tail and
+          // only ever write whole "\n\n"-terminated frames — plain string
+          // slicing, no per-event JSON work, server CPU stays near zero.
           const reader = synth.body!.getReader();
           const dec = new TextDecoder();
           const chunks: string[] = [];
           let sawStop = false;
-          let tail = "";
+          let carry = "";
           while (true) {
             const { done, value } = await reader.read();
             if (done) break;
-            const text = dec.decode(value, { stream: true });
-            chunks.push(text);
-            if ((tail + text).includes('"message_stop"')) sawStop = true;
-            tail = text.slice(-20);
-            await w.write(value);
+            const text = carry + dec.decode(value, { stream: true });
+            chunks.push(text.slice(carry.length));
+            if (text.includes('"message_stop"')) sawStop = true;
+            const cut = text.lastIndexOf("\n\n");
+            if (cut >= 0) {
+              await w.write(enc.encode(text.slice(0, cut + 2)));
+              carry = text.slice(cut + 2);
+            } else {
+              carry = text;
+            }
           }
+          if (carry) await w.write(enc.encode(carry));
           if (!sawStop) throw new Error("synth_truncated");
 
           // Parse the transcript ONCE, persist the report server-side, then
