@@ -1,14 +1,14 @@
 import { supabase } from "../lib/supabase";
 import { buildProfile } from "./scoring";
 
-// מצפן — client for the career-compass Edge Function.
+// מצפן — client for the career-compass Edge Function (v2, two-phase analysis).
 
 const FN_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/career-compass`;
 
 async function authHeaders() {
   const { data } = await supabase.auth.getSession();
   const token = data?.session?.access_token;
-  if (!token) throw new Error("not_authenticated");
+  if (!token) throw Object.assign(new Error("not_authenticated"), { code: "not_authenticated" });
   return {
     "content-type": "application/json",
     "authorization": `Bearer ${token}`,
@@ -16,50 +16,36 @@ async function authHeaders() {
   };
 }
 
+function apiError(data) {
+  const err = new Error(data.error || "ai_error");
+  err.code = data.error || "ai_error";
+  err.wait = data.wait;
+  return err;
+}
+
 // Ask the interviewer agent for the next adaptive question.
-// Returns { question, index, total, done } or throws {code, wait?}.
 export async function fetchInterviewQuestion(journeyId, answers, interview) {
   const res = await fetch(FN_URL, {
     method: "POST",
     headers: await authHeaders(),
-    body: JSON.stringify({
-      action: "interview",
-      journeyId,
-      profile: buildProfile(answers),
-      interview,
-    }),
+    body: JSON.stringify({ action: "interview", journeyId, profile: buildProfile(answers), interview }),
   });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    const err = new Error(data.error || "ai_error");
-    err.code = data.error || "ai_error";
-    err.wait = data.wait;
-    throw err;
-  }
+  if (!res.ok) throw apiError(data);
   return data;
 }
 
-// Run the multi-agent analysis. Streams SSE; invokes callbacks as events land.
-// onEvent receives: {type: "agents_start"|"agent_done"|"synthesis_start"|"delta"|"done"|"error", ...}
-export async function streamAnalysis(journeyId, answers, interview, onEvent, signal) {
+// Shared SSE runner for the analysis phases. onEvent receives every parsed
+// `data:` event — both our control events ({type:"agent_done"|"done"|"error"...})
+// and, during synthesis, raw Anthropic events ({type:"content_block_delta"...}).
+async function streamAction(action, journeyId, answers, interview, onEvent, signal) {
   const res = await fetch(FN_URL, {
     method: "POST",
     headers: await authHeaders(),
-    body: JSON.stringify({
-      action: "analyze",
-      journeyId,
-      profile: buildProfile(answers),
-      interview,
-    }),
+    body: JSON.stringify({ action, journeyId, profile: buildProfile(answers), interview }),
     signal,
   });
-  if (!res.ok) {
-    const data = await res.json().catch(() => ({}));
-    const err = new Error(data.error || "ai_error");
-    err.code = data.error || "ai_error";
-    err.wait = data.wait;
-    throw err;
-  }
+  if (!res.ok) throw apiError(await res.json().catch(() => ({})));
 
   const reader = res.body.getReader();
   const dec = new TextDecoder();
@@ -78,10 +64,28 @@ export async function streamAnalysis(journeyId, answers, interview, onEvent, sig
         evt = JSON.parse(line.slice(6));
       } catch { continue; /* malformed frame — skip */ }
       // Deliberately OUTSIDE the try: the caller throws from onEvent on server
-      // error events, and that error must propagate out of streamAnalysis.
+      // error events, and that error must propagate out of the stream loop.
       onEvent(evt);
     }
   }
+}
+
+export const streamExperts = (journeyId, answers, interview, onEvent, signal) =>
+  streamAction("experts", journeyId, answers, interview, onEvent, signal);
+
+export const streamSynthesis = (journeyId, answers, interview, onEvent, signal) =>
+  streamAction("synthesize", journeyId, answers, interview, onEvent, signal);
+
+// Paywall entitlement — read from profiles (server enforces it independently).
+export async function checkCompassPaid() {
+  const { data: { user } = {} } = await supabase.auth.getUser();
+  if (!user) return false;
+  const { data } = await supabase
+    .from("profiles")
+    .select("compass_paid, plan")
+    .eq("id", user.id)
+    .maybeSingle();
+  return data?.compass_paid === true || data?.plan === "admin";
 }
 
 // Split the streamed report into named sections by the @@marker@@ lines.

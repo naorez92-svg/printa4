@@ -1,12 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import { track } from "../hooks/useEvents";
-import { streamAnalysis, parseReport } from "./api";
+import { streamExperts, streamSynthesis, parseReport } from "./api";
 import { Btn, CompassMark } from "./ui";
 
-// מצפן — the multi-agent analysis screen. Three specialist agents run in
-// parallel on the server; their status animates here, then the synthesizer's
-// report streams in live. On completion the parsed report is stored on the
-// journey and we advance to the report stage.
+// מצפן — the two-phase analysis screen.
+// Phase 1 (experts): three specialist agents run server-side in parallel; their
+// analyses are persisted to the journey row, so retries never re-run them.
+// Phase 2 (synthesize): the synthesizer streams the report live (raw Anthropic
+// SSE, parsed here); the server persists the final report independently of us.
 
 const AGENT_DEFS = [
   { key: "psych",    icon: "🧠", label: "פסיכולוג תעסוקתי",     desc: "מנתח אישיות, ערכים ומוטיבציות עומק" },
@@ -20,10 +21,18 @@ export default function Analysis({ journey, update, ensureRow, goToStage }) {
   const [streamed, setStreamed] = useState("");
   const [error, setError] = useState("");
   const rawRef = useRef("");
-  const doneRef = useRef(false);       // set only by the server's "done" event
+  const doneRef = useRef(false);       // set only by the server's synthesis "done"
   const lastFlushRef = useRef(0);
   const abortRef = useRef(null);
   const streamBoxRef = useRef(null);
+
+  const finishWithReport = () => {
+    if (doneRef.current) return;
+    doneRef.current = true;
+    const raw = rawRef.current;
+    track("compass_report_ready", { chars: raw.length });
+    update({ report: { raw, sections: parseReport(raw) }, stage: "report" });
+  };
 
   const run = async () => {
     const controller = new AbortController();
@@ -39,45 +48,56 @@ export default function Analysis({ journey, update, ensureRow, goToStage }) {
     try {
       const rowId = journey.rowId || (await ensureRow());
       if (!rowId) throw Object.assign(new Error("no_row"), { code: "no_row" });
-      await streamAnalysis(rowId, journey.answers, journey.interview, (evt) => {
+
+      // ── Phase 1: experts (replays instantly from cache on retry) ──
+      let expertsDone = false;
+      await streamExperts(rowId, journey.answers, journey.interview, (evt) => {
         if (evt.type === "agents_start") {
           setPhase("agents");
           setAgentState(Object.fromEntries(AGENT_DEFS.map((a) => [a.key, "running"])));
         } else if (evt.type === "agent_done") {
           setAgentState((s) => ({ ...s, [evt.key]: "done" }));
-        } else if (evt.type === "synthesis_start") {
-          setPhase("synthesis");
-        } else if (evt.type === "delta") {
-          rawRef.current += evt.text;
-          // Throttle renders: deltas arrive many times per second and each
-          // render re-scans the visible tail — a few flushes/sec is plenty.
+        } else if (evt.type === "experts_cached") {
+          setAgentState(Object.fromEntries(AGENT_DEFS.map((a) => [a.key, "done"])));
+        } else if (evt.type === "done") {
+          expertsDone = true;
+          setAgentState(Object.fromEntries(AGENT_DEFS.map((a) => [a.key, "done"])));
+        } else if (evt.type === "error") {
+          throw Object.assign(new Error(evt.error), { code: evt.error, phase: "experts" });
+        }
+      }, controller.signal);
+      if (!expertsDone) throw Object.assign(new Error("experts_truncated"), { code: "ai_error" });
+
+      // ── Phase 2: synthesis (raw Anthropic SSE + our control events) ──
+      setPhase("synthesis");
+      await streamSynthesis(rowId, journey.answers, journey.interview, (evt) => {
+        if (evt.type === "content_block_delta" && evt.delta?.type === "text_delta") {
+          rawRef.current += evt.delta.text;
           if (Date.now() - lastFlushRef.current > 150) {
             lastFlushRef.current = Date.now();
             setStreamed(rawRef.current);
           }
         } else if (evt.type === "done") {
-          if (doneRef.current) return; // duplicate terminal event
-          doneRef.current = true;
-          const raw = rawRef.current;
-          track("compass_report_ready", { chars: raw.length });
-          update({ report: { raw, sections: parseReport(raw) }, stage: "report" });
+          finishWithReport();
         } else if (evt.type === "error") {
-          // Propagates out of streamAnalysis (frame parsing is caught separately).
-          throw Object.assign(new Error(evt.error), { code: evt.error });
+          throw Object.assign(new Error(evt.error), { code: evt.error, phase: "synthesis" });
         }
+        // Other Anthropic events (message_start/stop, block start/stop) — ignore.
       }, controller.signal);
-      // Stream closed without the terminal "done" — the report is untrustworthy
-      // (mid-synthesis drop). Surface a retry instead of storing a partial.
+      // Stream closed without the server's "done" → the server didn't persist
+      // a report; surface a retry (experts are cached, so it's cheap).
       if (!doneRef.current) {
         setPhase("error");
-        setError("הניתוח נקטע באמצע. נסה שוב 🙏");
+        setError("הכתיבה נקטעה באמצע. המומחים כבר סיימו — נסה שוב וזה ימשיך מהם 🙏");
       }
     } catch (e) {
       if (controller.signal.aborted) return; // unmounted / superseded — stay silent
       setPhase("error");
-      if (e.code === "rate_limited") setError(`המערכת עמוסה רגע — נסה שוב בעוד ${e.wait || 45} שניות`);
-      else if (e.code === "journey_quota_exceeded" || e.code === "daily_limit") setError("הגעת למגבלת הניתוחים להיום. חזור מחר — ההתקדמות שלך שמורה.");
-      else setError("משהו השתבש בניתוח. נסה שוב עוד רגע 🙏");
+      if (e.code === "payment_required") { goToStage("paywall"); return; }
+      if (e.code === "experts_missing") { setError("שלב המומחים לא הושלם — נסה שוב"); return; }
+      if (e.code === "rate_limited") setError(`שנייה של נשימה — נסה שוב בעוד ${e.wait || 20} שניות`);
+      else if (e.code === "journey_quota_exceeded" || e.code === "daily_limit") setError("הגעת למגבלת הניתוחים להיום. חזור מחר — הכל שמור.");
+      else setError("משהו השתבש בניתוח. ההתקדמות שמורה — נסה שוב 🙏");
     }
   };
 
@@ -101,7 +121,7 @@ export default function Analysis({ journey, update, ensureRow, goToStage }) {
         <h2 className="text-2xl font-bold font-display mb-1">
           {phase === "synthesis" ? "המצפן שלך נכתב ברגעים אלה…" : "צוות המומחים מנתח את המסע שלך"}
         </h2>
-        <p className="text-white/45 text-sm">זה לוקח בין דקה לשלוש. שווה כל שנייה.</p>
+        <p className="text-white/45 text-sm">זה לוקח כמה דקות. שווה כל שנייה — אל תסגור את המסך.</p>
       </div>
 
       <div className="space-y-3 mb-6">

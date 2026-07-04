@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "../lib/supabase";
 import { track } from "../hooks/useEvents";
+import { parseReport } from "./api";
 import { STAGES } from "./data/questions";
 
 // מצפן journey state: a small state machine persisted to localStorage on every
@@ -15,6 +16,7 @@ const SCHEMA_V = 1;
 const EMPTY = {
   v: SCHEMA_V,
   rowId: null,
+  dismissedRowId: null, // set by restart() — blocks the DB-resume effect from resurrecting the old journey
   stage: "welcome",
   answers: {},      // { background, riasec, values, bigfive, cognitive, open }
   interview: [],    // [{ q, a }]
@@ -114,13 +116,14 @@ export function useJourney(session) {
     return () => clearTimeout(syncTimer.current);
   }, [session, journey]);
 
-  // On login with a fresh local journey, resume the newest journey from the DB
-  // (cross-device / cleared-storage recovery). Local progress always wins.
+  // On login, reconcile with the newest journey row in the DB:
+  //  • Fresh local state → resume the DB journey (cross-device / cleared storage).
+  //  • Same journey, and the SERVER holds a report the client missed (stream
+  //    died after the server persisted it) → adopt the report. The last thing
+  //    that happened is never lost.
+  // Otherwise local progress wins.
   useEffect(() => {
     if (!session?.user) return;
-    const j = journeyRef.current;
-    const localHasProgress = j.stage !== "welcome" || Object.keys(j.answers).length > 0;
-    if (localHasProgress) return;
     supabase
       .from("career_journeys")
       .select("id, stage, answers, interview, report")
@@ -129,14 +132,25 @@ export function useJourney(session) {
       .limit(1)
       .maybeSingle()
       .then(({ data }) => {
-        if (data && STAGES.some((s) => s.id === data.stage)) {
+        if (!data || !STAGES.some((s) => s.id === data.stage)) return;
+        // A journey the user explicitly restarted away from stays dismissed.
+        if (data.id === journeyRef.current.dismissedRowId) return;
+        // Server-saved reports carry only {raw} — normalize to {raw, sections}.
+        const normReport = data.report?.raw
+          ? { raw: data.report.raw, sections: data.report.sections || parseReport(data.report.raw) }
+          : null;
+        const j = journeyRef.current;
+        const localHasProgress = j.stage !== "welcome" || Object.keys(j.answers).length > 0;
+        if (!localHasProgress) {
           update({
             rowId: data.id,
             stage: data.stage,
             answers: data.answers || {},
             interview: data.interview || [],
-            report: data.report || null,
+            report: normReport,
           });
+        } else if (j.rowId === data.id && normReport && !j.report) {
+          update({ report: normReport, stage: "report" });
         }
       }, () => {});
   }, [session, update]);
@@ -158,8 +172,12 @@ export function useJourney(session) {
   }, [update]);
 
   const restart = useCallback(() => {
-    try { localStorage.removeItem(LS_KEY); } catch { /* ignore */ }
-    setJourney({ ...EMPTY });
+    // Keep a tombstone for the abandoned journey so the DB-resume effect
+    // doesn't resurrect it on the next mount (its report stays safe in the DB).
+    const fresh = { ...EMPTY, dismissedRowId: journeyRef.current.rowId || journeyRef.current.dismissedRowId };
+    journeyRef.current = fresh;
+    try { localStorage.setItem(LS_KEY, JSON.stringify(fresh)); } catch { /* ignore */ }
+    setJourney(fresh);
   }, []);
 
   return { journey, update, ensureRow, goToStage, nextStage, saveSection, restart };

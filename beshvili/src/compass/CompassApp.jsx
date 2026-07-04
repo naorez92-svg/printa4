@@ -1,23 +1,19 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabase";
 import { track, pageView, identify } from "../hooks/useEvents";
-import { STAGES } from "./data/questions";
 import { useJourney } from "./useJourney";
 import Journey from "./Journey";
 import Interview from "./Interview";
+import Paywall from "./Paywall";
 import Analysis from "./Analysis";
 import Report from "./Report";
 import { Shell, ProgressHeader, Btn, CompassMark } from "./ui";
 
 // מצפן (Compass) — root of the career-guidance journey app, served at /compass.
-// The assessment itself runs without login (answers live in localStorage), so
-// the journey starts with zero friction. Login (magic link / Google) is asked
-// for only when reaching the AI stages — the Edge Function requires a JWT and
-// the report is worth saving to an account anyway.
-
-// Derived from the single STAGES config — adding a new AI stage there gates it
-// behind login automatically.
-const AI_STAGES = new Set(STAGES.filter((s) => s.ai).map((s) => s.id));
+// Login (magic link / Google) is required right after the welcome screen: every
+// user's journey lives in their own account (cross-device resume, the paywall
+// entitlement, and the Edge Function's JWT all hang off it). localStorage still
+// backs every keystroke so the magic-link redirect never loses progress.
 
 export default function CompassApp() {
   const [session, setSession] = useState(null);
@@ -56,9 +52,10 @@ export default function CompassApp() {
     return <Welcome onStart={() => { track("compass_start", {}); goToStage("background"); }} />;
   }
 
-  // AI stages require auth. Wait for the session check before deciding —
-  // otherwise a logged-in user flashes the login screen on every reload.
-  if (AI_STAGES.has(stage) && !session) {
+  // Everything past the welcome screen requires auth. Wait for the session
+  // check before deciding — otherwise a logged-in user flashes the login
+  // screen on every reload.
+  if (stage !== "welcome" && !session) {
     if (authLoading) {
       return (
         <Shell>
@@ -78,6 +75,8 @@ export default function CompassApp() {
       }} />}
       {stage === "interview" ? (
         <Interview journey={journey} update={update} ensureRow={ensureRow} nextStage={nextStage} />
+      ) : stage === "paywall" ? (
+        <Paywall journey={journey} nextStage={nextStage} />
       ) : stage === "analysis" ? (
         <Analysis journey={journey} update={update} ensureRow={ensureRow} goToStage={goToStage} />
       ) : stage === "report" ? (
@@ -177,10 +176,10 @@ function CompassLogin() {
     <Shell>
       <div className="flex-1 flex flex-col items-center justify-center text-center">
         <CompassMark size={56} className="mb-5" />
-        <h2 className="text-2xl font-bold font-display mb-2">עצירה קטנה לפני החלק העמוק</h2>
+        <h2 className="text-2xl font-bold font-display mb-2">רגע לפני שיוצאים לדרך</h2>
         <p className="text-white/50 max-w-sm mb-8 leading-relaxed">
-          מכאן מתחיל הראיון האישי והניתוח שלך. כניסה מהירה במייל — כדי שהמסע והדוח
-          יישמרו בחשבונך, מכל מכשיר. בלי סיסמה.
+          כניסה מהירה במייל — בלי סיסמה. ככה המסע, התשובות והדוח שלך נשמרים
+          בחשבון אישי משלך, ואפשר לעצור ולחזור מכל מכשיר.
         </p>
 
         <div className="w-full max-w-sm space-y-3">
