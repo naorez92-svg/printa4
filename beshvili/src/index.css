@@ -56,6 +56,12 @@ h1, h2, h3 {
   opacity: 0;
 }
 
+/* מצפן (compass) screen-entry animation — used via animate-[fadeIn_…] */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
 /* Reduced motion (WCAG 2.3.3 / IS 5568). Two triggers, one effect:
    the OS-level `prefers-reduced-motion: reduce` setting, and the manual
    "הפחתת אנימציות" toggle in the accessibility widget (adds .a11y-reduce-motion

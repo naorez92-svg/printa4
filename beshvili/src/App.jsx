@@ -12,11 +12,14 @@ const Login = lazy(() => import("./pages/Login"));
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const PublicBooklet = lazy(() => import("./pages/PublicBooklet"));
 const BookletFeedback = lazy(() => import("./pages/BookletFeedback"));
+const CompassApp = lazy(() => import("./compass/CompassApp"));
 
 // /b/:token — public booklet share page (no auth needed)
 const shareMatch = window.location.pathname.match(/^\/b\/([0-9a-f-]{36})$/i);
 // /f/:token — printed-booklet feedback form, reached via the QR on the page
 const feedbackMatch = window.location.pathname.match(/^\/f\/([0-9a-f-]{36})$/i);
+// /compass — מצפן, the career-guidance journey (its own auth handling inside)
+const compassMatch = /^\/compass(\/|$)/.test(window.location.pathname);
 
 // Full-screen loading spinner — reused for the session check AND the lazy-chunk
 // fetch so there's no second, differently-styled flash between the two.
@@ -108,7 +111,11 @@ export default function App() {
   return (
     <>
       <InAppBrowserBanner />
-      {shareMatch ? (
+      {compassMatch ? (
+        <Suspense fallback={PageSpinner}>
+          <CompassApp />
+        </Suspense>
+      ) : shareMatch ? (
         <Suspense fallback={PageSpinner}>
           <PublicBooklet token={shareMatch[1]} />
         </Suspense>
