@@ -51,6 +51,13 @@ def check_strength(
                 inertia_mm4=section.inertia_mm4,
             )
         elif element_type == "beam_custom":
+            # הפותר הנומרי מטפל אך ורק בכוחות מרוכזים. עומס מפורס שנשלח כאן
+            # היה נבלע בשקט ומחזיר מקדם ביטחון לא-שמרני — לכן חוסמים במפורש.
+            if udl_n_per_mm is not None:
+                raise beam.UnsupportedCase(
+                    "עומס מפורס אינו נתמך במצב 'קורה על תמיכות'. "
+                    "השתמש במקרה אנליטי (simply_supported_udl) או פרק את העומס לכוחות מרוכזים"
+                )
             result = beam.solve_beam_anastruct(
                 length_mm, support_positions_mm or [], point_loads or [],
                 elastic_modulus_mpa=material["elastic_modulus_gpa"] * 1000.0,

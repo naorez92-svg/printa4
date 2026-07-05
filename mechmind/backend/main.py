@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import threading
 import time
 from pathlib import Path
 
@@ -40,20 +41,24 @@ app.add_middleware(
 # הגבלת קצב פשוטה לבקשות יקרות (בזיכרון, לכל IP)
 # ---------------------------------------------------------------------------
 _last_request: dict[str, float] = {}
+_rate_lock = threading.Lock()
 
 
 def rate_limit(request: Request) -> None:
     ip = request.client.host if request.client else "unknown"
     now = time.time()
-    last = _last_request.get(ip, 0.0)
-    wait = settings.rate_limit_seconds - (now - last)
-    if wait > 0:
-        raise HTTPException(429, detail=f"יותר מדי בקשות — נסה שוב בעוד {int(wait) + 1} שניות.")
-    _last_request[ip] = now
-    if len(_last_request) > 10_000:  # מניעת תפיחת זיכרון
-        cutoff = now - 3600
-        for k in [k for k, v in _last_request.items() if v < cutoff]:
-            _last_request.pop(k, None)
+    # check-then-set אטומי — נקודות הקצה רצות ב-threadpool, בלי הנעילה
+    # שתי בקשות במקביל מאותו IP היו עוקפות את ההגבלה
+    with _rate_lock:
+        last = _last_request.get(ip, 0.0)
+        wait = settings.rate_limit_seconds - (now - last)
+        if wait > 0:
+            raise HTTPException(429, detail=f"יותר מדי בקשות — נסה שוב בעוד {int(wait) + 1} שניות.")
+        _last_request[ip] = now
+        if len(_last_request) > 10_000:  # מניעת תפיחת זיכרון
+            cutoff = now - 3600
+            for k in [k for k, v in _last_request.items() if v < cutoff]:
+                _last_request.pop(k, None)
 
 
 def _llm_unavailable(e: LLMUnavailable) -> HTTPException:
@@ -177,9 +182,10 @@ def catalog() -> dict:
 def chat(req: ChatRequest, request: Request, db: DBSession = Depends(get_db)):
     rate_limit(request)
     session = _ensure_session(db, req.session_id)
+    # 40 ההודעות האחרונות (לא הראשונות) — בסדר כרונולוגי
     history_rows = (db.query(Message).filter(Message.session_id == session.id)
-                    .order_by(Message.id).limit(40).all())
-    history = [{"role": m.role, "content": m.content} for m in history_rows]
+                    .order_by(Message.id.desc()).limit(40).all())
+    history = [{"role": m.role, "content": m.content} for m in reversed(history_rows)]
 
     try:
         result = run_chat(history, req.message)
@@ -222,7 +228,8 @@ def strength(req: StrengthRequest, db: DBSession = Depends(get_db)):
 
 
 @app.post("/api/material")
-def material(req: MaterialRequest, db: DBSession = Depends(get_db)):
+def material(req: MaterialRequest, request: Request, db: DBSession = Depends(get_db)):
+    rate_limit(request)  # advise_material עשוי לבצע קריאת LLM חיה
     result = advise_material(**req.model_dump(exclude={"session_id"}))
     return _module_response(db, req.session_id, "M-03", result)
 

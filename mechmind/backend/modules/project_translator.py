@@ -45,12 +45,7 @@ def translate_to_project(source_description_he: str,
                 "data": {}, "artifacts": []}
 
     tasks = plan.get("tasks", [])
-    # לוח זמנים פשוט (Gantt) — חישוב דטרמיניסטי של ימי התחלה לפי תלויות
-    start_days: dict[int, int] = {}
-    for t in tasks:
-        deps = t.get("depends_on") or []
-        dep_ends = [start_days.get(d, 0) + _days_of(tasks, d) for d in deps]
-        start_days[t["id"]] = max(dep_ends, default=0)
+    start_days = _schedule(tasks)
     total_days = max((start_days[t["id"]] + int(t.get("days", 1)) for t in tasks), default=0)
 
     job_id = uuid.uuid4().hex[:12]
@@ -103,6 +98,32 @@ def translate_to_project(source_description_he: str,
     }
 
 
-def _days_of(tasks: list[dict], task_id: int) -> int:
-    t = next((x for x in tasks if x["id"] == task_id), None)
+def _days_of(tasks_by_id: dict[int, dict], task_id: int) -> int:
+    t = tasks_by_id.get(task_id)
     return int(t.get("days", 1)) if t else 0
+
+
+def _schedule(tasks: list[dict]) -> dict[int, int]:
+    """יום התחלה לכל משימה = הסיום המאוחר של תלויותיה. עמיד לתלויות
+    שמופיעות בהמשך הרשימה (forward refs) ולמחזורים (מתעלם מקשת שסוגרת מחזור).
+    """
+    tasks_by_id = {t["id"]: t for t in tasks}
+    start_days: dict[int, int] = {}
+    resolving: set[int] = set()
+
+    def start_of(task_id: int) -> int:
+        if task_id in start_days:
+            return start_days[task_id]
+        t = tasks_by_id.get(task_id)
+        if t is None or task_id in resolving:  # תלות חסרה או מחזור → יום 0
+            return 0
+        resolving.add(task_id)
+        deps = t.get("depends_on") or []
+        start = max((start_of(d) + _days_of(tasks_by_id, d) for d in deps), default=0)
+        resolving.discard(task_id)
+        start_days[task_id] = start
+        return start
+
+    for t in tasks:
+        start_of(t["id"])
+    return start_days
