@@ -4,14 +4,18 @@ import { fetchInterviewQuestion } from "./api";
 import { Btn, StageIntro, CompassMark, MicButton } from "./ui";
 
 // מצפן — the adaptive AI interview. A chat-like flow: the interviewer agent
-// reads the whole assessment and asks up to 5 personalized questions, one at
-// a time. Each Q&A pair is appended to journey.interview.
+// reads the whole assessment and asks up to 8 personalized questions, one at
+// a time (depth first, then direction-sharpening). Each Q&A pair is appended
+// to journey.interview. The server is the source of truth for the total AND
+// for the depth/sharpen boundary — both sync from every interview response
+// (the literals below only cover the pre-first-fetch render).
 
 export default function Interview({ journey, update, ensureRow, nextStage }) {
   const intro = STAGE_INTROS.interview;
   const [started, setStarted] = useState(() => journey.interview.length > 0);
   const [pendingQ, setPendingQ] = useState(null);   // current unanswered question
-  const [progress, setProgress] = useState({ index: journey.interview.length, total: 5 });
+  const [progress, setProgress] = useState({ index: journey.interview.length, total: 8, depth: 5 });
+  const sharpenFrom = (progress.depth || 5) + 1; // first question of the sharpening phase
   const [draft, setDraft] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -29,7 +33,7 @@ export default function Interview({ journey, update, ensureRow, nextStage }) {
       const data = await fetchInterviewQuestion(rowId, journey.answers, interviewSoFar);
       if (data.done) { nextStage(); return; }
       setPendingQ(data.question);
-      setProgress({ index: data.index, total: data.total });
+      setProgress({ index: data.index, total: data.total, depth: data.depth || 5 });
     } catch (e) {
       if (e.code === "rate_limited") {
         setError(`רגע אחד… נסה שוב בעוד ${e.wait || 10} שניות`);
@@ -54,7 +58,7 @@ export default function Interview({ journey, update, ensureRow, nextStage }) {
   }, [journey.interview.length, pendingQ, loading]);
 
   if (!started) {
-    return <StageIntro icon="🎙️" title={intro.title} text={intro.text} minutes={8} onStart={() => setStarted(true)} />;
+    return <StageIntro icon="🎙️" title={intro.title} text={intro.text} minutes={10} onStart={() => setStarted(true)} />;
   }
 
   const submit = () => {
@@ -74,6 +78,7 @@ export default function Interview({ journey, update, ensureRow, nextStage }) {
       <div className="flex-1 space-y-4 mb-5 overflow-y-auto">
         {journey.interview.map((qa, i) => (
           <div key={i} className="space-y-3">
+            {i === sharpenFrom - 1 && <PhaseDivider />}
             <AgentBubble text={qa.q} />
             <div className="flex justify-start">
               <div className="bg-magic/20 border border-magic/30 rounded-2xl rounded-tl-sm px-4 py-3 max-w-[85%] text-white/85 leading-relaxed text-sm">
@@ -82,6 +87,7 @@ export default function Interview({ journey, update, ensureRow, nextStage }) {
             </div>
           </div>
         ))}
+        {pendingQ && journey.interview.length === sharpenFrom - 1 && <PhaseDivider />}
         {pendingQ && <AgentBubble text={pendingQ} highlight />}
         {loading && (
           <div className="flex items-center gap-2 text-white/40 text-sm pr-1">
@@ -121,6 +127,18 @@ export default function Interview({ journey, update, ensureRow, nextStage }) {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// The visible moment the app "gets" you — the interviewer announces it is now
+// zeroing in on the directions that emerged from THIS user's data.
+function PhaseDivider() {
+  return (
+    <div className="flex items-center gap-3 py-2 animate-[fadeIn_0.4s_ease]">
+      <div className="flex-1 h-px bg-gradient-to-l from-brand/50 to-transparent" />
+      <span className="text-xs text-brand font-semibold whitespace-nowrap">🎯 שלב הדיוק — מחדדים את הכיוונים שמסתמנים אצלך</span>
+      <div className="flex-1 h-px bg-gradient-to-r from-brand/50 to-transparent" />
     </div>
   );
 }

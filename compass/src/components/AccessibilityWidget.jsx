@@ -75,13 +75,16 @@ export default function AccessibilityWidget() {
 
   return createPortal(
     <div dir="rtl">
-      {/* Toggle button */}
+      {/* Toggle button — a mid-edge tab (the standard Israeli a11y-widget spot).
+          Tucked into the LEFT screen edge: in an RTL app that's the ragged
+          line-end side, and it stays clear of the bottom action buttons and
+          of the text column — it never sits on top of content. */}
       <button
         onClick={() => setOpen((o) => !o)}
         aria-label="אפשרויות נגישות"
         aria-expanded={open}
-        className="fixed bottom-20 right-4 lg:bottom-6 z-[60] w-12 h-12 rounded-full bg-ink text-white shadow-lg flex items-center justify-center text-2xl hover:scale-105 transition-transform focus:outline-none focus-visible:ring-2 focus-visible:ring-magic"
-        style={{ fontSize: "1.5rem" }}
+        className="fixed left-0 top-[62%] z-[60] w-11 h-12 rounded-l-none rounded-r-xl bg-magic text-white shadow-lg shadow-magic/30 flex items-center justify-center hover:w-12 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-white print:hidden"
+        style={{ fontSize: "1.25rem" }}
       >
         ♿
       </button>
@@ -91,7 +94,7 @@ export default function AccessibilityWidget() {
           ref={panelRef}
           role="dialog"
           aria-label="תפריט נגישות"
-          className="fixed bottom-36 right-4 lg:bottom-24 z-[60] w-72 max-w-[calc(100vw-2rem)] bg-canvas rounded-2xl shadow-2xl border border-ink/10 p-4 space-y-2"
+          className="fixed left-2 top-[62%] -translate-y-full z-[60] w-72 max-w-[calc(100vw-2rem)] max-h-[60vh] overflow-y-auto bg-canvas rounded-2xl shadow-2xl border border-ink/10 p-4 space-y-2 print:hidden"
         >
           <div className="flex items-center justify-between mb-1">
             <h2 className="font-bold text-ink text-sm">♿ נגישות</h2>

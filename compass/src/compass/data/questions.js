@@ -12,8 +12,10 @@ export const STAGES = [
   { id: "bigfive",    label: "מי אתה באמת",        icon: "🪞", minutes: 4 },
   { id: "cognitive",  label: "אתגר המחשבה",        icon: "🧠", minutes: 6 },
   { id: "open",       label: "שאלות עומק",         icon: "✍️", minutes: 8 },
+  // Adaptive: the scenario list is CHOSEN per user from their RIASEC results.
+  { id: "scenarios",  label: "בדיקת מציאות",        icon: "🎬", minutes: 3 },
   // ai: true → the stage calls the Edge Function and therefore requires login.
-  { id: "interview",  label: "ראיון אישי",          icon: "🎙️", minutes: 8, ai: true },
+  { id: "interview",  label: "ראיון אישי",          icon: "🎙️", minutes: 10, ai: true },
   { id: "paywall",    label: "הפקת הדוח",           icon: "🎁", ai: true },
   { id: "analysis",   label: "ניתוח",               icon: "🔮", minutes: 3, ai: true },
   { id: "report",     label: "המצפן שלך", ai: true },
@@ -44,9 +46,13 @@ export const STAGE_INTROS = {
     title: "שאלות עומק",
     text: "כאן קורה הקסם. חמש שאלות שדורשות עצירה אמיתית. כתוב בחופשיות — כמה משפטים לפחות לכל שאלה. ככל שתיתן יותר, המצפן שלך יהיה מדויק יותר.",
   },
+  scenarios: {
+    title: "בדיקת מציאות",
+    text: "לפי מה שגילינו עליך עד עכשיו, בחרנו כמה תרחישי יום-יום שכנראה קרובים אליך. דמיין שזה היום-יום שלך בעוד שנתיים — וענה מהבטן: כמה זה אתה?",
+  },
   interview: {
     title: "ראיון אישי",
-    text: "עברתי על כל מה שכתבת. עכשיו יש לי כמה שאלות שמכוונות בדיוק אליך — כמו שיחה עם פסיכולוג תעסוקתי. ענה בכנות ובהרחבה.",
+    text: "עברתי על כל מה שכתבת. עכשיו יש לי שאלות שמכוונות בדיוק אליך — כמו שיחה עם פסיכולוג תעסוקתי. בסוף הראיון גם אחדד איתך את הכיוונים שמסתמנים. ענה בכנות ובהרחבה.",
   },
 };
 
@@ -234,6 +240,41 @@ export const COGNITIVE_ADVANCED = [
     options: ["0°", "7.5°", "12.5°", "30°"], correct: 1,
   },
 ];
+
+// ── "Reality check" scenarios — adaptive, zero-AI-cost personalization ──
+// The stage shows 6 concrete day-in-the-life scenarios chosen from the user's
+// TOP-3 Holland letters (2 per letter — see scenarioItems in scoring.js), so
+// every user rates a different, personally-relevant set. Gut reactions to a
+// concrete day beat abstract interest ratings — and give the AI a "does the
+// fantasy survive contact with reality" signal per emerging direction.
+export const SCENARIO_SCALE = ["ממש לא", "לא ממש", "אולי", "נשמע טוב", "זה אני!"];
+
+export const SCENARIOS_BY_TYPE = {
+  R: [
+    { id: "scR1", text: "אתה מגיע בבוקר למוסך / אתר / מעבדה, מקבל תקלה שאף אחד לא הצליח לפצח, ומבלה את היום עם הידיים בתוך המערכת — עד שהיא עובדת" },
+    { id: "scR2", text: "רוב היום שלך עובר על הרגליים — בשטח, עם ציוד וכלים, מעט מאוד ישיבה מול מסך" },
+  ],
+  I: [
+    { id: "scI1", text: "בוקר של צלילה בנתונים או במחקר: אתה בונה השערה, בודק, טועה, מתקן — ובסוף היום מבין משהו שאף אחד סביבך עוד לא הבין" },
+    { id: "scI2", text: "העבודה שלך נמדדת בעומק, לא בקצב: שבועות על בעיה אחת מסובכת, בלי תוצאה מיידית ובלי מחיאות כפיים" },
+  ],
+  A: [
+    { id: "scA1", text: "היום מתחיל בדף ריק: אתה יוצר משהו חדש — עיצוב, טקסט, סרטון — ובסופו מציג אותו לאנשים שמגיבים אליו" },
+    { id: "scA2", text: "אין לך שגרה קבועה: כל פרויקט נראה אחרת, והסגנון האישי שלך הוא בעצם המוצר" },
+  ],
+  S: [
+    { id: "scS1", text: "היום שלך בנוי מפגישות אחד-על-אחד: אנשים מגיעים אליך עם קושי אמיתי — ויוצאים ממך עם כיוון" },
+    { id: "scS2", text: "אתה עומד מול קבוצה — מלמד, מדריך, מלווה — וההצלחה שלך נמדדת בהצלחה שלהם" },
+  ],
+  E: [
+    { id: "scE1", text: "אתה פותח את הבוקר עם יעדים: שיחות, משא ומתן, החלטות מהירות — ובערב יודע בדיוק אם ניצחת היום" },
+    { id: "scE2", text: "אתה מוביל צוות קטן: מגייס, מלהיב, סוגר פינות — והאחריות על התוצאה כולה עליך" },
+  ],
+  C: [
+    { id: "scC1", text: "אתה מקבל תהליך מבולגן והופך אותו למערכת מסודרת: טבלאות, נהלים, בקרה — והכול מתחיל לעבוד חלק" },
+    { id: "scC2", text: "עבודה מדויקת עם כללים ברורים: אתה זה שמוודא שלא נופלות טעויות — והדיוק שלך הוא הערך" },
+  ],
+};
 
 // ── Open reflective questions — 5 ──
 export const OPEN_QUESTIONS = [

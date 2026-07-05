@@ -3,9 +3,10 @@ import {
   STAGE_INTROS, STAGES,
   RIASEC_ITEMS, VALUES_ITEMS, BIG5_ITEMS, COGNITIVE_ITEMS, OPEN_QUESTIONS,
   COGNITIVE_ADVANCED, COGNITIVE_ADVANCED_THRESHOLD,
-  INTEREST_SCALE, AGREE_SCALE, VALUE_SCALE,
+  INTEREST_SCALE, AGREE_SCALE, VALUE_SCALE, SCENARIO_SCALE,
   SITUATION_OPTIONS, EDUCATION_OPTIONS, CONSTRAINT_OPTIONS,
 } from "./data/questions";
+import { scenarioItems } from "./scoring";
 import { Btn, Chip, Scale, StageIntro, MicButton, DictationTip } from "./ui";
 
 // מצפן — the assessment stages. Each stage: intro screen → items → save + advance.
@@ -385,6 +386,17 @@ export default function Journey({ journey, saveSection, nextStage }) {
       return <CognitiveStage saved={answers.cognitive} onDone={done("cognitive")} onSave={save("cognitive")} />;
     case "open":
       return <OpenStage saved={answers.open} onDone={done("open")} onSave={save("open")} />;
+    // "Reality check" — the item list itself is personalized: 6 day-in-the-life
+    // scenarios chosen from THIS user's top-3 Holland letters.
+    case "scenarios":
+      return (
+        <LikertStage
+          key="scenarios"
+          stageId="scenarios" items={scenarioItems(answers.riasec)} scale={SCENARIO_SCALE}
+          prompt="דמיין שזה היום-יום שלך בעוד שנתיים…" saved={answers.scenarios}
+          onDone={done("scenarios")} onSave={save("scenarios")}
+        />
+      );
     default:
       return null;
   }
