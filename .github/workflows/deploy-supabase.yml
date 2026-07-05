@@ -39,6 +39,7 @@ jobs:
           supabase functions deploy send-followup-emails --project-ref gywpdzkvkdisonuzhsib --no-verify-jwt
           supabase functions deploy record-survey-answer --project-ref gywpdzkvkdisonuzhsib --no-verify-jwt
           supabase functions deploy record-booklet-result --project-ref gywpdzkvkdisonuzhsib --no-verify-jwt
+          supabase functions deploy weekly-marketing-kit --project-ref gywpdzkvkdisonuzhsib --no-verify-jwt
           supabase functions deploy career-compass --project-ref gywpdzkvkdisonuzhsib --no-verify-jwt
         working-directory: beshvili
         env:

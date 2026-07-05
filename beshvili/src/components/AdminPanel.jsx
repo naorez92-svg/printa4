@@ -1186,28 +1186,65 @@ export default function AdminPanel() {
         </div>
       )}
 
-      {/* Recent leads */}
-      {data.recentLeads?.length > 0 && (
-        <div className="bg-white rounded-2xl p-4 border border-ink/5 shadow-sm">
-          <h3 className="font-bold text-ink mb-3 text-sm">ליידים — בקשות שדרוג ({data.recentLeads.length})</h3>
-          <div className="space-y-2">
-            {data.recentLeads.map((l, i) => (
-              <div key={i} className="flex justify-between items-center bg-canvas rounded-xl p-3">
-                <div>
-                  <p className="text-sm font-medium text-ink">{l.name || "ללא שם"}</p>
-                  <p className="text-xs text-ink/40">{fmt(l.created_at)}</p>
-                </div>
-                {l.phone && (
-                  <a href={`https://wa.me/${l.phone.replace(/\D/g, "")}`} target="_blank" rel="noopener noreferrer"
-                    className="bg-[#25D366] text-white text-xs px-3 py-1.5 rounded-lg hover:opacity-90 transition-opacity">
-                    WhatsApp
-                  </a>
-                )}
-              </div>
-            ))}
+      {/* Recent leads — full contact context, duplicates from double-taps grouped */}
+      {data.recentLeads?.length > 0 && (() => {
+        const PLAN_TAG = { teacher: "מורה ₪59", parent: "הורה ₪19", pro: "פרו" };
+        const grouped = [];
+        for (const l of data.recentLeads) {
+          const prev = grouped[grouped.length - 1];
+          const key = l.user_id ?? l.email;
+          const sameUser = prev && key && (prev.user_id ?? prev.email) === key;
+          const closeInTime = prev && Math.abs(new Date(prev.created_at) - new Date(l.created_at)) < 6 * 3600 * 1000;
+          if (sameUser && closeInTime) prev.count += 1;
+          else grouped.push({ ...l, count: 1 });
+        }
+        return (
+          <div className="bg-white rounded-2xl p-4 border border-ink/5 shadow-sm">
+            <h3 className="font-bold text-ink mb-3 text-sm">🔥 לידים — בקשות שדרוג ({grouped.length})</h3>
+            <div className="space-y-2">
+              {grouped.map((l, i) => {
+                const digits = (l.phone || "").replace(/\D/g, "");
+                const intl = digits.startsWith("0") ? "972" + digits.slice(1) : digits;
+                const waText = encodeURIComponent(`היי${l.name ? " " + l.name : ""}! 👋 כאן נאור מבשבילי — ראיתי שביקשת לשדרג. אשמח לעזור לך להתחיל 🙂`);
+                return (
+                  <div key={i} className="bg-canvas rounded-xl p-3">
+                    <div className="flex justify-between items-start gap-2 flex-wrap">
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-ink truncate">
+                          {l.name || l.email?.split("@")[0] || "משתמש"}
+                          {l.count > 1 && <span className="mr-1.5 text-[10px] bg-brand/15 text-brand rounded-full px-1.5 py-0.5 font-bold">×{l.count} לחיצות</span>}
+                        </p>
+                        {l.email && <p className="text-xs text-ink/50 truncate" dir="ltr">{l.email}</p>}
+                        <div className="flex gap-1.5 mt-1 flex-wrap items-center">
+                          {l.plan && <span className="text-[10px] font-semibold bg-magic/10 text-magic rounded-full px-2 py-0.5">{PLAN_TAG[l.plan] ?? l.plan}</span>}
+                          {l.method === "bit" && <span className="text-[10px] font-semibold bg-blue-50 text-blue-600 rounded-full px-2 py-0.5">💙 ביט</span>}
+                          {l.method === "whatsapp" && <span className="text-[10px] font-semibold bg-green-50 text-green-700 rounded-full px-2 py-0.5">💬 וואטסאפ</span>}
+                          <span className="text-[10px] text-ink/35">{fmt(l.created_at)}</span>
+                        </div>
+                      </div>
+                      <div className="flex gap-1.5 flex-shrink-0">
+                        {intl.length >= 11 && (
+                          <a href={`https://wa.me/${intl}?text=${waText}`} target="_blank" rel="noopener noreferrer"
+                            className="bg-[#25D366] text-white text-xs px-3 py-1.5 rounded-lg hover:opacity-90 transition-opacity font-semibold">
+                            💬 וואטסאפ
+                          </a>
+                        )}
+                        {l.email && (
+                          <a href={`mailto:${l.email}?subject=${encodeURIComponent("השדרוג שלך לבשבילי 🎉")}`}
+                            className="bg-magic/10 text-magic text-xs px-3 py-1.5 rounded-lg hover:bg-magic/20 transition-colors font-semibold">
+                            ✉️ מייל
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <p className="text-[10px] text-ink/35 mt-2">💡 אין טלפון? כמעט לכולם יש מייל — כפתור המייל פותח הודעה מוכנה לשליחה.</p>
           </div>
-        </div>
-      )}
+        );
+      })()}
     </div>
   );
 }

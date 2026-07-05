@@ -1,0 +1,22 @@
+name: Weekly Marketing Kit
+
+on:
+  schedule:
+    # Sunday 03:00 UTC = 06:00 Israel — the kit waits in the inbox by morning
+    - cron: '0 3 * * 0'
+  workflow_dispatch:
+
+jobs:
+  send-kit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Generate and email this week's marketing kit
+        run: |
+          STATUS=$(curl -sS -o /tmp/body.txt -w "%{http_code}" --max-time 120 -X POST \
+            "https://gywpdzkvkdisonuzhsib.supabase.co/functions/v1/weekly-marketing-kit" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            -H "Content-Type: application/json" \
+            -d '{}')
+          echo "Status: $STATUS"
+          cat /tmp/body.txt
+          [ "$STATUS" = "200" ] || exit 1
