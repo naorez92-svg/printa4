@@ -76,6 +76,29 @@ export const streamExperts = (journeyId, answers, interview, onEvent, signal) =>
 export const streamSynthesis = (journeyId, answers, interview, onEvent, signal) =>
   streamAction("synthesize", journeyId, answers, interview, onEvent, signal);
 
+// ── Admin (the /admin dashboard; server verifies plan='admin') ──
+export async function adminStats() {
+  const res = await fetch(FN_URL, {
+    method: "POST",
+    headers: await authHeaders(),
+    body: JSON.stringify({ action: "admin_stats" }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw apiError(data);
+  return data;
+}
+
+export async function adminSetPaid(email, paid) {
+  const res = await fetch(FN_URL, {
+    method: "POST",
+    headers: await authHeaders(),
+    body: JSON.stringify({ action: "admin_set_paid", email, paid }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw apiError(data);
+  return data;
+}
+
 // Paywall entitlement — read from profiles (server enforces it independently).
 export async function checkCompassPaid() {
   const { data: { user } = {} } = await supabase.auth.getUser();
