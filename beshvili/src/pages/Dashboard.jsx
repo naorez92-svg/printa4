@@ -4,6 +4,7 @@ import Create from "../components/Create";
 import History from "../components/History";
 import UpgradeModal from "../components/UpgradeModal";
 import FeedbackWidget from "../components/FeedbackWidget";
+import SupportChat from "../components/SupportChat";
 import OnboardingModal from "../components/OnboardingModal";
 import SurveyModal from "../components/SurveyModal";
 import { useProfile, FREE_LIMIT } from "../hooks/useProfile";
@@ -299,6 +300,7 @@ export default function Dashboard() {
         />
       )}
       <FeedbackWidget />
+      <SupportChat />
       <InstallPWA variant="banner" />
     </div>
   );
