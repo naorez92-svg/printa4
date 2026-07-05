@@ -96,7 +96,16 @@ Deno.serve(async (req) => {
         plan:    planId,
         method,
       });
-      if (insertErr) console.error("notify-lead insert error:", insertErr.message);
+      if (insertErr) {
+        // Migration 0037 not applied yet (missing columns) — never lose a lead
+        // over metadata: fall back to the legacy shape.
+        const { error: legacyErr } = await admin.from("leads").insert({
+          user_id: user.id,
+          name:    name || null,
+          phone,
+        });
+        if (legacyErr) console.error("notify-lead insert error:", insertErr.message, "| legacy:", legacyErr.message);
+      }
     }
 
     // 2. Email the owner immediately (unless rate-limited).
