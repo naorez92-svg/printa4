@@ -134,7 +134,8 @@ function CompassLogin() {
   const [sent, setSent] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const redirectTo = `${window.location.origin}/compass`;
+  // Standalone site — auth always returns to our own origin, never to beshvili.
+  const redirectTo = `${window.location.origin}/`;
 
   // Same error map as friendlyAuthError in pages/Login.jsx, rephrased for the
   // compass audience (neutral/masculine). Keep the two regexes in sync.

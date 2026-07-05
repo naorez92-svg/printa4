@@ -37,13 +37,20 @@ const SYNTH_MAX_TOKENS = 8000;
 function getCors(req: Request) {
   const origin = req.headers.get("origin") ?? "";
   const allowed =
+    // מצפן — the standalone compass site (Vercel project "mitzpen"). The
+    // preview regex pins the team slug so foreign Vercel projects that merely
+    // start with "mitzpen-" are NOT allowed. When a custom domain is bought,
+    // add it here.
+    origin === "https://mitzpen.vercel.app" ||
+    /^https:\/\/mitzpen-[a-z0-9-]+-naor-s-projects\.vercel\.app$/.test(origin) ||
+    // beshvili origins kept during the transition (old /compass links redirect)
     origin === "https://www.beshvili.com" ||
     origin === "https://beshvili.com" ||
     origin === "http://localhost:5173" ||
     origin === "http://localhost:4173" ||
     /^https:\/\/printa4-git-[a-z0-9-]+-naor-s-projects\.vercel\.app$/.test(origin);
   return {
-    "Access-Control-Allow-Origin": allowed ? origin : "https://www.beshvili.com",
+    "Access-Control-Allow-Origin": allowed ? origin : "https://mitzpen.vercel.app",
     "Vary": "Origin",
     "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
     "Access-Control-Allow-Methods": "POST, OPTIONS",

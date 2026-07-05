@@ -4,8 +4,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Repository Layout
 
-This repo contains two separate apps:
-- `beshvili/` — the active SaaS product (React + Vite + Supabase). **All new work goes here.**
+This repo contains three separate apps:
+- `beshvili/` — the booklets SaaS product (React + Vite + Supabase).
+- `compass/` — מצפן, the standalone career-guidance journey app (React + Vite,
+  same Supabase project, its own Vercel project / domain). Its Edge Function
+  lives in `beshvili/supabase/functions/career-compass/` (single Supabase
+  project, single deploy pipeline).
 - `app_cloud.py` / `Dockerfile` — legacy Flask prototype. Do not modify.
 
 ## Development (inside `beshvili/`)
