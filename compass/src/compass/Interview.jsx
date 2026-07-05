@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { STAGE_INTROS } from "./data/questions";
 import { fetchInterviewQuestion } from "./api";
-import { Btn, StageIntro, CompassMark } from "./ui";
+import { Btn, StageIntro, CompassMark, MicButton } from "./ui";
 
 // מצפן — the adaptive AI interview. A chat-like flow: the interviewer agent
 // reads the whole assessment and asks up to 5 personalized questions, one at
@@ -108,10 +108,13 @@ export default function Interview({ journey, update, ensureRow, nextStage }) {
             onChange={(e) => setDraft(e.target.value)}
             rows={3}
             className="w-full bg-ink/90 backdrop-blur border border-white/20 rounded-2xl px-4 py-3 outline-none focus:border-magic transition-colors leading-relaxed"
-            placeholder="ענה בכנות ובהרחבה…"
+            placeholder="ענה בכנות ובהרחבה… או לחץ 🎤 ודבר"
           />
-          <div className="flex justify-between items-center mt-2">
-            <span className="text-xs text-white/30">{draft.trim().length < 10 ? "כמה מילים לפחות…" : ""}</span>
+          <div className="flex justify-between items-center gap-2 mt-2 flex-wrap">
+            <div className="flex items-center gap-2">
+              <MicButton onText={(t) => setDraft((d) => `${d} ${t}`.trim().slice(0, 2000))} />
+              <span className="text-xs text-white/30">{draft.trim().length < 10 ? "כמה מילים לפחות…" : ""}</span>
+            </div>
             <Btn onClick={submit} disabled={draft.trim().length < 10}>
               {journey.interview.length + 1 >= progress.total ? "סיום הראיון ←" : "שלח ←"}
             </Btn>

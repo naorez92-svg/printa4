@@ -196,6 +196,45 @@ export const COGNITIVE_ITEMS = [
 
 export const COGNITIVE_DOMAINS = { num: "חשיבה כמותית", verbal: "חשיבה מילולית", logic: "חשיבה לוגית" };
 
+// ── Cognitive BONUS round — adaptive top-end discrimination ──
+// Shown only to users who score ≥ COGNITIVE_ADVANCED_THRESHOLD on the base 8
+// (weaker performers never see it, so the stage stays short and non-tiring;
+// strong performers get a real ceiling test that separates "solid" from
+// "engineer-grade" reasoning).
+export const COGNITIVE_ADVANCED_THRESHOLD = 6;
+export const COGNITIVE_ADVANCED = [
+  {
+    id: "a1", domain: "num",
+    text: "אם 5 מכונות מייצרות 5 חלקים ב-5 דקות — כמה דקות ייקח ל-100 מכונות לייצר 100 חלקים?",
+    options: ["100 דקות", "5 דקות", "20 דקות", "דקה אחת"], correct: 1,
+  },
+  {
+    id: "a2", domain: "logic",
+    text: "בקופסה 3 כדורים אדומים ו-3 כחולים. מוציאים 2 באקראי. מה הסיכוי ששניהם באותו צבע?",
+    options: ["1/2", "2/5", "1/3", "3/5"], correct: 1,
+  },
+  {
+    id: "a3", domain: "verbal",
+    text: "זרע : עץ — כמו — טיוטה : ?",
+    options: ["עיפרון", "ספר", "מחברת", "סופר"], correct: 1,
+  },
+  {
+    id: "a4", domain: "num",
+    text: "המשך את הסדרה: 2, 3, 5, 7, 11, 13, ...",
+    options: ["15", "16", "17", "19"], correct: 2,
+  },
+  {
+    id: "a5", domain: "logic",
+    text: "בכפר מסוים כל תושב או תמיד משקר או תמיד דובר אמת. פוגשים אדם שאומר: \"אני שקרן\". מה נכון בהכרח?",
+    options: ["הוא שקרן", "הוא דובר אמת", "הוא לא תושב הכפר", "אי אפשר לדעת"], correct: 2,
+  },
+  {
+    id: "a6", domain: "num",
+    text: "שעון מחוגים מראה 3:15 בדיוק. מה הזווית בין מחוג השעות למחוג הדקות?",
+    options: ["0°", "7.5°", "12.5°", "30°"], correct: 1,
+  },
+];
+
 // ── Open reflective questions — 5 ──
 export const OPEN_QUESTIONS = [
   {
