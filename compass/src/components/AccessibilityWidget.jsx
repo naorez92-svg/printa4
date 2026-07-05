@@ -83,7 +83,7 @@ export default function AccessibilityWidget() {
         onClick={() => setOpen((o) => !o)}
         aria-label="אפשרויות נגישות"
         aria-expanded={open}
-        className="fixed left-0 top-[62%] z-[60] w-10 h-11 rounded-l-none rounded-r-xl bg-magic text-white shadow-lg shadow-magic/30 flex items-center justify-center hover:w-12 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-white print:hidden"
+        className="fixed left-0 top-[62%] z-[60] w-11 h-12 rounded-l-none rounded-r-xl bg-magic text-white shadow-lg shadow-magic/30 flex items-center justify-center hover:w-12 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-white print:hidden"
         style={{ fontSize: "1.25rem" }}
       >
         ♿

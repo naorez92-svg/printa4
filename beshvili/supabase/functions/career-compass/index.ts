@@ -107,17 +107,20 @@ function profileText(p: any): string {
       // deno-lint-ignore no-explicit-any
       (p.cognitive.domains ?? []).map((d: any) => clamp(d, 60)).join(" · "));
   }
-  if (Array.isArray(p?.scenarios) && p.scenarios.length) {
-    lines.push("\nתגובות בטן לתרחישי יום-יום שנבחרו לפי תחומי העניין המובילים שלו (1=ממש לא, 5=זה אני!):");
-    for (const s of p.scenarios.slice(0, 8)) {
-      lines.push(`• "${clamp(s.text, 220)}" — ${clamp(s.score, 3)}/5`);
-    }
-  }
   if (Array.isArray(p?.openAnswers)) {
     lines.push("\nתשובות לשאלות העומק:");
     for (const qa of p.openAnswers.slice(0, 8)) {
       lines.push(`שאלה: ${clamp(qa.question, 300)}`);
       lines.push(`תשובה: ${clamp(qa.answer)}`);
+    }
+  }
+  // AFTER the open answers on purpose: the profile is hard-clamped below, and
+  // when budget runs out it's the gut-reaction scores that should fall off the
+  // end — never the free-text depth essays (the highest-value signal).
+  if (Array.isArray(p?.scenarios) && p.scenarios.length) {
+    lines.push("\nתגובות בטן לתרחישי יום-יום שנבחרו לפי תחומי העניין המובילים שלו (1=ממש לא, 5=זה אני!):");
+    for (const s of p.scenarios.slice(0, 8)) {
+      lines.push(`• "${clamp(s.text, 220)}" — ${clamp(s.score, 3)}/5`);
     }
   }
   return lines.join("\n").substring(0, MAX_PROFILE_CHARS);
@@ -545,7 +548,9 @@ Deno.serve(async (req) => {
         return new Response(JSON.stringify({ error: "ai_error" }), { status: 503, headers: cors });
       }
       return new Response(
-        JSON.stringify({ question, index: asked + 1, total: INTERVIEW_MAX, done: false }),
+        // depth = last question of the depth phase; the client draws the
+        // "שלב הדיוק" divider right after it (single source of truth here).
+        JSON.stringify({ question, index: asked + 1, total: INTERVIEW_MAX, depth: INTERVIEW_DEPTH, done: false }),
         { status: 200, headers: { ...cors, "content-type": "application/json" } },
       );
     }

@@ -5,16 +5,17 @@ import { Btn, StageIntro, CompassMark, MicButton } from "./ui";
 
 // מצפן — the adaptive AI interview. A chat-like flow: the interviewer agent
 // reads the whole assessment and asks up to 8 personalized questions, one at
-// a time (1-5 depth, 6-8 direction-sharpening). Each Q&A pair is appended to
-// journey.interview. The server is the source of truth for the total.
-
-const SHARPEN_FROM = 6; // question number where the interviewer switches to direction-sharpening
+// a time (depth first, then direction-sharpening). Each Q&A pair is appended
+// to journey.interview. The server is the source of truth for the total AND
+// for the depth/sharpen boundary — both sync from every interview response
+// (the literals below only cover the pre-first-fetch render).
 
 export default function Interview({ journey, update, ensureRow, nextStage }) {
   const intro = STAGE_INTROS.interview;
   const [started, setStarted] = useState(() => journey.interview.length > 0);
   const [pendingQ, setPendingQ] = useState(null);   // current unanswered question
-  const [progress, setProgress] = useState({ index: journey.interview.length, total: 8 });
+  const [progress, setProgress] = useState({ index: journey.interview.length, total: 8, depth: 5 });
+  const sharpenFrom = (progress.depth || 5) + 1; // first question of the sharpening phase
   const [draft, setDraft] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -32,7 +33,7 @@ export default function Interview({ journey, update, ensureRow, nextStage }) {
       const data = await fetchInterviewQuestion(rowId, journey.answers, interviewSoFar);
       if (data.done) { nextStage(); return; }
       setPendingQ(data.question);
-      setProgress({ index: data.index, total: data.total });
+      setProgress({ index: data.index, total: data.total, depth: data.depth || 5 });
     } catch (e) {
       if (e.code === "rate_limited") {
         setError(`רגע אחד… נסה שוב בעוד ${e.wait || 10} שניות`);
@@ -77,7 +78,7 @@ export default function Interview({ journey, update, ensureRow, nextStage }) {
       <div className="flex-1 space-y-4 mb-5 overflow-y-auto">
         {journey.interview.map((qa, i) => (
           <div key={i} className="space-y-3">
-            {i === SHARPEN_FROM - 1 && <PhaseDivider />}
+            {i === sharpenFrom - 1 && <PhaseDivider />}
             <AgentBubble text={qa.q} />
             <div className="flex justify-start">
               <div className="bg-magic/20 border border-magic/30 rounded-2xl rounded-tl-sm px-4 py-3 max-w-[85%] text-white/85 leading-relaxed text-sm">
@@ -86,7 +87,7 @@ export default function Interview({ journey, update, ensureRow, nextStage }) {
             </div>
           </div>
         ))}
-        {pendingQ && journey.interview.length === SHARPEN_FROM - 1 && <PhaseDivider />}
+        {pendingQ && journey.interview.length === sharpenFrom - 1 && <PhaseDivider />}
         {pendingQ && <AgentBubble text={pendingQ} highlight />}
         {loading && (
           <div className="flex items-center gap-2 text-white/40 text-sm pr-1">
