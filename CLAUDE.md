@@ -56,7 +56,7 @@ feedback   — id, user_id, message
 leads      — id, user_id, name, phone
 ```
 
-Migrations live in `supabase/migrations/`. They are applied manually via GitHub Actions (`workflow_dispatch` on `deploy-supabase.yml`), not on every push.
+Migrations live in `supabase/migrations/`. They are applied automatically by `deploy-supabase.yml` on any push that touches `supabase/migrations/` (and can still be run manually via `workflow_dispatch`).
 
 ## Tailwind Design Tokens
 
@@ -83,7 +83,7 @@ Fonts: `font-display` = Baloo 2, `font-sans` = Assistant (Hebrew), `font-mono` =
 
 **Edge Function:** push changes under `beshvili/supabase/functions/` to `main` → GitHub Actions auto-deploys.
 
-**DB Migrations:** add a new file in `supabase/migrations/` → go to GitHub Actions → `Deploy Supabase` → **Run workflow** manually.
+**DB Migrations:** add a new file in `supabase/migrations/` and push to `main` — the `Deploy Supabase` workflow applies it automatically (manual **Run workflow** still works as a fallback).
 
 ## Supabase Project
 
