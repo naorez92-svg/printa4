@@ -1,4 +1,4 @@
--- 0037 — make leads actionable in the admin panel.
+-- 0042 (renamed from 0037; version collided with 0037_career_compass) — make leads actionable in the admin panel.
 -- Leads stored only optional name+phone; most users skip both, so the panel
 -- showed "ללא שם" with no way to identify or contact the lead — even though
 -- every lead is an AUTHENTICATED user whose email we know. Store the full
