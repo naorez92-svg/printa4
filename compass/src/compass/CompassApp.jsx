@@ -80,7 +80,7 @@ export default function CompassApp() {
       ) : stage === "analysis" ? (
         <Analysis journey={journey} update={update} ensureRow={ensureRow} goToStage={goToStage} />
       ) : stage === "report" ? (
-        <Report journey={journey} restart={restart} />
+        <Report journey={journey} restart={restart} update={update} />
       ) : (
         <Journey journey={journey} saveSection={saveSection} nextStage={nextStage} />
       )}
@@ -89,40 +89,164 @@ export default function CompassApp() {
 }
 
 // ── Landing / welcome ──
+
+// A peek at the real product — mock report cards in the exact visual language
+// of the final report (honest preview, not testimonials).
+const PREVIEW_CARDS = [
+  {
+    id: "direction",
+    label: "ככה נראה כיוון בדוח שלך",
+    node: (
+      <div className="text-right">
+        <div className="flex items-center justify-between gap-2 mb-2">
+          <span className="text-[10px] bg-brand text-ink rounded-full px-2 py-0.5 font-bold">ההתאמה הגבוהה ביותר</span>
+          <div className="flex items-center gap-1.5" dir="ltr">
+            <div className="w-16 h-1.5 bg-white/10 rounded-full overflow-hidden">
+              <div className="h-full w-[92%] bg-gradient-to-r from-magic to-brand" />
+            </div>
+            <span className="text-xs font-bold text-brand">92%</span>
+          </div>
+        </div>
+        <p className="font-bold mb-1.5">כיוון מס׳ 1 — מותאם אליך</p>
+        <p className="text-xs text-white/55 leading-relaxed">
+          למה דווקא אתה מתאים לזה, איך נראה יום-יום בתפקיד, טווח שכר ריאלי
+          בישראל — וגם המחיר שכדאי להכיר מראש.
+        </p>
+      </div>
+    ),
+  },
+  {
+    id: "roadmap",
+    label: "מפת דרכים שהופכת למשימות",
+    node: (
+      <div className="text-right">
+        <p className="font-bold mb-2.5">🗺️ מסלול הפעולה החי שלך</p>
+        {[
+          { t: "לקבוע שיחה עם בוגר בתחום", done: true },
+          { t: "להירשם לקורס מבוא (חינמי)", done: true },
+          { t: "להגיש מועמדות ראשונה", done: false },
+        ].map((s) => (
+          <div key={s.t} className="flex items-center gap-2 text-xs mb-1.5">
+            <span className={`w-4 h-4 rounded-md border flex items-center justify-center flex-shrink-0 ${s.done ? "bg-grow border-grow text-ink font-bold" : "border-white/25"}`}>
+              {s.done ? "✓" : ""}
+            </span>
+            <span className={s.done ? "text-white/40 line-through" : "text-white/70"}>{s.t}</span>
+          </div>
+        ))}
+        <p className="text-[10px] text-grow mt-2">67% מהדרך — הדוח מתעדכן איתך</p>
+      </div>
+    ),
+  },
+  {
+    id: "letter",
+    label: "והמכתב שכולם קוראים פעמיים",
+    node: (
+      <div className="text-right">
+        <p className="text-xs text-white/40 mb-2">✉️ מכתב אישי, ממצפן אליך</p>
+        <p className="text-sm italic text-white/70 leading-relaxed">
+          "ראיתי אצלך משהו שאתה אולי עוד לא רואה: הדפוס שחוזר בכל תשובה
+          שכתבת. ברגעים של ספק, תחזור למשפט הזה…"
+        </p>
+      </div>
+    ),
+  },
+];
+
 function Welcome({ onStart }) {
+  const [slide, setSlide] = useState(0);
+  const [clock, setClock] = useState(0); // bumped by manual dot clicks — restarts the interval
+
+  // Auto-advance the preview carousel. Honors reduced-motion (WCAG 2.3.3 /
+  // IS 5568): when the OS asks for less motion, slides only change on tap.
+  useEffect(() => {
+    if (window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) return;
+    const t = setInterval(() => setSlide((s) => (s + 1) % PREVIEW_CARDS.length), 4000);
+    return () => clearInterval(t);
+  }, [clock]);
+  const goTo = (i) => { setClock((c) => c + 1); setSlide(i); };
+
   return (
     <Shell>
-      <div className="flex-1 flex flex-col items-center justify-center text-center py-10">
-        <CompassMark size={84} className="mb-6" />
-        <h1 className="text-5xl font-bold font-display mb-3">מצפן</h1>
-        <p className="text-xl text-white/70 mb-2 max-w-md leading-relaxed">
+      <div className="flex-1 flex flex-col items-center text-center pt-10 pb-6">
+        {/* Hero — the compass breathes */}
+        <div className="relative mb-6">
+          <div className="absolute inset-0 -m-6 rounded-full bg-magic/25 blur-2xl animate-pulse [animation-duration:4s]" />
+          <CompassMark size={92} className="relative animate-[spinSlow_24s_linear_infinite]" />
+        </div>
+        <h1 className="text-5xl font-bold font-display mb-3 bg-gradient-to-l from-brand via-white to-magic bg-clip-text text-transparent">
+          מצפן
+        </h1>
+        <p className="text-xl text-white/75 mb-2 max-w-md leading-relaxed font-semibold">
           לא יודע מה ללמוד? מה לעשות בחיים?
         </p>
-        <p className="text-white/45 mb-10 max-w-md leading-relaxed">
-          מסע עומק אישי — פסיכולוגי ואינטלקטואלי — שבסופו תצא עם תשובה ברורה:
-          מה הייעוד שלך, מה בדיוק ללמוד, ואיך מגיעים לשם.
+        <p className="text-white/45 mb-8 max-w-md leading-relaxed">
+          מסע עומק פסיכולוגי ואינטלקטואלי, עם צוות מומחי AI שמנתח רק אותך —
+          ובסופו תשובה ברורה: הייעוד, מה בדיוק ללמוד, ומפת דרכים חיה שמלווה
+          אותך גם אחרי.
         </p>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 w-full max-w-lg mb-10 text-right">
+        <Btn onClick={onStart} className="text-lg px-10 py-4 mb-2 animate-[fadeIn_0.6s_ease]">
+          יוצאים למסע ←
+        </Btn>
+        <p className="text-xs text-white/30 mb-10">
+          ‏30–60 דקות · אפשר לעצור ולחזור מתי שרוצים · המסע חינם
+        </p>
+
+        {/* Live preview carousel — the actual report, not promises */}
+        <div className="w-full max-w-md mb-3">
+          <p className="text-xs font-semibold text-magic mb-3">🔍 ככה נראה הדוח שמחכה לך בסוף</p>
+          <div className="overflow-hidden rounded-3xl border border-magic/25 bg-white/5">
+            <div
+              className="flex transition-transform duration-500 ease-out"
+              style={{ transform: `translateX(${slide * 100}%)` }}
+            >
+              {PREVIEW_CARDS.map((c) => (
+                <div key={c.id} className="w-full flex-shrink-0 p-5">
+                  {c.node}
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="flex items-center justify-center gap-2 mt-3">
+            {PREVIEW_CARDS.map((c, i) => (
+              <button
+                key={c.id}
+                onClick={() => goTo(i)}
+                aria-label={c.label}
+                className={`h-1.5 rounded-full transition-all ${i === slide ? "w-6 bg-brand" : "w-1.5 bg-white/25 hover:bg-white/40"}`}
+              />
+            ))}
+          </div>
+          <p className="text-[11px] text-white/35 mt-2 min-h-[1em]">{PREVIEW_CARDS[slide].label}</p>
+        </div>
+
+        {/* How it works */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 w-full max-w-lg mb-8 text-right">
           {[
-            { icon: "🧭", title: "אבחון עומק", desc: "תשוקות, ערכים, אישיות, יכולות — כלים פסיכולוגיים אמיתיים" },
-            { icon: "🎙️", title: "ראיון אישי", desc: "צוות מומחי AI ששואל בדיוק את השאלות הנכונות עליך" },
-            { icon: "🗺️", title: "תוצאה ברורה", desc: "ייעוד, מה ללמוד ואיפה, ומפת דרכים עם צעדים" },
+            { n: "1", title: "מסע היכרות", desc: "תשוקות, ערכים, אישיות ויכולות — כלים פסיכולוגיים אמיתיים, לא עוד 'איזה חיה אתה'" },
+            { n: "2", title: "ראיון אישי", desc: "מומחה AI שקרא הכל ושואל בדיוק את השאלות שנוגעות בך" },
+            { n: "3", title: "המצפן שלך", desc: "דוח עומק: ייעוד, 3 כיוונים מדורגים, מה ללמוד, ומפת דרכים שחיה איתך" },
           ].map((f) => (
-            <div key={f.title} className="bg-white/5 border border-white/10 rounded-2xl p-4">
-              <div className="text-2xl mb-2">{f.icon}</div>
-              <div className="font-bold text-sm mb-1">{f.title}</div>
+            <div key={f.n} className="bg-white/5 border border-white/10 rounded-2xl p-4 relative overflow-hidden">
+              <span className="absolute -top-2 left-2 text-5xl font-display font-bold text-white/5 select-none">{f.n}</span>
+              <div className="font-bold text-sm mb-1 text-brand">{f.title}</div>
               <div className="text-xs text-white/45 leading-relaxed">{f.desc}</div>
             </div>
           ))}
         </div>
 
-        <Btn onClick={onStart} className="text-lg px-10 py-4">
-          יוצאים למסע ←
-        </Btn>
-        <p className="text-xs text-white/30 mt-4">
-          ‏30–60 דקות · אפשר לעצור ולחזור מתי שרוצים · חינם
+        {/* Trust + legal */}
+        <p className="text-[11px] text-white/30 mb-4 max-w-sm leading-relaxed">
+          🔒 המסע שלך פרטי. הנתונים משמשים רק להפקת הדוח שלך — לא נמכרים ולא
+          משותפים. <a href="/privacy" className="underline hover:text-white/60">מדיניות הפרטיות</a>
         </p>
+        <nav className="flex items-center gap-4 text-[11px] text-white/25">
+          <a href="/terms" className="hover:text-white/50 transition-colors">תקנון</a>
+          <span>·</span>
+          <a href="/privacy" className="hover:text-white/50 transition-colors">פרטיות</a>
+          <span>·</span>
+          <a href="https://wa.me/972509139137" target="_blank" rel="noreferrer" className="hover:text-white/50 transition-colors">צור קשר</a>
+        </nav>
       </div>
     </Shell>
   );
@@ -228,6 +352,12 @@ function CompassLogin() {
           )}
         </div>
         <p className="text-xs text-white/25 mt-6">ההתקדמות שלך עד כאן שמורה במכשיר — שום דבר לא הולך לאיבוד.</p>
+        <p className="text-[11px] text-white/25 mt-3 max-w-xs leading-relaxed">
+          בהתחברות אתה מאשר את{" "}
+          <a href="/terms" target="_blank" rel="noreferrer" className="underline hover:text-white/50">התקנון</a>
+          {" "}ואת{" "}
+          <a href="/privacy" target="_blank" rel="noreferrer" className="underline hover:text-white/50">מדיניות הפרטיות</a>
+        </p>
       </div>
     </Shell>
   );

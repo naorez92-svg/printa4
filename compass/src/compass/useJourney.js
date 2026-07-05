@@ -21,6 +21,7 @@ const EMPTY = {
   answers: {},      // { background, riasec, values, bigfive, cognitive, open }
   interview: [],    // [{ q, a }]
   report: null,     // { raw, sections } once analysis completes
+  roadmapDone: {},  // { "stepIdx-lineIdx": true } — the live action-plan checkmarks
 };
 
 function loadLocal() {
@@ -41,6 +42,7 @@ export function useJourney(session) {
   const [journey, setJourney] = useState(loadLocal);
   const syncTimer = useRef(null);
   const lsTimer = useRef(null);
+  const reportSynced = useRef(false);
   const journeyRef = useRef(journey);
   journeyRef.current = journey;
 
@@ -104,24 +106,40 @@ export function useJourney(session) {
   useEffect(() => {
     if (!session?.user || !journey.rowId) return;
     if (journey.stage === "analysis" && !journey.report) return;
-    const delay = journey.stage === "report" && journey.report ? 0 : 2000;
+    // 0-delay only for the FIRST sync that carries the completed report (the
+    // one write that must not be lost); roadmap toggles afterwards use the
+    // normal debounce so 10 quick checkmarks aren't 10 full-row writes.
+    const firstReportSync = journey.stage === "report" && journey.report && !reportSynced.current;
+    const delay = firstReportSync ? 0 : 2000;
     clearTimeout(syncTimer.current);
     syncTimer.current = setTimeout(() => {
       const payload = {
         stage: journey.stage,
         answers: journey.answers,
         interview: journey.interview,
+        roadmap_done: journey.roadmapDone || {},
         updated_at: new Date().toISOString(),
       };
       if (journey.report) {
         payload.report = journey.report;
         payload.status = journey.stage === "report" ? "completed" : "in_progress";
+        reportSynced.current = true;
       }
       supabase
         .from("career_journeys")
         .update(payload)
         .eq("id", journey.rowId)
-        .then(() => {}, () => {});
+        .then(({ error }) => {
+          // Deploy-ordering resilience: if migration 0040 hasn't landed yet
+          // (or its workflow failed), the roadmap_done column/grant doesn't
+          // exist and the WHOLE update is rejected. Never let the new column
+          // take down core journey sync — retry without it.
+          if (error && /roadmap_done/i.test(error.message || "")) {
+            const { roadmap_done: _drop, ...rest } = payload;
+            supabase.from("career_journeys").update(rest).eq("id", journey.rowId)
+              .then(() => {}, () => {});
+          }
+        }, () => {});
     }, delay);
     return () => clearTimeout(syncTimer.current);
   }, [session, journey]);
@@ -134,34 +152,55 @@ export function useJourney(session) {
   // Otherwise local progress wins.
   useEffect(() => {
     if (!session?.user) return;
+    const applyRow = (data) => {
+      if (!data || !STAGES.some((s) => s.id === data.stage)) return;
+      // A journey the user explicitly restarted away from stays dismissed.
+      if (data.id === journeyRef.current.dismissedRowId) return;
+      // Server-saved reports carry only {raw} — normalize to {raw, sections}.
+      const normReport = data.report?.raw
+        ? { raw: data.report.raw, sections: data.report.sections || parseReport(data.report.raw) }
+        : null;
+      const j = journeyRef.current;
+      const localHasProgress = j.stage !== "welcome" || Object.keys(j.answers).length > 0;
+      // Checkmark merge is a UNION: a checkmark set on any device is never
+      // destroyed by a device that hasn't seen it yet. (Tradeoff: an uncheck
+      // can be resurrected by a stale device — losing checks is worse.)
+      const mergedDone = { ...(data.roadmap_done || {}), ...(j.roadmapDone || {}) };
+      if (!localHasProgress) {
+        update({
+          rowId: data.id,
+          stage: data.stage,
+          answers: data.answers || {},
+          interview: data.interview || [],
+          report: normReport,
+          roadmapDone: mergedDone,
+        });
+      } else if (j.rowId === data.id && normReport && !j.report) {
+        update({ report: normReport, stage: "report", roadmapDone: mergedDone });
+      } else if (j.rowId === data.id &&
+                 Object.keys(mergedDone).length !== Object.keys(j.roadmapDone || {}).length) {
+        update({ roadmapDone: mergedDone });
+      }
+    };
     supabase
       .from("career_journeys")
-      .select("id, stage, answers, interview, report")
+      .select("id, stage, answers, interview, report, roadmap_done")
       .eq("user_id", session.user.id)
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle()
-      .then(({ data }) => {
-        if (!data || !STAGES.some((s) => s.id === data.stage)) return;
-        // A journey the user explicitly restarted away from stays dismissed.
-        if (data.id === journeyRef.current.dismissedRowId) return;
-        // Server-saved reports carry only {raw} — normalize to {raw, sections}.
-        const normReport = data.report?.raw
-          ? { raw: data.report.raw, sections: data.report.sections || parseReport(data.report.raw) }
-          : null;
-        const j = journeyRef.current;
-        const localHasProgress = j.stage !== "welcome" || Object.keys(j.answers).length > 0;
-        if (!localHasProgress) {
-          update({
-            rowId: data.id,
-            stage: data.stage,
-            answers: data.answers || {},
-            interview: data.interview || [],
-            report: normReport,
-          });
-        } else if (j.rowId === data.id && normReport && !j.report) {
-          update({ report: normReport, stage: "report" });
-        }
+      .then(({ data, error }) => {
+        if (!error) return applyRow(data);
+        // Migration 0040 not applied yet → the column doesn't exist and the
+        // whole select fails. Resume must keep working — retry without it.
+        supabase
+          .from("career_journeys")
+          .select("id, stage, answers, interview, report")
+          .eq("user_id", session.user.id)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle()
+          .then(({ data: d2 }) => applyRow(d2), () => {});
       }, () => {});
   }, [session, update]);
 

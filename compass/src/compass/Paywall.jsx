@@ -27,6 +27,7 @@ export default function Paywall({ journey, nextStage }) {
   const [checking, setChecking] = useState(false);
   const [notYet, setNotYet] = useState(false);
   const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
   const checkedOnMount = useRef(false);
 
   const name = journey.answers?.background?.name || "";
@@ -44,10 +45,11 @@ export default function Paywall({ journey, nextStage }) {
   }, []);
 
   const payBit = () => {
-    track("compass_pay_click", { method: "bit", price: PRICE });
+    const cleanPhone = phone.trim().replace(/[^\d+]/g, "").slice(0, 20) || null;
+    track("compass_pay_click", { method: "bit", price: PRICE, phone_given: !!cleanPhone });
     // Heads-up for the admin inbox (reuses the existing notify-lead function).
     supabase.functions.invoke("notify-lead", {
-      body: { name: name || null, phone: null, plan: "compass", price: PRICE, method: "bit" },
+      body: { name: name || null, phone: cleanPhone, plan: "compass", price: PRICE, method: "bit" },
     }).catch(() => {});
     const msg = encodeURIComponent(
       `שלום! שילמתי ${PRICE} ₪ בביט על דוח מצפן 🧭\nהמייל שלי: ${email || "(המייל שאיתו נרשמתי)"}${name ? `\nשם: ${name}` : ""}\nאפשר להפעיל לי את הדוח?`,
@@ -149,12 +151,35 @@ export default function Paywall({ journey, nextStage }) {
               <span className="text-4xl font-bold font-display text-brand">₪{PRICE}</span>
             </div>
             <p className="text-xs text-white/45 mb-1">מחיר השקה · תשלום חד-פעמי · בלי מנוי</p>
-            <p className="text-xs text-white/35 mb-5">להשוואה: פגישת ייעוץ קריירה אחת עולה ₪800–1,500</p>
+            <p className="text-xs text-white/35 mb-4">להשוואה: פגישת ייעוץ קריירה אחת עולה ₪800–1,500</p>
+
+            {/* Optional phone — incentive-framed, never blocks the purchase */}
+            <div className="text-right mb-4">
+              <label htmlFor="pw-phone" className="text-xs text-white/50 block mb-1.5">
+                📱 טלפון <span className="text-white/30">(לא חובה)</span> — כדי שנוכל לעדכן אותך
+                בוואטסאפ ברגע שהדוח מופעל
+              </label>
+              <input
+                id="pw-phone"
+                type="tel"
+                dir="ltr"
+                inputMode="tel"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="050-0000000"
+                className="w-full bg-white/5 border border-white/15 rounded-xl px-4 py-2.5 outline-none focus:border-magic transition-colors text-center text-sm"
+              />
+            </div>
+
             <Btn onClick={payBit} className="w-full text-lg py-4 mb-3">
               💳 שלם ₪{PRICE} בביט והפק את הדוח
             </Btn>
             <p className="text-xs text-white/40 leading-relaxed">
               התשלום בביט למספר 050-9139137 · אחרי התשלום תיפתח הודעת וואטסאפ לאישור מהיר
+            </p>
+            <p className="text-[11px] text-white/30 leading-relaxed mt-2">
+              אפשר לבטל ולקבל החזר מלא עד תחילת הפקת הדוח · בתשלום אתה מאשר את{" "}
+              <a href="/terms" target="_blank" rel="noreferrer" className="underline hover:text-white/60">התקנון</a>
             </p>
           </>
         )}

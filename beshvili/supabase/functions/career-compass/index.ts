@@ -229,6 +229,56 @@ function textFromMessage(data: any): string {
     .join("");
 }
 
+// "Your report is ready" email. Returns true only when Resend accepted it —
+// the caller stamps report_emailed_at ONLY on success, so a transient failure
+// keeps the claim open for the next synthesis retry. Never throws: email is a
+// courtesy on top of the report, which is already safely persisted.
+async function sendReportEmail(toEmail: string, name: string): Promise<boolean> {
+  const resendKey = Deno.env.get("RESEND_API_KEY");
+  if (!resendKey || !toEmail) return false;
+  const escHtml = (v: string) => v
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+  const who = escHtml(name || "");
+  const html = `<!DOCTYPE html><html dir="rtl" lang="he"><body style="font-family:Arial,sans-serif;background:#F7F6FB;margin:0;padding:20px;">
+  <div style="max-width:520px;margin:0 auto;background:#20184A;border-radius:20px;padding:32px;color:#fff;">
+    <div style="font-size:40px;text-align:center;margin-bottom:8px;">🧭</div>
+    <h1 style="text-align:center;margin:0 0 6px;font-size:24px;">${who ? `${who}, ` : ""}המצפן שלך מוכן</h1>
+    <p style="text-align:center;color:rgba(255,255,255,0.65);font-size:15px;line-height:1.6;margin:0 0 24px;">
+      דוח העומק האישי שלך — הייעוד, הכיוונים, מה ללמוד ומסלול הפעולה —
+      שמור בחשבון שלך וזמין מכל מכשיר, לתמיד.
+    </p>
+    <div style="text-align:center;margin-bottom:24px;">
+      <a href="https://mitzpen.vercel.app/" style="display:inline-block;background:linear-gradient(90deg,#F4A02C,#6C5CE7);color:#fff;padding:14px 36px;border-radius:14px;text-decoration:none;font-weight:bold;font-size:16px;">פתח את הדוח שלי</a>
+    </div>
+    <p style="color:rgba(255,255,255,0.45);font-size:13px;line-height:1.6;margin:0 0 4px;">
+      💡 טיפ: בדוח יש "מסלול פעולה חי" — סמן כל צעד שהשלמת, וההתקדמות תישמר.
+      חזור אליו פעם בשבוע ותראה את הדרך נבנית.
+    </p>
+    <p style="color:rgba(255,255,255,0.3);font-size:11px;text-align:center;margin:20px 0 0;">
+      מצפן · מבית בשבילי · <a href="https://mitzpen.vercel.app/privacy" style="color:rgba(255,255,255,0.4);">פרטיות</a>
+    </p>
+  </div></body></html>`;
+  try {
+    const res = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: { "Authorization": `Bearer ${resendKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        from: "מצפן 🧭 <hello@beshvili.com>",
+        to: [toEmail],
+        // Subject is a plain-text header — the RAW name, not the HTML-escaped one.
+        subject: name ? `🧭 ${name}, דוח המצפן שלך מוכן` : "🧭 דוח המצפן שלך מוכן",
+        html,
+      }),
+    });
+    if (!res.ok) console.error("[career-compass] report email failed:", await res.text());
+    return res.ok;
+  } catch (e) {
+    console.error("[career-compass] report email error:", String(e));
+    return false;
+  }
+}
+
 // Parse a full Anthropic SSE transcript ONCE (post-stream) and extract the text.
 function textFromSseTranscript(transcript: string): string {
   let out = "";
@@ -566,6 +616,28 @@ Deno.serve(async (req) => {
             .update({ report: { raw }, status: "completed", stage: "report", updated_at: new Date().toISOString() })
             .eq("id", journey.id);
           if (saveErr) console.error("[career-compass] report save failed:", saveErr.message);
+          // Deliver the permanent link by email — BEFORE the "done" frame, while
+          // the response stream (and therefore the isolate) is guaranteed alive.
+          // Once per journey: read the stamp, send, and stamp only on success —
+          // a transient Resend failure leaves the claim open for a later retry.
+          if (!saveErr && user.email) {
+            const { data: stampRow } = await admin
+              .from("career_journeys")
+              .select("report_emailed_at")
+              .eq("id", journey.id)
+              .maybeSingle();
+            if (stampRow && !stampRow.report_emailed_at) {
+              const sent = await sendReportEmail(user.email, clamp(body?.profile?.background?.name, 60));
+              if (sent) {
+                await admin
+                  .from("career_journeys")
+                  .update({ report_emailed_at: new Date().toISOString() })
+                  .eq("id", journey.id)
+                  .is("report_emailed_at", null)
+                  .then(() => {}, () => {});
+              }
+            }
+          }
           await send({ type: "done", raw_len: raw.length });
         } catch (e) {
           console.error("[career-compass] synthesize error:", String(e));
