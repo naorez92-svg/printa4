@@ -74,11 +74,44 @@ jobs:
               .map(l => `- ${l.name || 'ללא שם'} · ${l.phone || '—'}`)
               .join('\n') || '_אין לידים חדשים_';
 
+            // Business funnel (7-day windows from admin-stats)
+            const an = s.analytics ?? {};
+            const fs = s.funnelStats ?? {};
+            const pct = (a, b) => (b > 0 ? Math.round((a / b) * 100) + '%' : '—');
+            const sourceLines = (an.sources ?? []).slice(0, 6)
+              .map(x => `| ${x.source || 'ישיר'} | ${x.count} |`).join('\n') || '_אין נתונים_';
+            // Verdict: is the machine healthy this week?
+            const leads7 = fs.leads ?? 0;
+            const activated7 = an.activated ?? 0;
+            const verdict = activated7 === 0
+              ? '🔴 אין הפעלות השבוע — צריך תנועה: פרסום/פוסטים'
+              : leads7 === 0
+              ? '🟡 יש שימוש אבל אפס בקשות שדרוג — לבדוק את הפייוול/הצעת הערך'
+              : `🟢 המשפך חי: ${activated7} הפעלות → ${leads7} לידים (${pct(leads7, activated7)})`;
+
             // Build the body from joined lines — a raw multiline template literal
             // dropped to column 1 and broke the YAML block scalar (every push
             // produced a zero-job "failure" run because the file didn't parse).
             const body = [
               `## 📊 דוח יומי — ${dateStr} בשעה ${timeStr}`,
+              '',
+              `### 🎯 שורה תחתונה`,
+              verdict,
+              '',
+              '### משפך — 7 ימים',
+              '| שלב | כמות |',
+              '|---|---|',
+              `| מבקרים | ${an.visitors ?? '—'} |`,
+              `| נרשמו | ${an.signups ?? '—'} (${pct(an.signups ?? 0, an.visitors ?? 0)}) |`,
+              `| יצרו חוברת | ${an.activated ?? '—'} (${pct(an.activated ?? 0, an.signups ?? 0)}) |`,
+              `| פתחו מסך שדרוג | ${fs.upgradeOpened ?? '—'} |`,
+              `| לחצו על תשלום | ${fs.ctaClicked ?? '—'} |`,
+              `| השאירו ליד | ${fs.leads ?? '—'} |`,
+              '',
+              '### מקורות תנועה — 7 ימים',
+              '| מקור | מבקרים |',
+              '|---|---|',
+              sourceLines,
               '',
               '### משתמשים',
               '| מדד | ערך |',
