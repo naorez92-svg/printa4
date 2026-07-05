@@ -1,0 +1,97 @@
+name: Deploy מצפן (compass) to Vercel
+
+# Fully automated Vercel setup + deploy for the standalone compass site.
+# Creates the `mitzpen` project if it doesn't exist (framework=vite,
+# rootDirectory=compass, linked to this repo), removes the misconfigured
+# `printa4-jpq7` project left over from a manual import, and deploys to
+# production. Requires the VERCEL_TOKEN repo secret.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'compass/**'
+      - '.github/workflows/deploy-compass.yml'
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check VERCEL_TOKEN is configured
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          if [ -z "$VERCEL_TOKEN" ]; then
+            echo "::error::VERCEL_TOKEN חסר. צור טוקן ב-https://vercel.com/account/tokens והוסף אותו כאן: https://github.com/naorez92-svg/printa4/settings/secrets/actions/new (Name: VERCEL_TOKEN)"
+            exit 1
+          fi
+
+      - uses: actions/checkout@v4
+
+      - name: Ensure the mitzpen project exists with correct settings
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          set -euo pipefail
+          hdr=(-H "Authorization: Bearer $VERCEL_TOKEN" -H "Content-Type: application/json")
+
+          # Resolve the team scope (projects live under the naor-s-projects team;
+          # fall back to the first team, then to the personal account).
+          TEAMS=$(curl -sf "${hdr[@]}" "https://api.vercel.com/v2/teams")
+          TEAM_ID=$(echo "$TEAMS" | jq -r '[.teams[] | select(.slug == "naor-s-projects")][0].id // empty')
+          [ -z "$TEAM_ID" ] && TEAM_ID=$(echo "$TEAMS" | jq -r '.teams[0].id // empty')
+          if [ -n "$TEAM_ID" ]; then
+            Q="?teamId=$TEAM_ID"; ORG_ID="$TEAM_ID"
+          else
+            Q=""; ORG_ID=$(curl -sf "${hdr[@]}" "https://api.vercel.com/v2/user" | jq -r '.user.id // .id')
+          fi
+          echo "scope: ${TEAM_ID:-personal}"
+
+          # Upsert the project: fix settings if it exists, create it otherwise.
+          if PROJ=$(curl -sf "${hdr[@]}" "https://api.vercel.com/v9/projects/mitzpen$Q"); then
+            echo "project mitzpen exists — enforcing framework=vite, rootDirectory=compass"
+            PROJ=$(curl -sf -X PATCH "${hdr[@]}" \
+              -d '{"framework":"vite","rootDirectory":"compass"}' \
+              "https://api.vercel.com/v9/projects/mitzpen$Q")
+          else
+            echo "creating project mitzpen"
+            # Try with a git link (auto-deploys on push); fall back to unlinked —
+            # this workflow deploys on every compass/** push either way.
+            PROJ=$(curl -sf -X POST "${hdr[@]}" \
+              -d '{"name":"mitzpen","framework":"vite","rootDirectory":"compass","gitRepository":{"type":"github","repo":"naorez92-svg/printa4"}}' \
+              "https://api.vercel.com/v10/projects$Q") \
+            || PROJ=$(curl -sf -X POST "${hdr[@]}" \
+              -d '{"name":"mitzpen","framework":"vite","rootDirectory":"compass"}' \
+              "https://api.vercel.com/v10/projects$Q")
+          fi
+          PID=$(echo "$PROJ" | jq -r '.id')
+          [ -n "$PID" ] && [ "$PID" != "null" ] || { echo "::error::failed to resolve project id"; exit 1; }
+
+          # Link the checkout to the project for the CLI deploy step.
+          mkdir -p .vercel
+          jq -n --arg p "$PID" --arg o "$ORG_ID" '{projectId: $p, orgId: $o}' > .vercel/project.json
+
+          # Clean up the broken manual import (repo root, blank site). 404 = already gone.
+          CODE=$(curl -s -o /dev/null -w "%{http_code}" -X DELETE "${hdr[@]}" \
+            "https://api.vercel.com/v9/projects/printa4-jpq7$Q")
+          echo "delete printa4-jpq7: HTTP $CODE"
+
+      - name: Deploy to production
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          set -euo pipefail
+          URL=$(npx --yes vercel@latest deploy --prod --yes --token="$VERCEL_TOKEN")
+          echo "✅ production deploy: $URL"
+
+      - name: Show production domains
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          hdr=(-H "Authorization: Bearer $VERCEL_TOKEN")
+          TEAMS=$(curl -sf "${hdr[@]}" "https://api.vercel.com/v2/teams")
+          TEAM_ID=$(echo "$TEAMS" | jq -r '[.teams[] | select(.slug == "naor-s-projects")][0].id // .teams[0].id // empty')
+          Q=""; [ -n "$TEAM_ID" ] && Q="?teamId=$TEAM_ID"
+          echo "🌐 domains:"
+          curl -sf "${hdr[@]}" "https://api.vercel.com/v9/projects/mitzpen/domains$Q" | jq -r '.domains[].name'
