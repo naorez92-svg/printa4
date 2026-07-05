@@ -195,6 +195,7 @@ export default function Report({ journey, restart, update }) {
   const essence = sections["תמצית"];
   const profile = sections["פרופיל"];
   const { intro, items: directions } = parseDirections(sections["כיוונים"]);
+  const bottomLine = sections["שורה_תחתונה"]; // the decisive pick + 30-day reality test
   const studies = sections["לימודים"];
   const roadmap = parseRoadmap(sections["מפת_דרכים"]);
   const letter = sections["מכתב"];
@@ -261,6 +262,15 @@ export default function Report({ journey, restart, update }) {
                 ))}
               </div>
             </SectionCard>
+          )}
+
+          {bottomLine && (
+            <section className="bg-gradient-to-br from-brand/20 to-magic/10 border border-brand/40 rounded-3xl p-6 sm:p-8 print-avoid">
+              <h2 className="text-xl font-bold font-display mb-4 flex items-center gap-2.5">
+                <span className="text-2xl">⚖️</span>השורה התחתונה
+              </h2>
+              <div className="text-lg leading-relaxed"><Rich text={bottomLine} /></div>
+            </section>
           )}
 
           {studies && (
