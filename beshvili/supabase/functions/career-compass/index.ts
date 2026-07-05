@@ -1,24 +1,38 @@
 import { createClient } from "jsr:@supabase/supabase-js@2";
 
-// מצפן (Career Compass) — multi-agent career-guidance backend.
+// מצפן (Career Compass) v2 — multi-agent career-guidance backend.
 //
-// Two actions, one endpoint:
-//   • interview — adaptive deep-dive: given the full assessment profile and the
+// Three actions, one endpoint:
+//   • interview  — adaptive deep-dive: given the full assessment profile and the
 //     interview so far, a psychologist agent asks the next personalized question.
-//   • analyze   — the multi-agent pipeline: three specialist agents run in
-//     parallel (occupational psychologist, aptitude analyst, Israeli labor-market
-//     strategist), then a synthesizer streams the final Hebrew report over SSE.
+//     Free (part of the journey experience).
+//   • experts    — phase 1 of the analysis: three specialist agents in parallel
+//     (occupational psychologist, aptitude analyst, Israeli labor-market
+//     strategist). Results are PERSISTED to the journey row, so a later failure
+//     never re-runs (or re-bills) them. Paid.
+//   • synthesize — phase 2: the synthesizer streams the final Hebrew report.
+//     Anthropic's SSE bytes are forwarded RAW (near-zero CPU — JSON-parsing
+//     every delta server-side previously tripped the edge-runtime CPU ceiling
+//     and killed the stream mid-report). The full report is parsed ONCE at
+//     stream end and persisted to the journey row. Paid.
+//
+// Splitting analysis into two shorter requests (v1 ran everything in one) keeps
+// each request far from the platform wall-clock/CPU limits — the root cause of
+// "the report streams and then dies at the end".
 //
 // Cost controls are server-side: per-journey ai_calls cap + minimum gap between
-// calls (CAS on the journey row), daily journey cap per user, and input clamps.
+// calls (CAS on the journey row), daily journey cap per user, paywall
+// entitlement (profiles.compass_paid), and input clamps.
 
 const MODEL = "claude-opus-4-8";
 const INTERVIEW_MAX = 5;              // adaptive interview questions per journey
-const MAX_AI_CALLS_PER_JOURNEY = 14;  // 5 interview + 2 analyze + retry headroom
+const MAX_AI_CALLS_PER_JOURNEY = 14;  // 5 interview + experts/synthesize + retry headroom
 const MAX_JOURNEYS_PER_DAY = 5;
-const GAP_SECONDS = { interview: 8, analyze: 45 };
+const GAP_SECONDS = { interview: 8, experts: 30, synthesize: 20 };
 const MAX_PROFILE_CHARS = 18000;      // clamp on the serialized profile text
 const MAX_ANSWER_CHARS = 2500;        // clamp on any single free-text answer
+const EXPERT_MAX_TOKENS = 1800;
+const SYNTH_MAX_TOKENS = 8000;
 
 function getCors(req: Request) {
   const origin = req.headers.get("origin") ?? "";
@@ -39,7 +53,7 @@ function getCors(req: Request) {
 
 // Strip tags that could break out of the data delimiters (prompt injection).
 const esc = (s: string) =>
-  s.replace(/<\/?(user_data|system|instructions?|INST)\b[^>]*>/gi, "");
+  s.replace(/<\/?(user_data|expert_analysis|system|instructions?|INST)\b[^>]*>/gi, "");
 
 const clamp = (v: unknown, max = MAX_ANSWER_CHARS) =>
   esc(String(v ?? "").trim()).substring(0, max);
@@ -62,21 +76,26 @@ function profileText(p: any): string {
     lines.push(`\nקוד הולנד (RIASEC): ${clamp(p.riasec.code, 6)}`);
     if (Array.isArray(p.riasec.top)) {
       lines.push("תחומי עניין מובילים: " +
+        // deno-lint-ignore no-explicit-any
         p.riasec.top.map((t: any) => `${clamp(t.label, 40)} (${clamp(t.score, 6)}/25)`).join(" · "));
     }
   }
   if (p?.big5) {
     lines.push("\nפרופיל אישיות (1-5): " +
+      // deno-lint-ignore no-explicit-any
       Object.values(p.big5).map((t: any) => `${clamp(t.label, 40)}: ${clamp(t.score, 6)}`).join(" · "));
   }
   if (p?.values) {
+    // deno-lint-ignore no-explicit-any
     const top = (p.values.top ?? []).map((v: any) => clamp(v.label, 80)).join(" | ");
+    // deno-lint-ignore no-explicit-any
     const low = (p.values.low ?? []).map((v: any) => clamp(v.label, 80)).join(" | ");
     if (top) lines.push(`\nערכים קריטיים עבורו: ${top}`);
     if (low) lines.push(`ערכים פחות חשובים לו: ${low}`);
   }
   if (p?.cognitive) {
     lines.push(`\nאתגר קוגניטיבי: ${clamp(p.cognitive.total, 12)} · ` +
+      // deno-lint-ignore no-explicit-any
       (p.cognitive.domains ?? []).map((d: any) => clamp(d, 60)).join(" · "));
   }
   if (Array.isArray(p?.openAnswers)) {
@@ -92,6 +111,7 @@ function profileText(p: any): string {
 // deno-lint-ignore no-explicit-any
 function interviewText(interview: any): string {
   if (!Array.isArray(interview) || interview.length === 0) return "(הראיון עוד לא התחיל)";
+  // deno-lint-ignore no-explicit-any
   return interview.slice(0, INTERVIEW_MAX + 2).map((qa: any, i: number) =>
     `שאלה ${i + 1}: ${clamp(qa.q, 600)}\nתשובה ${i + 1}: ${clamp(qa.a)}`).join("\n\n");
 }
@@ -202,6 +222,20 @@ function textFromMessage(data: any): string {
     .join("");
 }
 
+// Parse a full Anthropic SSE transcript ONCE (post-stream) and extract the text.
+function textFromSseTranscript(transcript: string): string {
+  let out = "";
+  for (const frame of transcript.split("\n\n")) {
+    const line = frame.split("\n").find((l) => l.startsWith("data: "));
+    if (!line) continue;
+    try {
+      const evt = JSON.parse(line.slice(6));
+      if (evt.type === "content_block_delta" && evt.delta?.type === "text_delta") out += evt.delta.text;
+    } catch { /* partial frame */ }
+  }
+  return out;
+}
+
 // ── Handler ──────────────────────────────────────────────────────────────────
 
 Deno.serve(async (req) => {
@@ -228,43 +262,70 @@ Deno.serve(async (req) => {
 
     // 2. Body
     const body = await req.json().catch(() => null);
-    const action = body?.action;
+    const action = body?.action as string;
     const journeyId = String(body?.journeyId ?? "");
-    if (!body || !["interview", "analyze"].includes(action) || !/^[0-9a-f-]{36}$/i.test(journeyId)) {
+    if (!body || !["interview", "experts", "synthesize"].includes(action) || !/^[0-9a-f-]{36}$/i.test(journeyId)) {
       return new Response(JSON.stringify({ error: "bad_request" }), { status: 400, headers: cors });
     }
 
-    // 3. Journey ownership + abuse caps (independent reads — run concurrently)
+    // 3. Journey ownership + entitlement + abuse caps (independent reads)
     const dayAgo = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
-    const [journeyResult, { count: journeysToday }] = await Promise.all([
+    const [journeyResult, { count: journeysToday }, profileResult] = await Promise.all([
       admin.from("career_journeys")
-        .select("id, user_id, ai_calls, last_ai_call_at")
+        .select("id, user_id, ai_calls, last_ai_call_at, analyses")
         .eq("id", journeyId)
         .single(),
       admin.from("career_journeys")
         .select("*", { count: "exact", head: true })
         .eq("user_id", user.id)
         .gte("created_at", dayAgo),
+      admin.from("profiles")
+        .select("plan, compass_paid")
+        .eq("id", user.id)
+        .maybeSingle(),
     ]);
     const journey = journeyResult.data;
     if (journeyResult.error || !journey || journey.user_id !== user.id) {
       return new Response(JSON.stringify({ error: "not_found" }), { status: 404, headers: cors });
     }
-    if (journey.ai_calls >= MAX_AI_CALLS_PER_JOURNEY) {
-      return new Response(JSON.stringify({ error: "journey_quota_exceeded" }), { status: 403, headers: cors });
-    }
     // Strict >: with N journeys existing, count === N — so ">" allows calls on
-    // up to MAX journeys and blocks once an (MAX+1)th row exists. ">=" would
-    // silently shrink the usable cap to MAX-1.
+    // up to MAX journeys and blocks once an (MAX+1)th row exists.
     if ((journeysToday ?? 0) > MAX_JOURNEYS_PER_DAY) {
       return new Response(JSON.stringify({ error: "daily_limit" }), { status: 403, headers: cors });
     }
 
-    // 4. Rate gap + atomic call accounting (CAS on ai_calls prevents a
-    //    concurrent double-spend; the gap prevents rapid-fire looping).
-    const gap = GAP_SECONDS[action as "interview" | "analyze"];
+    // Paywall: the analysis pipeline (experts + synthesize) requires payment.
+    // The interview stays free — it's part of the journey experience.
+    const isPaid = profileResult.data?.compass_paid === true || profileResult.data?.plan === "admin";
+    if ((action === "experts" || action === "synthesize") && !isPaid) {
+      return new Response(JSON.stringify({ error: "payment_required" }), { status: 402, headers: cors });
+    }
+
+    const apiKey = Deno.env.get("ANTHROPIC_API_KEY");
+    if (!apiKey) throw new Error("ANTHROPIC_API_KEY missing");
+
+    const enc = new TextEncoder();
+
+    // ── experts (cached): a retry after synthesis failure must not re-run or
+    //    re-bill the agents — replay completion from the stored analyses.
+    if (action === "experts" && journey.analyses) {
+      const cached = `data: ${JSON.stringify({ type: "experts_cached" })}\n\ndata: ${JSON.stringify({ type: "done" })}\n\n`;
+      return new Response(enc.encode(cached), {
+        headers: { ...cors, "content-type": "text/event-stream", "cache-control": "no-cache, no-transform" },
+      });
+    }
+    // synthesize requires the experts phase to have completed.
+    if (action === "synthesize" && !journey.analyses) {
+      return new Response(JSON.stringify({ error: "experts_missing" }), { status: 409, headers: cors });
+    }
+
+    // 4. Budget cap + rate gap + atomic call accounting (CAS on ai_calls).
+    if (journey.ai_calls >= MAX_AI_CALLS_PER_JOURNEY) {
+      return new Response(JSON.stringify({ error: "journey_quota_exceeded" }), { status: 403, headers: cors });
+    }
+    const gap = GAP_SECONDS[action as keyof typeof GAP_SECONDS];
     if (journey.last_ai_call_at && Date.now() - new Date(journey.last_ai_call_at).getTime() < gap * 1000) {
-      const wait = Math.ceil(gap - (Date.now() - new Date(journey.last_ai_call_at).getTime()) / 1000);
+      const wait = Math.max(1, Math.ceil(gap - (Date.now() - new Date(journey.last_ai_call_at).getTime()) / 1000));
       return new Response(JSON.stringify({ error: "rate_limited", wait }), { status: 429, headers: cors });
     }
     const { data: casRow } = await admin
@@ -277,19 +338,16 @@ Deno.serve(async (req) => {
     if (!casRow) {
       return new Response(JSON.stringify({ error: "rate_limited", wait: gap }), { status: 429, headers: cors });
     }
-    // A failed AI call must not burn journey budget — refund on error paths.
-    // CAS-guarded like the increment: roll back ONLY if the counter still holds
-    // the value we wrote, so a concurrent call's increment is never clobbered
-    // (worst case a refund is skipped, which fails in the safe direction).
-    const refund = () =>
-      admin.from("career_journeys")
-        .update({ ai_calls: journey.ai_calls })
+    // A failed AI call must not burn journey budget OR block an immediate retry:
+    // roll back the counter (CAS-guarded — never clobbers a concurrent
+    // increment) and clear the rate-gap stamp.
+    const refund = async () => {
+      await admin.from("career_journeys")
+        .update({ ai_calls: journey.ai_calls, last_ai_call_at: null })
         .eq("id", journey.id)
         .eq("ai_calls", journey.ai_calls + 1)
         .then(() => {}, () => {});
-
-    const apiKey = Deno.env.get("ANTHROPIC_API_KEY");
-    if (!apiKey) throw new Error("ANTHROPIC_API_KEY missing");
+    };
 
     const profile = profileText(body.profile ?? {});
     const interview = interviewText(body.interview ?? []);
@@ -309,6 +367,7 @@ Deno.serve(async (req) => {
         300, false, 60_000,
       );
       if (!r.ok) {
+        await r.body?.cancel().catch(() => {});
         await refund();
         console.error(`[career-compass] interview Anthropic ${r.status}`);
         return new Response(JSON.stringify({ error: "ai_error" }), { status: 503, headers: cors });
@@ -324,75 +383,115 @@ Deno.serve(async (req) => {
       );
     }
 
-    // ── analyze: 3 specialists in parallel, then streamed synthesis (SSE) ──
-    const enc = new TextEncoder();
+    // ── Shared SSE plumbing for experts / synthesize ──
     const { readable, writable } = new TransformStream<Uint8Array, Uint8Array>();
     const w = writable.getWriter();
     const send = (obj: unknown) => w.write(enc.encode(`data: ${JSON.stringify(obj)}\n\n`)).catch(() => {});
     const hb = setInterval(() => { w.write(enc.encode(": keep-alive\n\n")).catch(() => {}); }, 8000);
 
-    (async () => {
-      try {
-        const agents = [
-          { key: "psych",    system: PSYCH_SYSTEM,    label: "פסיכולוג תעסוקתי" },
-          { key: "aptitude", system: APTITUDE_SYSTEM, label: "מומחה חוזקות ולמידה" },
-          { key: "market",   system: MARKET_SYSTEM,   label: "אסטרטג שוק העבודה" },
-        ];
-        await send({ type: "agents_start", agents: agents.map((a) => ({ key: a.key, label: a.label })) });
-
-        const analyses = await Promise.all(agents.map(async (a) => {
-          const r = await callAnthropic(apiKey, a.system, dataBlock, 2000, false, 120_000);
-          if (!r.ok) {
-            await r.body?.cancel().catch(() => {});
-            throw new Error(`agent_${a.key}_${r.status}`);
-          }
-          const text = textFromMessage(await r.json());
-          await send({ type: "agent_done", key: a.key });
-          return { key: a.key, label: a.label, text };
-        }));
-
-        await send({ type: "synthesis_start" });
-        const synthMsg =
-          `${dataBlock}\n\n` +
-          analyses.map((a) => `<expert_analysis source="${a.label}">\n${a.text}\n</expert_analysis>`).join("\n\n") +
-          `\n\nכתוב עכשיו את דוח המצפן המלא לפי המבנה שהוגדר.`;
-        const synth = await callAnthropic(apiKey, SYNTH_SYSTEM, synthMsg, 10000, true, 200_000);
-        if (!synth.ok) {
-          await synth.body?.cancel().catch(() => {});
-          throw new Error(`synth_${synth.status}`);
+    if (action === "experts") {
+      (async () => {
+        try {
+          const agents = [
+            { key: "psych",    system: PSYCH_SYSTEM,    label: "פסיכולוג תעסוקתי" },
+            { key: "aptitude", system: APTITUDE_SYSTEM, label: "מומחה חוזקות ולמידה" },
+            { key: "market",   system: MARKET_SYSTEM,   label: "אסטרטג שוק העבודה" },
+          ];
+          await send({ type: "agents_start" });
+          const analyses = await Promise.all(agents.map(async (a) => {
+            const r = await callAnthropic(apiKey, a.system, dataBlock, EXPERT_MAX_TOKENS, false, 110_000);
+            if (!r.ok) {
+              await r.body?.cancel().catch(() => {});
+              throw new Error(`agent_${a.key}_${r.status}`);
+            }
+            const text = textFromMessage(await r.json());
+            await send({ type: "agent_done", key: a.key });
+            return { key: a.key, label: a.label, text };
+          }));
+          // Persist BEFORE reporting success — the whole point is durability.
+          // Also clear the rate-gap stamp: the client auto-chains straight into
+          // synthesize, which must not 429 just because the experts were fast.
+          const { error: saveErr } = await admin
+            .from("career_journeys")
+            .update({ analyses, last_ai_call_at: null })
+            .eq("id", journey.id);
+          if (saveErr) throw new Error("analyses_save_failed");
+          await send({ type: "done" });
+        } catch (e) {
+          console.error("[career-compass] experts error:", String(e));
+          await refund();
+          await send({ type: "error", error: "ai_error" });
+        } finally {
+          clearInterval(hb);
+          try { await w.close(); } catch { /* already closed */ }
         }
-
-        // Re-emit Anthropic's SSE text deltas as our own compact events.
-        const reader = synth.body!.getReader();
-        const dec = new TextDecoder();
-        let buf = "";
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          buf += dec.decode(value, { stream: true });
-          const events = buf.split("\n\n");
-          buf = events.pop() ?? "";
-          for (const evt of events) {
-            const dataLine = evt.split("\n").find((l) => l.startsWith("data: "));
-            if (!dataLine) continue;
-            try {
-              const parsed = JSON.parse(dataLine.slice(6));
-              if (parsed.type === "content_block_delta" && parsed.delta?.type === "text_delta") {
-                await send({ type: "delta", text: parsed.delta.text });
-              }
-            } catch { /* partial/non-JSON frame — skip */ }
+      })();
+    } else {
+      // ── synthesize ──
+      (async () => {
+        try {
+          await send({ type: "synthesis_start" });
+          // deno-lint-ignore no-explicit-any
+          const analyses = journey.analyses as any[];
+          const synthMsg =
+            `${dataBlock}\n\n` +
+            analyses.map((a) => `<expert_analysis source="${clamp(a.label, 60)}">\n${esc(String(a.text ?? ""))}\n</expert_analysis>`).join("\n\n") +
+            `\n\nכתוב עכשיו את דוח המצפן המלא לפי המבנה שהוגדר.`;
+          const synth = await callAnthropic(apiKey, SYNTH_SYSTEM, synthMsg, SYNTH_MAX_TOKENS, true, 250_000);
+          if (!synth.ok) {
+            await synth.body?.cancel().catch(() => {});
+            throw new Error(`synth_${synth.status}`);
           }
+
+          // RAW passthrough (client parses Anthropic events itself) with
+          // FRAME-ALIGNED writes: Anthropic frames can split across TCP reads,
+          // and the 8s heartbeat must never land inside a half-frame (that
+          // corrupted deltas client-side). We carry the incomplete tail and
+          // only ever write whole "\n\n"-terminated frames — plain string
+          // slicing, no per-event JSON work, server CPU stays near zero.
+          const reader = synth.body!.getReader();
+          const dec = new TextDecoder();
+          const chunks: string[] = [];
+          let sawStop = false;
+          let carry = "";
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            const text = carry + dec.decode(value, { stream: true });
+            chunks.push(text.slice(carry.length));
+            if (text.includes('"message_stop"')) sawStop = true;
+            const cut = text.lastIndexOf("\n\n");
+            if (cut >= 0) {
+              await w.write(enc.encode(text.slice(0, cut + 2)));
+              carry = text.slice(cut + 2);
+            } else {
+              carry = text;
+            }
+          }
+          if (carry) await w.write(enc.encode(carry));
+          if (!sawStop) throw new Error("synth_truncated");
+
+          // Parse the transcript ONCE, persist the report server-side, then
+          // signal completion. Even if the client vanished mid-stream, the
+          // report is safe in the row and shows up on the next visit.
+          const raw = textFromSseTranscript(chunks.join(""));
+          if (raw.trim().length < 300) throw new Error("synth_empty");
+          const { error: saveErr } = await admin
+            .from("career_journeys")
+            .update({ report: { raw }, status: "completed", stage: "report", updated_at: new Date().toISOString() })
+            .eq("id", journey.id);
+          if (saveErr) console.error("[career-compass] report save failed:", saveErr.message);
+          await send({ type: "done", raw_len: raw.length });
+        } catch (e) {
+          console.error("[career-compass] synthesize error:", String(e));
+          await refund();
+          await send({ type: "error", error: "ai_error" });
+        } finally {
+          clearInterval(hb);
+          try { await w.close(); } catch { /* already closed */ }
         }
-        await send({ type: "done" });
-      } catch (e) {
-        console.error("[career-compass] analyze error:", String(e));
-        refund();
-        await send({ type: "error", error: "ai_error" });
-      } finally {
-        clearInterval(hb);
-        try { await w.close(); } catch { /* already closed */ }
-      }
-    })();
+      })();
+    }
 
     return new Response(readable, {
       headers: {

@@ -14,6 +14,7 @@ export const STAGES = [
   { id: "open",       label: "שאלות עומק",         icon: "✍️", minutes: 8 },
   // ai: true → the stage calls the Edge Function and therefore requires login.
   { id: "interview",  label: "ראיון אישי",          icon: "🎙️", minutes: 8, ai: true },
+  { id: "paywall",    label: "הפקת הדוח",           icon: "🎁", ai: true },
   { id: "analysis",   label: "ניתוח",               icon: "🔮", minutes: 3, ai: true },
   { id: "report",     label: "המצפן שלך", ai: true },
 ];

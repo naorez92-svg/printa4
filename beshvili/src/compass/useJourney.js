@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "../lib/supabase";
 import { track } from "../hooks/useEvents";
+import { parseReport } from "./api";
 import { STAGES } from "./data/questions";
 
 // מצפן journey state: a small state machine persisted to localStorage on every
@@ -15,6 +16,7 @@ const SCHEMA_V = 1;
 const EMPTY = {
   v: SCHEMA_V,
   rowId: null,
+  dismissedRowId: null, // set by restart() — blocks the DB-resume effect from resurrecting the old journey
   stage: "welcome",
   answers: {},      // { background, riasec, values, bigfive, cognitive, open }
   interview: [],    // [{ q, a }]
@@ -93,34 +95,45 @@ export function useJourney(session) {
   // Debounced mirror of the current journey into its row. The completed report
   // syncs immediately — it's the one write that must not be lost to the
   // debounce window if the user closes the tab right after finishing.
+  //
+  // Two guards protect the server-persisted report from stale clobbers:
+  //  • during "analysis" with no local report there is nothing new to mirror —
+  //    and the server may be writing the report to this row right now;
+  //  • report/status are included in the payload only when a report exists, so
+  //    a mirror can never overwrite a saved report with null.
   useEffect(() => {
     if (!session?.user || !journey.rowId) return;
+    if (journey.stage === "analysis" && !journey.report) return;
     const delay = journey.stage === "report" && journey.report ? 0 : 2000;
     clearTimeout(syncTimer.current);
     syncTimer.current = setTimeout(() => {
+      const payload = {
+        stage: journey.stage,
+        answers: journey.answers,
+        interview: journey.interview,
+        updated_at: new Date().toISOString(),
+      };
+      if (journey.report) {
+        payload.report = journey.report;
+        payload.status = journey.stage === "report" ? "completed" : "in_progress";
+      }
       supabase
         .from("career_journeys")
-        .update({
-          stage: journey.stage,
-          answers: journey.answers,
-          interview: journey.interview,
-          report: journey.report,
-          status: journey.stage === "report" ? "completed" : "in_progress",
-          updated_at: new Date().toISOString(),
-        })
+        .update(payload)
         .eq("id", journey.rowId)
         .then(() => {}, () => {});
     }, delay);
     return () => clearTimeout(syncTimer.current);
   }, [session, journey]);
 
-  // On login with a fresh local journey, resume the newest journey from the DB
-  // (cross-device / cleared-storage recovery). Local progress always wins.
+  // On login, reconcile with the newest journey row in the DB:
+  //  • Fresh local state → resume the DB journey (cross-device / cleared storage).
+  //  • Same journey, and the SERVER holds a report the client missed (stream
+  //    died after the server persisted it) → adopt the report. The last thing
+  //    that happened is never lost.
+  // Otherwise local progress wins.
   useEffect(() => {
     if (!session?.user) return;
-    const j = journeyRef.current;
-    const localHasProgress = j.stage !== "welcome" || Object.keys(j.answers).length > 0;
-    if (localHasProgress) return;
     supabase
       .from("career_journeys")
       .select("id, stage, answers, interview, report")
@@ -129,14 +142,25 @@ export function useJourney(session) {
       .limit(1)
       .maybeSingle()
       .then(({ data }) => {
-        if (data && STAGES.some((s) => s.id === data.stage)) {
+        if (!data || !STAGES.some((s) => s.id === data.stage)) return;
+        // A journey the user explicitly restarted away from stays dismissed.
+        if (data.id === journeyRef.current.dismissedRowId) return;
+        // Server-saved reports carry only {raw} — normalize to {raw, sections}.
+        const normReport = data.report?.raw
+          ? { raw: data.report.raw, sections: data.report.sections || parseReport(data.report.raw) }
+          : null;
+        const j = journeyRef.current;
+        const localHasProgress = j.stage !== "welcome" || Object.keys(j.answers).length > 0;
+        if (!localHasProgress) {
           update({
             rowId: data.id,
             stage: data.stage,
             answers: data.answers || {},
             interview: data.interview || [],
-            report: data.report || null,
+            report: normReport,
           });
+        } else if (j.rowId === data.id && normReport && !j.report) {
+          update({ report: normReport, stage: "report" });
         }
       }, () => {});
   }, [session, update]);
@@ -158,8 +182,12 @@ export function useJourney(session) {
   }, [update]);
 
   const restart = useCallback(() => {
-    try { localStorage.removeItem(LS_KEY); } catch { /* ignore */ }
-    setJourney({ ...EMPTY });
+    // Keep a tombstone for the abandoned journey so the DB-resume effect
+    // doesn't resurrect it on the next mount (its report stays safe in the DB).
+    const fresh = { ...EMPTY, dismissedRowId: journeyRef.current.rowId || journeyRef.current.dismissedRowId };
+    journeyRef.current = fresh;
+    try { localStorage.setItem(LS_KEY, JSON.stringify(fresh)); } catch { /* ignore */ }
+    setJourney(fresh);
   }, []);
 
   return { journey, update, ensureRow, goToStage, nextStage, saveSection, restart };
