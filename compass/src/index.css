@@ -39,6 +39,7 @@ html {
 /* Print: the report should come out readable on white paper. The app is
    white-on-dark; for print we flatten everything to dark-on-white. */
 @media print {
+  @page { margin: 14mm 12mm; }
   body { background: white !important; }
   #root * {
     color: #20184A !important;
@@ -48,5 +49,12 @@ html {
     border-color: #ddd !important;
   }
   #root .bg-clip-text { -webkit-text-fill-color: #20184A !important; }
-  #root section, #root [class*="rounded-3xl"] { break-inside: avoid; }
+  /* Editorial page-breaks. Whole sections can be taller than a page (so a
+     section-level avoid just produces arbitrary cuts + blank gaps) — instead
+     we protect the units a reader actually notices: a paragraph or bullet is
+     never sliced mid-sentence, a card (.print-avoid) moves to the next page
+     whole, and a heading is never stranded at the bottom of a page. */
+  #root p, #root li, #root .print-avoid { break-inside: avoid; page-break-inside: avoid; }
+  #root h1, #root h2, #root h3 { break-after: avoid-page; page-break-after: avoid; break-inside: avoid; }
+  #root p { orphans: 3; widows: 3; }
 }

@@ -4,6 +4,7 @@
 import {
   RIASEC_ITEMS, RIASEC_TYPES, BIG5_ITEMS, BIG5_TRAITS,
   VALUES_ITEMS, COGNITIVE_ITEMS, COGNITIVE_ADVANCED, COGNITIVE_DOMAINS, OPEN_QUESTIONS,
+  SCENARIOS_BY_TYPE,
 } from "./data/questions";
 
 // RIASEC: sum per type (5 items × 1–5 → 5..25), plus a sorted 3-letter code.
@@ -63,6 +64,14 @@ export function scoreCognitive(answers = {}) {
   return { domains, total, of: COGNITIVE_ITEMS.length, advCorrect, advAnswered };
 }
 
+// The "reality check" scenario set for THIS user: 2 concrete day-in-the-life
+// scenarios per top-3 Holland letter. Deterministic given the riasec answers —
+// the stage and buildProfile derive the same list independently.
+export function scenarioItems(riasecAnswers = {}) {
+  const code = scoreRiasec(riasecAnswers).code || "RIA";
+  return [...code].flatMap((t) => SCENARIOS_BY_TYPE[t] || []);
+}
+
 // The compact profile object sent to the AI agents. Everything the model needs,
 // with question texts resolved (the server never sees our item ids).
 export function buildProfile(answers = {}) {
@@ -98,5 +107,11 @@ export function buildProfile(answers = {}) {
       question: q.text,
       answer: (answers.open || {})[q.id] || "",
     })).filter((qa) => qa.answer.trim()),
+    // Gut reactions to concrete day-in-the-life scenarios (1=ממש לא, 5=זה אני).
+    // A low score on a scenario from the user's own top interest area is a
+    // strong "the fantasy doesn't survive reality" signal for the agents.
+    scenarios: scenarioItems(answers.riasec)
+      .map((s) => ({ text: s.text, score: (answers.scenarios || {})[s.id] || 0 }))
+      .filter((s) => s.score > 0),
   };
 }

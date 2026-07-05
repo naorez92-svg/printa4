@@ -222,7 +222,7 @@ export default function Report({ journey, restart, update }) {
       ) : (
         <div className="space-y-6">
           {essence && (
-            <section className="bg-gradient-to-br from-magic/25 to-brand/15 border border-magic/40 rounded-3xl p-6 sm:p-8">
+            <section className="bg-gradient-to-br from-magic/25 to-brand/15 border border-magic/40 rounded-3xl p-6 sm:p-8 print-avoid">
               <h2 className="text-sm font-semibold text-brand tracking-wide mb-3">התמצית</h2>
               <div className="text-lg leading-relaxed"><Rich text={essence} /></div>
             </section>
@@ -239,7 +239,7 @@ export default function Report({ journey, restart, update }) {
               {intro && <div className="mb-5 text-white/60 text-sm"><Rich text={intro} /></div>}
               <div className="space-y-4">
                 {directions.map((d, i) => (
-                  <div key={i} className={`rounded-2xl border p-5 ${i === 0 ? "bg-brand/10 border-brand/40" : "bg-white/5 border-white/10"}`}>
+                  <div key={i} className={`rounded-2xl border p-5 print-avoid ${i === 0 ? "bg-brand/10 border-brand/40" : "bg-white/5 border-white/10"}`}>
                     {/* Badge → title → full-width fit bar: long Hebrew titles
                         wrap cleanly and the % never spills out of the card. */}
                     {i === 0 && (
@@ -293,7 +293,7 @@ export default function Report({ journey, restart, update }) {
                   <div className="absolute right-1.5 top-2 bottom-2 w-px bg-gradient-to-b from-magic via-brand to-grow" />
                   <div className="space-y-6">
                     {roadmap.map((step, si) => (
-                      <div key={si} className="relative">
+                      <div key={si} className="relative print-avoid">
                         <div className="absolute -right-5 top-1.5 w-3 h-3 rounded-full bg-brand ring-4 ring-ink" />
                         <h3 className="font-bold text-brand mb-2">{step.period}</h3>
                         <div className="space-y-1.5">
@@ -329,7 +329,7 @@ export default function Report({ journey, restart, update }) {
           })()}
 
           {letter && (
-            <section className="bg-white/5 border border-white/15 rounded-3xl p-6 sm:p-8 relative">
+            <section className="bg-white/5 border border-white/15 rounded-3xl p-6 sm:p-8 relative print-avoid">
               <div className="absolute top-5 left-6 text-4xl opacity-20">✉️</div>
               <h2 className="text-sm font-semibold text-white/50 tracking-wide mb-4">מכתב אישי, ממצפן אליך</h2>
               <div className="italic"><Rich text={letter} /></div>
