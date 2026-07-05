@@ -3,7 +3,7 @@
 
 import {
   RIASEC_ITEMS, RIASEC_TYPES, BIG5_ITEMS, BIG5_TRAITS,
-  VALUES_ITEMS, COGNITIVE_ITEMS, COGNITIVE_DOMAINS, OPEN_QUESTIONS,
+  VALUES_ITEMS, COGNITIVE_ITEMS, COGNITIVE_ADVANCED, COGNITIVE_DOMAINS, OPEN_QUESTIONS,
 } from "./data/questions";
 
 // RIASEC: sum per type (5 items × 1–5 → 5..25), plus a sorted 3-letter code.
@@ -44,7 +44,8 @@ export function scoreValues(answers = {}) {
     .sort((a, b) => b.score - a.score);
 }
 
-// Cognitive: correct counts per domain + total.
+// Cognitive: correct counts per domain + total. The adaptive bonus round is
+// scored separately — answered only by users who cleared the base threshold.
 export function scoreCognitive(answers = {}) {
   const domains = {};
   let total = 0;
@@ -53,7 +54,13 @@ export function scoreCognitive(answers = {}) {
     d.of += 1;
     if (answers[item.id] === item.correct) { d.correct += 1; total += 1; }
   }
-  return { domains, total, of: COGNITIVE_ITEMS.length };
+  let advCorrect = 0, advAnswered = 0;
+  for (const item of COGNITIVE_ADVANCED) {
+    if (answers[item.id] === undefined) continue;
+    advAnswered += 1;
+    if (answers[item.id] === item.correct) advCorrect += 1;
+  }
+  return { domains, total, of: COGNITIVE_ITEMS.length, advCorrect, advAnswered };
 }
 
 // The compact profile object sent to the AI agents. Everything the model needs,
@@ -78,7 +85,14 @@ export function buildProfile(answers = {}) {
     },
     cognitive: {
       total: `${cognitive.total}/${cognitive.of}`,
-      domains: Object.values(cognitive.domains).map((d) => `${d.label}: ${d.correct}/${d.of}`),
+      domains: [
+        ...Object.values(cognitive.domains).map((d) => `${d.label}: ${d.correct}/${d.of}`),
+        // The bonus-round signal rides in the domains list (the server prompt
+        // already prints it) — strong differentiator for top-end candidates.
+        cognitive.advAnswered > 0
+          ? `שלב בונוס מתקדם (נפתח רק למצטיינים): ${cognitive.advCorrect}/${cognitive.advAnswered}`
+          : "שלב הבונוס המתקדם לא נפתח (מתחת לסף בשלב הבסיס)",
+      ],
     },
     openAnswers: OPEN_QUESTIONS.map((q) => ({
       question: q.text,

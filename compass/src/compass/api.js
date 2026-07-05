@@ -35,6 +35,30 @@ export async function fetchInterviewQuestion(journeyId, answers, interview) {
   return data;
 }
 
+// Post-report chat: ask the psychologist a follow-up question (server caps
+// at 5 per journey; payment enforced server-side).
+export async function askFollowup(journeyId, question, answers, interview) {
+  const res = await fetch(FN_URL, {
+    method: "POST",
+    headers: await authHeaders(),
+    body: JSON.stringify({ action: "followup", journeyId, question, profile: buildProfile(answers), interview }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw apiError(data);
+  return data; // { answer, remaining }
+}
+
+// Load the saved follow-up history (clients can SELECT their own rows).
+export async function fetchFollowupHistory(journeyId) {
+  if (!journeyId) return [];
+  const { data } = await supabase
+    .from("career_journeys")
+    .select("followup")
+    .eq("id", journeyId)
+    .maybeSingle();
+  return Array.isArray(data?.followup) ? data.followup : [];
+}
+
 // Shared SSE runner for the analysis phases. onEvent receives every parsed
 // `data:` event — both our control events ({type:"agent_done"|"done"|"error"...})
 // and, during synthesis, raw Anthropic events ({type:"content_block_delta"...}).

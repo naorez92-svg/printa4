@@ -1,6 +1,7 @@
 // מצפן — shared UI atoms. Dark "night sky" theme built from the beshvili
 // design tokens (ink/canvas/brand/magic/grow), RTL Hebrew.
 
+import { useEffect, useRef, useState } from "react";
 import { STAGES } from "./data/questions";
 import { journeyProgress } from "./useJourney";
 
@@ -127,6 +128,70 @@ export function StageIntro({ icon, title, text, minutes, onStart }) {
       {minutes && <p className="text-xs text-white/35 mb-8">~{minutes} דקות</p>}
       <Btn onClick={onStart} className="min-w-[200px]">מתחילים ←</Btn>
     </div>
+  );
+}
+
+// ── Voice dictation (Hebrew) ────────────────────────────────────────────────
+// Web Speech API — supported on Chrome/Edge/Android; hidden elsewhere. Each
+// FINAL utterance chunk is passed to onText; consumers append with a
+// functional state update so multiple chunks in one session never clobber.
+
+function speechAPI() {
+  return typeof window !== "undefined" ? (window.SpeechRecognition || window.webkitSpeechRecognition) : null;
+}
+
+export function MicButton({ onText, className = "" }) {
+  const [listening, setListening] = useState(false);
+  const recRef = useRef(null);
+  const supported = !!speechAPI();
+
+  useEffect(() => () => { try { recRef.current?.abort(); } catch { /* ignore */ } }, []);
+  if (!supported) return null;
+
+  const toggle = () => {
+    if (listening) {
+      try { recRef.current?.stop(); } catch { /* ignore */ }
+      return;
+    }
+    const SR = speechAPI();
+    const rec = new SR();
+    rec.lang = "he-IL";
+    rec.continuous = true;
+    rec.interimResults = false;
+    rec.onresult = (e) => {
+      let text = "";
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        if (e.results[i].isFinal) text += e.results[i][0].transcript;
+      }
+      if (text.trim()) onText(text.trim());
+    };
+    rec.onend = () => setListening(false);
+    rec.onerror = () => setListening(false);
+    recRef.current = rec;
+    try { rec.start(); setListening(true); } catch { /* already running */ }
+  };
+
+  return (
+    <button
+      type="button"
+      onClick={toggle}
+      className={`inline-flex items-center gap-1.5 text-xs rounded-full border px-3.5 py-1.5 transition-all ${
+        listening
+          ? "bg-red-500/20 border-red-400/60 text-red-200 animate-pulse"
+          : "bg-white/5 border-white/20 text-white/60 hover:border-magic/60 hover:text-white"
+      } ${className}`}
+    >
+      {listening ? "⏹ מקליט… לחץ כשתסיים" : "🎤 עדיף לדבר? לחץ ודבר"}
+    </button>
+  );
+}
+
+// The nudge under free-text fields — people give 3× more detail speaking.
+export function DictationTip() {
+  return (
+    <p className="text-[11px] text-white/30 mt-1.5">
+      💡 רוב האנשים מפרטים הרבה יותר בדיבור — לחץ 🎤 (או על המיקרופון במקלדת) ופשוט דבר חופשי
+    </p>
   );
 }
 
