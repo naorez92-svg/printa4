@@ -94,7 +94,7 @@ Deno.serve(async (req) => {
     admin.from("booklets").select("*", { count: "exact", head: true }).gte("created_at", monthStart),
     admin.from("profiles").select("id, plan, full_name, created_at, followup_sent_at"),
     admin.from("feedback").select("message, created_at, user_id").order("created_at", { ascending: false }).limit(15),
-    admin.from("leads").select("name, phone, created_at").order("created_at", { ascending: false }).limit(15),
+    admin.from("leads").select("user_id, name, phone, email, plan, method, created_at").order("created_at", { ascending: false }).limit(15),
     admin.from("booklets").select("user_id, created_at"),
     admin.from("booklets").select("user_id, title, world, goal, created_at, difficulty_feedback").order("created_at", { ascending: false }).limit(200),
     // Booklet-lifecycle events (last 14d) — used to tell "tried & failed" from
@@ -719,7 +719,12 @@ Deno.serve(async (req) => {
     // cover the oldest users — surface that so the admin isn't misled.
     userPoolCapped: users.length >= 1000,
     recentFeedback:     recentFeedback ?? [],
-    recentLeads:        recentLeads ?? [],
+    // Enrich leads with the user's email even for rows saved before 0037
+    // (the lead is an authenticated user — the email is always known).
+    recentLeads:        (recentLeads ?? []).map((l) => ({
+      ...l,
+      email: l.email ?? users.find((u) => u.id === l.user_id)?.email ?? null,
+    })),
     funnelStats,
     analytics,
     reliability,
