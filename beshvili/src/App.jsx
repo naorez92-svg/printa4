@@ -22,6 +22,12 @@ const feedbackMatch = window.location.pathname.match(/^\/f\/([0-9a-f-]{36})$/i);
 const compassMatch = /^\/compass(\/|$)/.test(window.location.pathname);
 const COMPASS_URL = "https://mitzpen.vercel.app";
 
+// Side-effect belongs in an effect, not the render body (StrictMode renders twice).
+function CompassRedirect() {
+  useEffect(() => { window.location.replace(COMPASS_URL); }, []);
+  return PageSpinner;
+}
+
 // Full-screen loading spinner — reused for the session check AND the lazy-chunk
 // fetch so there's no second, differently-styled flash between the two.
 const PageSpinner = (
@@ -113,7 +119,7 @@ export default function App() {
     <>
       <InAppBrowserBanner />
       {compassMatch ? (
-        (() => { window.location.replace(COMPASS_URL); return PageSpinner; })()
+        <CompassRedirect />
       ) : shareMatch ? (
         <Suspense fallback={PageSpinner}>
           <PublicBooklet token={shareMatch[1]} />

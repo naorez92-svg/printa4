@@ -12,7 +12,8 @@ html {
   to   { opacity: 1; transform: translateY(0); }
 }
 
-/* Reduced motion (WCAG 2.3.3 / IS 5568) */
+/* Reduced motion (WCAG 2.3.3 / IS 5568) — OS setting + the manual toggle in
+   the accessibility widget (adds .a11y-reduce-motion to #root). */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.001ms !important;
@@ -20,6 +21,13 @@ html {
     transition-duration: 0.001ms !important;
     scroll-behavior: auto !important;
   }
+}
+#root.a11y-reduce-motion *,
+#root.a11y-reduce-motion *::before,
+#root.a11y-reduce-motion *::after {
+  animation-duration: 0.001ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.001ms !important;
 }
 
 /* Print: the report should come out readable on white paper */
