@@ -4,8 +4,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Repository Layout
 
-This repo contains two separate apps:
-- `beshvili/` — the active SaaS product (React + Vite + Supabase). **All new work goes here.**
+This repo contains three separate apps:
+- `beshvili/` — the booklets SaaS product (React + Vite + Supabase).
+- `compass/` — מצפן, the standalone career-guidance journey app (React + Vite,
+  same Supabase project, its own Vercel project / domain). Its Edge Function
+  lives in `beshvili/supabase/functions/career-compass/` (single Supabase
+  project, single deploy pipeline).
 - `app_cloud.py` / `Dockerfile` — legacy Flask prototype. Do not modify.
 
 ## Development (inside `beshvili/`)
@@ -52,7 +56,7 @@ feedback   — id, user_id, message
 leads      — id, user_id, name, phone
 ```
 
-Migrations live in `supabase/migrations/`. They are applied manually via GitHub Actions (`workflow_dispatch` on `deploy-supabase.yml`), not on every push.
+Migrations live in `supabase/migrations/`. They are applied automatically by `deploy-supabase.yml` on any push that touches `supabase/migrations/` (and can still be run manually via `workflow_dispatch`).
 
 ## Tailwind Design Tokens
 
@@ -79,7 +83,7 @@ Fonts: `font-display` = Baloo 2, `font-sans` = Assistant (Hebrew), `font-mono` =
 
 **Edge Function:** push changes under `beshvili/supabase/functions/` to `main` → GitHub Actions auto-deploys.
 
-**DB Migrations:** add a new file in `supabase/migrations/` → go to GitHub Actions → `Deploy Supabase` → **Run workflow** manually.
+**DB Migrations:** add a new file in `supabase/migrations/` and push to `main` — the `Deploy Supabase` workflow applies it automatically (manual **Run workflow** still works as a fallback).
 
 ## Supabase Project
 

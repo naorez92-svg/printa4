@@ -17,6 +17,16 @@ const BookletFeedback = lazy(() => import("./pages/BookletFeedback"));
 const shareMatch = window.location.pathname.match(/^\/b\/([0-9a-f-]{36})$/i);
 // /f/:token — printed-booklet feedback form, reached via the QR on the page
 const feedbackMatch = window.location.pathname.match(/^\/f\/([0-9a-f-]{36})$/i);
+// /compass — מצפן moved to its own standalone site (compass/ app, separate
+// Vercel project). Old links bounce there so they never land on beshvili.
+const compassMatch = /^\/compass(\/|$)/.test(window.location.pathname);
+const COMPASS_URL = "https://mitzpen.vercel.app";
+
+// Side-effect belongs in an effect, not the render body (StrictMode renders twice).
+function CompassRedirect() {
+  useEffect(() => { window.location.replace(COMPASS_URL); }, []);
+  return PageSpinner;
+}
 
 // Full-screen loading spinner — reused for the session check AND the lazy-chunk
 // fetch so there's no second, differently-styled flash between the two.
@@ -108,7 +118,9 @@ export default function App() {
   return (
     <>
       <InAppBrowserBanner />
-      {shareMatch ? (
+      {compassMatch ? (
+        <CompassRedirect />
+      ) : shareMatch ? (
         <Suspense fallback={PageSpinner}>
           <PublicBooklet token={shareMatch[1]} />
         </Suspense>
