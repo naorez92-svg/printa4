@@ -141,7 +141,7 @@ Deno.serve(async (req) => {
         return intl.length >= 11
           ? `<a href="https://wa.me/${intl}?text=${greet}" style="display:inline-block;background:#25D366;color:white;padding:12px 28px;border-radius:12px;text-decoration:none;font-weight:bold;">💬 שלח וואטסאפ ללקוח</a>`
           : userEmail !== "—"
-          ? `<a href="mailto:${esc(userEmail)}?subject=${encodeURIComponent("השדרוג שלך לבשבילי מוכן 🎉")}" style="display:inline-block;background:#6C5CE7;color:white;padding:12px 28px;border-radius:12px;text-decoration:none;font-weight:bold;">✉️ השב ללקוח במייל</a><p style="color:#888;font-size:12px;margin-top:8px;">(הלקוח לא השאיר טלפון — המייל הוא הדרך ליצור קשר)</p>`
+          ? `<a href="mailto:${esc(userEmail)}?subject=${encodeURIComponent("השדרוג שלך לבשבילי מוכן 🎉")}&body=${encodeURIComponent(`היי${displayName !== "—" ? " " + displayName : ""}! 🙂\n\nאיזה כיף שבחרת לשדרג לתוכנית ${planLabel}. ככה מפעילים, לוקח דקה:\n\n1. 💙 שלחו את הסכום בביט למספר 050-9139137\n2. 📸 שלחו צילום של ההעברה לוואטסאפ: https://wa.me/972509139137\n3. ⚡ אנחנו מפעילים תוך שעה!\n\nשאלות? פשוט השיבו למייל הזה.\nנאור · בשבילי · beshvili.com`)}" style="display:inline-block;background:#6C5CE7;color:white;padding:12px 28px;border-radius:12px;text-decoration:none;font-weight:bold;">✉️ השב ללקוח במייל (הודעה מוכנה)</a><p style="color:#888;font-size:12px;margin-top:8px;">(הלקוח לא השאיר טלפון — או השתמש ב"שלח הוראות תשלום" בדף הניהול)</p>`
           : "";
       })()}
     </div>
