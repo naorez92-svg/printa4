@@ -77,20 +77,39 @@ Deno.serve(async (req) => {
     // Anti-spam: skip the owner email if this user already produced a lead in the
     // last 5 minutes (rapid double-clicks / scripted abuse). The lead is still saved.
     const fiveMinAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
-    const { count: recentLeadCount } = await admin
-      .from("leads").select("*", { count: "exact", head: true })
+    const { data: recentLeads } = await admin
+      .from("leads").select("name, phone, plan, method")
       .eq("user_id", user.id).gte("created_at", fiveMinAgo);
+    const recentLeadCount = recentLeads?.length ?? 0;
 
     // 1. Persist the lead server-side (immune to client RLS silent-failure).
-    //    Cap at 3 rows per 5 minutes: a genuine correction (fixed phone number,
-    //    switched plan) still lands, but unbounded flooding doesn't.
-    if ((recentLeadCount ?? 0) < 3) {
+    //    Cap at 3 rows per 5 minutes so a genuine correction (fixed phone,
+    //    switched plan) still lands — but skip EXACT repeats: a double-tap on
+    //    the payment button was creating two identical rows that read as two
+    //    different interested people in the admin panel.
+    const isExactRepeat = (recentLeads ?? []).some(l =>
+      (l.name ?? "") === (name || "") && (l.phone ?? "") === (phone ?? "") &&
+      (l.plan ?? "") === planId && (l.method ?? "") === method
+    );
+    if (recentLeadCount < 3 && !isExactRepeat) {
       const { error: insertErr } = await admin.from("leads").insert({
         user_id: user.id,
         name:    name || null,
         phone,
+        email:   user.email ?? null,
+        plan:    planId,
+        method,
       });
-      if (insertErr) console.error("notify-lead insert error:", insertErr.message);
+      if (insertErr) {
+        // Migration 0037 not applied yet (missing columns) — never lose a lead
+        // over metadata: fall back to the legacy shape.
+        const { error: legacyErr } = await admin.from("leads").insert({
+          user_id: user.id,
+          name:    name || null,
+          phone,
+        });
+        if (legacyErr) console.error("notify-lead insert error:", insertErr.message, "| legacy:", legacyErr.message);
+      }
     }
 
     // 2. Email the owner immediately (unless rate-limited).
@@ -113,7 +132,18 @@ Deno.serve(async (req) => {
       <tr><td style="padding:8px 0;color:#888;">חוברות שיצר/ה</td><td style="padding:8px 0;">${bookletCount}</td></tr>
     </table>
     <div style="text-align:center;margin:24px 0 8px;">
-      <a href="https://wa.me/972509139137" style="display:inline-block;background:#25D366;color:white;padding:12px 28px;border-radius:12px;text-decoration:none;font-weight:bold;">פתח וואטסאפ</a>
+      ${(() => {
+        // Contact THE LEAD, not ourselves (the old fixed wa.me/owner-number
+        // opened WhatsApp to the owner's own chat — a dead end).
+        const digits = (phone ?? "").replace(/\D/g, "");
+        const intl = digits.startsWith("0") ? "972" + digits.slice(1) : digits;
+        const greet = encodeURIComponent(`היי${displayName !== "—" ? " " + displayName : ""}! 👋 כאן נאור מבשבילי — ראיתי שביקשת לשדרג ל${planLabel}. אשמח לעזור לך להתחיל 🙂`);
+        return intl.length >= 11
+          ? `<a href="https://wa.me/${intl}?text=${greet}" style="display:inline-block;background:#25D366;color:white;padding:12px 28px;border-radius:12px;text-decoration:none;font-weight:bold;">💬 שלח וואטסאפ ללקוח</a>`
+          : userEmail !== "—"
+          ? `<a href="mailto:${esc(userEmail)}?subject=${encodeURIComponent("השדרוג שלך לבשבילי מוכן 🎉")}" style="display:inline-block;background:#6C5CE7;color:white;padding:12px 28px;border-radius:12px;text-decoration:none;font-weight:bold;">✉️ השב ללקוח במייל</a><p style="color:#888;font-size:12px;margin-top:8px;">(הלקוח לא השאיר טלפון — המייל הוא הדרך ליצור קשר)</p>`
+          : "";
+      })()}
     </div>
     <p style="color:#aaa;font-size:11px;text-align:center;margin:16px 0 0;">בשבילי · התראת ליד אוטומטית</p>
   </div></body></html>`;
