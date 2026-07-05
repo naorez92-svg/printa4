@@ -16,3 +16,5 @@ alter table public.career_journeys
 -- existing row); inserts rely on the server-side default, and
 -- report_emailed_at gets no client grant at all.
 grant update (roadmap_done) on public.career_journeys to authenticated;
+
+-- touch: re-trigger deploy after the migrations job skipped this file on the merge push
