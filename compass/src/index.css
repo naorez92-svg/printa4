@@ -12,6 +12,12 @@ html {
   to   { opacity: 1; transform: translateY(0); }
 }
 
+/* Welcome hero — the compass slowly turns (neutralized by reduced-motion rules) */
+@keyframes spinSlow {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
 /* Reduced motion (WCAG 2.3.3 / IS 5568) — OS setting + the manual toggle in
    the accessibility widget (adds .a11y-reduce-motion to #root). */
 @media (prefers-reduced-motion: reduce) {
@@ -30,7 +36,17 @@ html {
   transition-duration: 0.001ms !important;
 }
 
-/* Print: the report should come out readable on white paper */
+/* Print: the report should come out readable on white paper. The app is
+   white-on-dark; for print we flatten everything to dark-on-white. */
 @media print {
   body { background: white !important; }
+  #root * {
+    color: #20184A !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    text-shadow: none !important;
+    border-color: #ddd !important;
+  }
+  #root .bg-clip-text { -webkit-text-fill-color: #20184A !important; }
+  #root section, #root [class*="rounded-3xl"] { break-inside: avoid; }
 }

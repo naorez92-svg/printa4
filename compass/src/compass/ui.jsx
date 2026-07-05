@@ -130,14 +130,18 @@ export function StageIntro({ icon, title, text, minutes, onStart }) {
   );
 }
 
+// Inline **bold** renderer — shared by Rich and the roadmap task lines.
+// Text nodes only, no HTML injection.
+export const richInline = (line, key) => {
+  const parts = String(line).split(/\*\*(.+?)\*\*/g);
+  return parts.map((p, i) => (i % 2 ? <strong key={`${key}-${i}`} className="text-white font-semibold">{p}</strong> : p));
+};
+
 // Tiny markdown-lite renderer for AI report text: **bold**, "- " bullets,
 // plain paragraphs. No external deps, no HTML injection (text nodes only).
 export function Rich({ text }) {
   if (!text) return null;
-  const bold = (line, key) => {
-    const parts = line.split(/\*\*(.+?)\*\*/g);
-    return parts.map((p, i) => (i % 2 ? <strong key={`${key}-${i}`} className="text-white font-semibold">{p}</strong> : p));
-  };
+  const bold = richInline;
   const blocks = [];
   let list = [];
   const flush = () => {

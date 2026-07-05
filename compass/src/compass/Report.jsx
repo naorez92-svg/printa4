@@ -1,4 +1,5 @@
-import { Btn, CompassMark, Rich } from "./ui";
+import { track } from "../hooks/useEvents";
+import { Btn, CompassMark, Rich, richInline } from "./ui";
 
 // מצפן — the final report. Renders the parsed sections from the synthesizer:
 // תמצית (essence) → פרופיל (portrait) → כיוונים (ranked directions) →
@@ -31,11 +32,15 @@ function parseDirections(text = "") {
   };
 }
 
-// "### תקופה" chunks → [{period, body}]
+// "### תקופה" chunks → [{period, items: [task lines]}]. Each task line becomes
+// a checkable item in the live action plan (the report's return-visit hook).
 function parseRoadmap(text = "") {
   return splitH3(text).chunks.map((chunk) => {
     const [head, ...rest] = chunk.split("\n");
-    return { period: head.trim(), body: rest.join("\n").trim() };
+    const items = rest
+      .map((l) => l.replace(/^([-•*]|\d+[.)])\s+/, "").trim())
+      .filter(Boolean);
+    return { period: head.trim(), items };
   });
 }
 
@@ -50,9 +55,19 @@ function SectionCard({ icon, title, children, accent = "border-white/10" }) {
   );
 }
 
-export default function Report({ journey, restart }) {
+export default function Report({ journey, restart, update }) {
   const { sections = {}, raw = "" } = journey.report || {};
   const name = journey.answers?.background?.name || "";
+  const done = journey.roadmapDone || {};
+  const toggleTask = (key) => {
+    track("compass_roadmap_toggle", { key, done: !done[key] });
+    update((prev) => {
+      const next = { ...(prev.roadmapDone || {}) };
+      if (next[key]) delete next[key];
+      else next[key] = true;
+      return { ...prev, roadmapDone: next };
+    });
+  };
   const essence = sections["תמצית"];
   const profile = sections["פרופיל"];
   const { intro, items: directions } = parseDirections(sections["כיוונים"]);
@@ -128,22 +143,64 @@ export default function Report({ journey, restart }) {
             </SectionCard>
           )}
 
-          {roadmap.length > 0 && (
-            <SectionCard icon="🗺️" title="מפת הדרכים שלך" accent="border-grow/25">
-              <div className="relative pr-5">
-                <div className="absolute right-1.5 top-2 bottom-2 w-px bg-gradient-to-b from-magic via-brand to-grow" />
-                <div className="space-y-6">
-                  {roadmap.map((step, i) => (
-                    <div key={i} className="relative">
-                      <div className="absolute -right-5 top-1.5 w-3 h-3 rounded-full bg-brand ring-4 ring-ink" />
-                      <h3 className="font-bold text-brand mb-2">{step.period}</h3>
-                      <Rich text={step.body} />
-                    </div>
-                  ))}
+          {roadmap.length > 0 && (() => {
+            const total = roadmap.reduce((n, s) => n + s.items.length, 0);
+            const doneCount = roadmap.reduce(
+              (n, s, si) => n + s.items.filter((_, li) => done[`${si}-${li}`]).length, 0);
+            const pct = total ? Math.round((doneCount / total) * 100) : 0;
+            return (
+              <SectionCard icon="🗺️" title="מסלול הפעולה החי שלך" accent="border-grow/25">
+                {/* Live progress — this is why the report is worth returning to */}
+                <div className="mb-5 print:hidden">
+                  <div className="flex items-center justify-between text-sm mb-1.5">
+                    <span className="text-white/60">סמן כל צעד שהשלמת — ההתקדמות נשמרת בחשבון שלך</span>
+                    <span className="font-bold text-grow flex-shrink-0">{doneCount}/{total}</span>
+                  </div>
+                  <div className="h-2 bg-white/10 rounded-full overflow-hidden">
+                    <div className="h-full bg-gradient-to-l from-grow to-magic transition-all duration-500" style={{ width: `${pct}%` }} />
+                  </div>
+                  {pct === 100 && total > 0 && (
+                    <p className="text-grow text-sm font-semibold mt-2">🎉 השלמת את כל המסלול — הכיוון כבר לא חלום, הוא בדרך</p>
+                  )}
                 </div>
-              </div>
-            </SectionCard>
-          )}
+                <div className="relative pr-5">
+                  <div className="absolute right-1.5 top-2 bottom-2 w-px bg-gradient-to-b from-magic via-brand to-grow" />
+                  <div className="space-y-6">
+                    {roadmap.map((step, si) => (
+                      <div key={si} className="relative">
+                        <div className="absolute -right-5 top-1.5 w-3 h-3 rounded-full bg-brand ring-4 ring-ink" />
+                        <h3 className="font-bold text-brand mb-2">{step.period}</h3>
+                        <div className="space-y-1.5">
+                          {step.items.map((task, li) => {
+                            const key = `${si}-${li}`;
+                            const checked = !!done[key];
+                            return (
+                              <button
+                                key={key}
+                                onClick={() => toggleTask(key)}
+                                className="w-full flex items-start gap-2.5 text-right group"
+                              >
+                                <span className={`w-5 h-5 rounded-lg border flex items-center justify-center flex-shrink-0 mt-0.5 text-xs font-bold transition-all ${
+                                  checked
+                                    ? "bg-grow border-grow text-ink"
+                                    : "border-white/25 group-hover:border-grow/60"
+                                }`}>
+                                  {checked ? "✓" : ""}
+                                </span>
+                                <span className={`leading-relaxed transition-colors ${checked ? "text-white/35 line-through" : "text-white/75"}`}>
+                                  {richInline(task, key)}
+                                </span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </SectionCard>
+            );
+          })()}
 
           {letter && (
             <section className="bg-white/5 border border-white/15 rounded-3xl p-6 sm:p-8 relative">
@@ -155,16 +212,19 @@ export default function Report({ journey, restart }) {
         </div>
       )}
 
-      <div className="flex flex-wrap items-center justify-center gap-4 mt-10">
-        <Btn onClick={() => window.print()}>🖨️ שמור כ-PDF</Btn>
+      <div className="flex flex-wrap items-center justify-center gap-4 mt-10 print:hidden">
+        <Btn onClick={() => { track("compass_report_print", {}); window.print(); }}>🖨️ שמור כ-PDF</Btn>
         <Btn ghost onClick={() => {
           if (window.confirm("להתחיל מסע חדש? הדוח הנוכחי יימחק מהמכשיר הזה.")) restart();
         }}>
           מסע חדש
         </Btn>
       </div>
-      <p className="text-center text-xs text-white/25 mt-6">
-        מצפן · מבית בשבילי ✨ · הדוח נשמר בחשבון שלך
+      <p className="text-center text-xs text-white/25 mt-6 print:hidden">
+        🔒 הדוח נשמר בחשבון שלך לתמיד — פשוט תיכנס עם אותו מייל, מכל מכשיר
+      </p>
+      <p className="text-center text-[11px] text-white/20 mt-2 print:hidden">
+        מצפן · מבית בשבילי ✨ · <a href="/terms" className="underline hover:text-white/40">תקנון</a> · <a href="/privacy" className="underline hover:text-white/40">פרטיות</a>
       </p>
     </div>
   );

@@ -9,14 +9,26 @@ import { initPixel } from "./lib/pixel";
 initPixel();
 
 // /admin — the management dashboard (lazy: regular users never download it).
+// /terms + /privacy — the legal pages (lazy for the same reason).
 const AdminApp = lazy(() => import("./admin/AdminApp"));
-const isAdminRoute = /^\/admin(\/|$)/.test(window.location.pathname);
+const LegalPage = lazy(() =>
+  import("./compass/Legal").then((m) => ({
+    default: /^\/privacy(\/|$)/.test(window.location.pathname) ? m.Privacy : m.Terms,
+  }))
+);
+const path = window.location.pathname;
+const isAdminRoute = /^\/admin(\/|$)/.test(path);
+const isLegalRoute = /^\/(terms|privacy)(\/|$)/.test(path);
 
 createRoot(document.getElementById("root")).render(
   <StrictMode>
     {isAdminRoute ? (
       <Suspense fallback={null}>
         <AdminApp />
+      </Suspense>
+    ) : isLegalRoute ? (
+      <Suspense fallback={null}>
+        <LegalPage />
       </Suspense>
     ) : (
       <CompassApp />

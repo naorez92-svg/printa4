@@ -12,6 +12,7 @@ const PLAN_LABELS: Record<string, string> = {
   parent:  "הורה (₪19/חודש)",
   teacher: "מורה פרטית (₪59/חודש)",
   pro:     "פרו",
+  compass: "מצפן 🧭 — דוח (₪49)",
 };
 
 function getCors(req: Request) {
@@ -19,6 +20,9 @@ function getCors(req: Request) {
   const allowed =
     origin === "https://www.beshvili.com" ||
     origin === "https://beshvili.com" ||
+    // מצפן — the standalone compass site fires purchase-intent leads too.
+    origin === "https://mitzpen.vercel.app" ||
+    /^https:\/\/mitzpen-[a-z0-9-]+-naor-s-projects\.vercel\.app$/.test(origin) ||
     origin === "http://localhost:5173" ||
     origin === "http://localhost:4173" ||
     /^https:\/\/printa4-git-[a-z0-9-]+-naor-s-projects\.vercel\.app$/.test(origin);
@@ -59,7 +63,7 @@ Deno.serve(async (req) => {
       .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
     const name    = clean(body.name, 100);
     const phone   = clean(body.phone, 40) || null;
-    const planId  = ["parent", "teacher", "pro"].includes(body.plan) ? body.plan : "teacher";
+    const planId  = ["parent", "teacher", "pro", "compass"].includes(body.plan) ? body.plan : "teacher";
     const method  = body.method === "bit" ? "bit" : body.method === "whatsapp" ? "whatsapp" : "unknown";
     const bookletCount = Number.isInteger(body.bookletCount) ? body.bookletCount : 0;
 
