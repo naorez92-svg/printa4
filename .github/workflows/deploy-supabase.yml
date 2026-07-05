@@ -51,6 +51,26 @@ jobs:
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
 
+      - name: Sync auth redirect URLs (מצפן + beshvili)
+        # Merges the required redirect URLs into the project's allow list via
+        # the Management API — no dashboard clicking. Idempotent: existing
+        # entries are kept, required ones are appended only if missing.
+        run: |
+          REQUIRED="https://mitzpen.vercel.app/**,https://mitzpen-*-naor-s-projects.vercel.app/**,https://www.beshvili.com/**,https://beshvili.com/**,http://localhost:5173/**"
+          CURRENT=$(curl -sf -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
+            "https://api.supabase.com/v1/projects/gywpdzkvkdisonuzhsib/config/auth" \
+            | python3 -c "import sys,json;print(json.load(sys.stdin).get('uri_allow_list') or '')")
+          MERGED=$(python3 -c "import sys; cur=[u.strip() for u in sys.argv[1].split(',') if u.strip()]; req=[u.strip() for u in sys.argv[2].split(',') if u.strip()]; [cur.append(u) for u in req if u not in cur]; print(','.join(cur))" "$CURRENT" "$REQUIRED")
+          echo "uri_allow_list -> $MERGED"
+          curl -sf -X PATCH \
+            -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d "{\"uri_allow_list\": \"$MERGED\"}" \
+            "https://api.supabase.com/v1/projects/gywpdzkvkdisonuzhsib/config/auth" > /dev/null
+          echo "✅ redirect URLs synced"
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
       - name: Diagnostic — test function reachability
         run: |
           echo "=== Test 1: no Origin (server-like) ==="

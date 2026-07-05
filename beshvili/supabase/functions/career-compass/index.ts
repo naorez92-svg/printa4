@@ -271,8 +271,86 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => null);
     const action = body?.action as string;
     const journeyId = String(body?.journeyId ?? "");
-    if (!body || !["interview", "experts", "synthesize"].includes(action) || !/^[0-9a-f-]{36}$/i.test(journeyId)) {
+    const JOURNEY_ACTIONS = ["interview", "experts", "synthesize"];
+    const ADMIN_ACTIONS = ["admin_stats", "admin_set_paid"];
+    if (!body || ![...JOURNEY_ACTIONS, ...ADMIN_ACTIONS].includes(action)) {
       return new Response(JSON.stringify({ error: "bad_request" }), { status: 400, headers: cors });
+    }
+    if (JOURNEY_ACTIONS.includes(action) && !/^[0-9a-f-]{36}$/i.test(journeyId)) {
+      return new Response(JSON.stringify({ error: "bad_request" }), { status: 400, headers: cors });
+    }
+
+    // ── Admin actions (the /admin dashboard) — plan='admin' only ──
+    if (ADMIN_ACTIONS.includes(action)) {
+      const { data: adminProf } = await admin
+        .from("profiles").select("plan").eq("id", user.id).maybeSingle();
+      if (adminProf?.plan !== "admin") {
+        return new Response(JSON.stringify({ error: "forbidden" }), { status: 403, headers: cors });
+      }
+
+      // Map user ids ↔ emails via the auth admin API (paged; fine at this scale).
+      const emailById = new Map<string, string>();
+      const idByEmail = new Map<string, string>();
+      for (let page = 1; page <= 5; page++) {
+        const { data: pageData, error: luErr } = await admin.auth.admin.listUsers({ page, perPage: 500 });
+        if (luErr || !pageData?.users?.length) break;
+        for (const u of pageData.users) {
+          if (u.email) { emailById.set(u.id, u.email); idByEmail.set(u.email.toLowerCase(), u.id); }
+        }
+        if (pageData.users.length < 500) break;
+      }
+
+      if (action === "admin_set_paid") {
+        const email = String(body.email ?? "").trim().toLowerCase();
+        const paid = body.paid !== false;
+        const targetId = idByEmail.get(email);
+        if (!email || !targetId) {
+          return new Response(JSON.stringify({ error: "user_not_found" }), { status: 404, headers: cors });
+        }
+        const { error: upErr } = await admin
+          .from("profiles")
+          .upsert({ id: targetId, compass_paid: paid }, { onConflict: "id" });
+        if (upErr) {
+          console.error("[career-compass] admin_set_paid:", upErr.message);
+          return new Response(JSON.stringify({ error: "internal_error" }), { status: 500, headers: cors });
+        }
+        return new Response(JSON.stringify({ ok: true, email, paid }), {
+          status: 200, headers: { ...cors, "content-type": "application/json" },
+        });
+      }
+
+      // admin_stats
+      const dayAgoIso = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
+      const [journeysRes, paidRes] = await Promise.all([
+        admin.from("career_journeys")
+          .select("id, user_id, status, stage, ai_calls, created_at, updated_at")
+          .order("updated_at", { ascending: false })
+          .limit(200),
+        admin.from("profiles").select("id").eq("compass_paid", true),
+      ]);
+      const journeys = journeysRes.data ?? [];
+      const paidIds = new Set((paidRes.data ?? []).map((p: { id: string }) => p.id));
+      const funnel: Record<string, number> = {};
+      for (const j of journeys) funnel[j.stage] = (funnel[j.stage] ?? 0) + 1;
+      const stats = {
+        total_journeys: journeys.length,
+        completed: journeys.filter((j) => j.status === "completed").length,
+        today: journeys.filter((j) => j.created_at >= dayAgoIso).length,
+        paid_users: paidIds.size,
+        revenue_estimate: paidIds.size * 49,
+      };
+      const rows = journeys.slice(0, 60).map((j) => ({
+        email: emailById.get(j.user_id) ?? j.user_id.slice(0, 8),
+        stage: j.stage,
+        status: j.status,
+        ai_calls: j.ai_calls,
+        paid: paidIds.has(j.user_id),
+        created_at: j.created_at,
+        updated_at: j.updated_at,
+      }));
+      return new Response(JSON.stringify({ stats, funnel, journeys: rows }), {
+        status: 200, headers: { ...cors, "content-type": "application/json" },
+      });
     }
 
     // 3. Journey ownership + entitlement + abuse caps (independent reads)
