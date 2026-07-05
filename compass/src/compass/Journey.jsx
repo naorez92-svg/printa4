@@ -131,6 +131,21 @@ function BackgroundStage({ saved, onDone, onSave }) {
         </div>
       </div>
 
+      {/* The current occupation is the single most important anchor for a
+          working adult — a real user's report suggested "stay in your role,
+          go managerial" without knowing the role, because we never asked. */}
+      <div>
+        <label className="block text-sm text-white/55 mb-2">
+          במה אתה עוסק היום בפועל? (תפקיד, תחום, כמה זמן)
+        </label>
+        <input
+          value={form.currentRole || ""}
+          onChange={(e) => set({ currentRole: e.target.value.slice(0, 120) })}
+          className="w-full bg-white/5 border border-white/15 rounded-xl px-4 py-3 outline-none focus:border-magic transition-colors"
+          placeholder="למשל: מורה בתיכון, 6 שנים · מלצר · חייל לפני שחרור"
+        />
+      </div>
+
       <div>
         <label className="block text-sm text-white/55 mb-2">מה יש לך ביד? (אפשר כמה)</label>
         <div className="flex flex-wrap gap-2">
