@@ -4,6 +4,7 @@ on:
   push:
     paths:
       - 'beshvili/supabase/functions/**'
+      - 'beshvili/supabase/migrations/**'
   workflow_dispatch:
 
 jobs:
@@ -105,7 +106,10 @@ jobs:
 
   migrations:
     runs-on: ubuntu-latest
-    if: github.event_name == 'workflow_dispatch'
+    # Runs on manual dispatch AND on any push that adds/edits migration files —
+    # `supabase db push` only applies migrations that aren't applied yet, so
+    # re-runs are no-ops. (Zero-touch: no dashboard/manual step needed.)
+    if: github.event_name == 'workflow_dispatch' || contains(join(github.event.commits.*.modified, ','), 'supabase/migrations/') || contains(join(github.event.commits.*.added, ','), 'supabase/migrations/')
     steps:
       - uses: actions/checkout@v4
 

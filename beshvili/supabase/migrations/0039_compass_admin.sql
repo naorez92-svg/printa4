@@ -1,4 +1,5 @@
--- מצפן — bootstrap the admin account.
+-- מצפן — bootstrap the admin account. (Applied automatically: the deploy
+-- workflow now runs migrations on any push that touches this directory.)
 -- naorez92@gmail.com gets plan='admin' (unlocks the /admin dashboard and the
 -- paywall bypass) and compass_paid=true. Runs as service role, so the
 -- plan/compass_paid protection triggers pass (auth.uid() IS NULL).
