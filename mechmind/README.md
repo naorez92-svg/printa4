@@ -94,14 +94,21 @@ cd mechmind
 
 ## פריסה לענן
 
-**Backend (Render):**
-- Build: `pip install -r requirements.txt`
-- Start: `uvicorn backend.main:app --host 0.0.0.0 --port $PORT`
-- Environment: `ANTHROPIC_API_KEY`, `CORS_ORIGINS=https://<הדומיין-של-הפרונט>`
+**הדרך הקלה — Render Blueprint (backend + frontend יחד):**
+במאגר יש `mechmind/render.yaml`. ב-Render: **New → Blueprint → הצבע על הריפו/הענף**.
+זה מקים את שני השירותים אוטומטית. אחר כך הגדר את משתני הסביבה המסומנים
+`sync: false`: `ANTHROPIC_API_KEY`, `CORS_ORIGINS` (כתובת ה-frontend),
+ו-`VITE_API_URL` (כתובת ה-backend).
 
-**Frontend (Vercel / Render Static):**
-- Build: `npm run build` · Output: `dist`
-- Environment: `VITE_API_URL=https://<כתובת-ה-backend>`
+**Backend ידני (Docker):** `mechmind/Dockerfile` כולל את כל ספריות המערכת
+(pango/cairo ל-WeasyPrint, libGL ל-CadQuery), רץ כמשתמש לא-root, ומאחסן SQLite
+בדיסק מתמיד. כל פלטפורמת קונטיינרים תריץ אותו.
+
+**Frontend ידני (Vercel / static):** `cd mechmind/frontend && npm run build`,
+פרסם את `dist`, והגדר `VITE_API_URL`.
+
+> הערה: WeasyPrint ו-CadQuery דורשים ספריות מערכת native — לכן backend נפרס
+> כ-Docker (ה-Dockerfile מטפל בכול), לא כ-runtime Python חשוף.
 
 ---
 
