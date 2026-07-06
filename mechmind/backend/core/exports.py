@@ -70,6 +70,14 @@ def export_pdf(title: str, sections: list[dict], out_path: str | Path,
     """
     from weasyprint import HTML
 
+    def _block_remote(url: str):
+        # הגנה לעומק: התוכן כבר עובר escape, אבל חוסמים לחלוטין כל טעינת
+        # משאב חיצוני (http/https/file) מתוך ה-HTML — רק data: URI מותר.
+        if not url.startswith("data:"):
+            raise ValueError(f"טעינת משאב חיצוני חסומה בייצוא PDF: {url[:40]}")
+        from weasyprint.urls import default_url_fetcher
+        return default_url_fetcher(url)
+
     parts = [f"<h1>{html.escape(title)}</h1>"]
     if safety_note:
         parts.append(f'<div class="safety">{html.escape(safety_note)}</div>')
@@ -93,5 +101,5 @@ def export_pdf(title: str, sections: list[dict], out_path: str | Path,
     doc = f'<html lang="he" dir="rtl"><head><meta charset="utf-8"><style>{_PDF_CSS}</style></head><body>{"".join(parts)}</body></html>'
     out = Path(out_path)
     out.parent.mkdir(parents=True, exist_ok=True)
-    HTML(string=doc).write_pdf(str(out))
+    HTML(string=doc, url_fetcher=_block_remote).write_pdf(str(out))
     return out
