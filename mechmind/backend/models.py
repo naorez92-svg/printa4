@@ -1,4 +1,5 @@
 """מודל הנתונים של MechMind — לפי מסמך האב, סעיף 7."""
+import secrets
 from datetime import datetime, timezone
 
 from sqlalchemy import DateTime, ForeignKey, Integer, String, Text
@@ -9,6 +10,11 @@ from .db import Base
 
 def utcnow() -> datetime:
     return datetime.now(timezone.utc)
+
+
+def new_token() -> str:
+    """אסימון יכולת בלתי-נחיש — מחליף מזהים סדרתיים לגישה לפי הרשאה."""
+    return secrets.token_urlsafe(18)
 
 
 class Project(Base):
@@ -22,6 +28,7 @@ class ChatSession(Base):
     __tablename__ = "sessions"
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     project_id: Mapped[int | None] = mapped_column(ForeignKey("projects.id"), nullable=True)
+    token: Mapped[str] = mapped_column(String(64), default=new_token, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 
 
@@ -38,6 +45,7 @@ class Artifact(Base):
     __tablename__ = "artifacts"
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     session_id: Mapped[int | None] = mapped_column(ForeignKey("sessions.id"), nullable=True)
+    token: Mapped[str] = mapped_column(String(64), default=new_token, index=True)
     module: Mapped[str] = mapped_column(String(10))  # 'M-01'...'M-06'
     kind: Mapped[str] = mapped_column(String(10))  # step/dxf/pdf/xlsx/json/image/svg
     filename: Mapped[str] = mapped_column(String(255))

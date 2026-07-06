@@ -6,10 +6,11 @@ import ModuleChips from './components/ModuleChips.jsx'
 
 export default function App() {
   const [health, setHealth] = useState(null)
-  const [sessionId, setSessionId] = useState(null)
+  const [session, setSession] = useState(null) // { id, token }
   const [messages, setMessages] = useState([])
   const [artifacts, setArtifacts] = useState([])
   const [jobs, setJobs] = useState([])
+  const [safetyRequired, setSafetyRequired] = useState(false)
   const [busy, setBusy] = useState(false)
   const [template, setTemplate] = useState('')
   const uploadRef = useRef(null)
@@ -22,9 +23,11 @@ export default function App() {
     setMessages((prev) => [...prev, { role, text, at: Date.now() + Math.random() }])
 
   const absorbResult = (result) => {
-    if (result.session_id) setSessionId(result.session_id)
+    if (result.session_id)
+      setSession({ id: result.session_id, token: result.session_token })
     if (result.artifacts?.length) setArtifacts((prev) => [...result.artifacts, ...prev])
     if (result.jobs?.length) setJobs((prev) => [...result.jobs, ...prev])
+    if (result.safety_required) setSafetyRequired(true)
   }
 
   const sendChat = async (text) => {
@@ -32,7 +35,7 @@ export default function App() {
     pushMessage('user', text)
     setBusy(true)
     try {
-      const result = await api.chat(text, sessionId)
+      const result = await api.chat(text, session)
       absorbResult(result)
       pushMessage('assistant', result.reply_he)
     } catch (e) {
@@ -47,10 +50,10 @@ export default function App() {
     pushMessage('user', `📎 העלאת שרטוט: ${file.name}${note ? ` — ${note}` : ''}`)
     setBusy(true)
     try {
-      const result = await api.drawing(file, note, sessionId)
+      const result = await api.drawing(file, note, session)
       absorbResult(result)
-      if (result.jobs === undefined && result.status)
-        setJobs((prev) => [{ module: 'M-05', status: result.status, summary: '' }, ...prev])
+      // /api/drawing מחזיר status אך לא jobs — יוצרים רשומת יומן ל-M-05
+      setJobs((prev) => [{ module: 'M-05', status: result.status, summary: '' }, ...prev])
       pushMessage(result.status === 'ok' ? 'assistant' : 'error', result.summary_he)
     } catch (e) {
       pushMessage('error', e.message)
@@ -106,7 +109,7 @@ export default function App() {
           />
         </section>
         <section className="flex-1 min-w-0">
-          <Canvas artifacts={artifacts} jobs={jobs} />
+          <Canvas artifacts={artifacts} jobs={jobs} safetyRequired={safetyRequired} />
         </section>
       </main>
     </div>

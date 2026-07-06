@@ -90,11 +90,11 @@ def test_drawing_upload_too_large(client):
 
 
 def test_artifact_download_missing(client):
-    assert client.get("/api/artifacts/999999/download").status_code == 404
+    assert client.get("/api/artifacts/nosuchtoken/download").status_code == 404
 
 
 def test_artifact_path_traversal_blocked(client):
-    """Artifact שמצביע מחוץ לתיקיית התוצרים — לא מוגש."""
+    """Artifact שמצביע מחוץ לתיקיית התוצרים — לא מוגש, גם עם token תקין."""
     from backend.db import SessionLocal
     from backend.models import Artifact
     db = SessionLocal()
@@ -102,10 +102,65 @@ def test_artifact_path_traversal_blocked(client):
                    filename="passwd", path="/etc/passwd")
     db.add(row)
     db.commit()
-    artifact_id = row.id
+    token = row.token
     db.close()
-    r = client.get(f"/api/artifacts/{artifact_id}/download")
+    r = client.get(f"/api/artifacts/{token}/download")
     assert r.status_code == 404
+
+
+def test_session_requires_token_to_resume(client):
+    """סשן קיים אינו נגיש ללא ה-token — מונע חטיפה בניחוש מזהה סדרתי."""
+    r1 = client.post("/api/strength", json={
+        "element_type": "beam_analytic", "case": "simply_supported_point",
+        "length_mm": 1000, "section_type": "rectangle",
+        "section_dims": {"width_mm": 20, "height_mm": 40},
+        "material_id": "s235jr", "load_n": 1000,
+    })
+    body1 = r1.json()
+    sid, token = body1["session_id"], body1["session_token"]
+    assert token
+
+    # אותו session_id בלי token → נפתח סשן חדש (לא מצטרף לקיים)
+    r2 = client.post("/api/strength", json={
+        "element_type": "beam_analytic", "case": "simply_supported_point",
+        "length_mm": 1000, "section_type": "rectangle",
+        "section_dims": {"width_mm": 20, "height_mm": 40},
+        "material_id": "s235jr", "load_n": 1000, "session_id": sid,
+    })
+    assert r2.json()["session_id"] != sid
+
+    # עם ה-token הנכון → מצטרף לאותו סשן
+    r3 = client.post("/api/strength", json={
+        "element_type": "beam_analytic", "case": "simply_supported_point",
+        "length_mm": 1000, "section_type": "rectangle",
+        "section_dims": {"width_mm": 20, "height_mm": 40},
+        "material_id": "s235jr", "load_n": 1000,
+        "session_id": sid, "session_token": token,
+    })
+    assert r3.json()["session_id"] == sid
+
+
+def test_session_artifacts_requires_token(client):
+    r = client.post("/api/strength", json={
+        "element_type": "beam_analytic", "case": "simply_supported_point",
+        "length_mm": 1000, "section_type": "rectangle",
+        "section_dims": {"width_mm": 20, "height_mm": 40},
+        "material_id": "s235jr", "load_n": 1000,
+    })
+    body = r.json()
+    sid, token = body["session_id"], body["session_token"]
+    assert client.get(f"/api/sessions/{sid}/artifacts?token=wrong").status_code == 404
+    assert client.get(f"/api/sessions/{sid}/artifacts?token={token}").status_code == 200
+
+
+def test_strength_safety_required_flag(client):
+    r = client.post("/api/strength", json={
+        "element_type": "beam_analytic", "case": "simply_supported_point",
+        "length_mm": 1000, "section_type": "rectangle",
+        "section_dims": {"width_mm": 20, "height_mm": 40},
+        "material_id": "s235jr", "load_n": 1000,
+    })
+    assert r.json()["safety_required"] is True
 
 
 def test_chat_message_validation(client):

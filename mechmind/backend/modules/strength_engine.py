@@ -6,7 +6,7 @@
 from __future__ import annotations
 
 from ..core import beam
-from ..core.materials import find_material_by_name, get_material
+from ..core.materials import resolve_material
 from ..safety import FS_RED_FLAG, NEEDS_ENGINEER_MSG, SAFETY_LINE
 
 
@@ -34,10 +34,10 @@ def check_strength(
             f"המקרה כולל {reason} — מחוץ לטווח החישוב הסטטי של MechMind. {NEEDS_ENGINEER_MSG}"
         )
 
-    material = get_material(material_id) or find_material_by_name(material_id)
+    material = resolve_material(material_id)
     if material is None:
         return {"status": "error",
-                "summary_he": f"חומר לא מוכר: '{material_id}'. בחר חומר מהקטלוג.",
+                "summary_he": f"חומר לא מוכר או רב-משמעי: '{material_id}'. ציין מזהה חומר מדויק מהקטלוג.",
                 "data": {}, "safety_note_he": SAFETY_LINE}
 
     try:

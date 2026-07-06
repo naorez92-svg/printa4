@@ -63,9 +63,10 @@ def extract_json(text: str) -> dict | list | None:
     start = min((i for i in (text.find("{"), text.find("[")) if i != -1), default=-1)
     if start == -1:
         return None
-    for end in range(len(text), start, -1):
-        try:
-            return json.loads(text[start:end])
-        except json.JSONDecodeError:
-            continue
-    return None
+    # raw_decode עוצר בסוף האובייקט/מערך התקין הראשון — מעבר יחיד O(n),
+    # במקום ניסיון חוזר מכל אורך (O(n²)) על תגובות LLM ארוכות.
+    try:
+        obj, _ = json.JSONDecoder().raw_decode(text, start)
+        return obj
+    except json.JSONDecodeError:
+        return None

@@ -11,7 +11,7 @@ import uuid
 from pathlib import Path
 
 from ..config import settings
-from ..core.materials import find_material_by_name, get_material, load_materials
+from ..core.materials import mass_from_volume, material_ids, resolve_material
 from ..core.sandbox import ScriptRejected, run_cadquery_script
 from ..llm import complete, extract_json, text_of
 from .bom_builder import build_bom
@@ -39,11 +39,11 @@ def _strip_code(text: str) -> str:
 
 
 def generate_cad(description_he: str, material_id: str = "al6061",
-                 quantity: int = 1, session_id: int | None = None) -> dict:
+                 quantity: int = 1) -> dict:
     """מחזיר {status, summary_he, data, artifacts[]}."""
-    material = get_material(material_id) or find_material_by_name(material_id)
+    material = resolve_material(material_id)
     if material is None:
-        names = ", ".join(m["id"] for m in load_materials())
+        names = ", ".join(material_ids())
         return {"status": "error",
                 "summary_he": f"חומר לא מוכר: '{material_id}'. האפשרויות: {names}",
                 "data": {}, "artifacts": []}
@@ -77,7 +77,7 @@ def generate_cad(description_he: str, material_id: str = "al6061",
                 "data": {}, "artifacts": []}
 
     volume_mm3 = result["volume_mm3"]
-    mass_g = round(volume_mm3 / 1000.0 * material["density_g_cm3"], 1)
+    mass_g = round(mass_from_volume(volume_mm3, material["id"]), 1)
 
     bom = build_bom(
         [{"name": description_he[:80], "material_id": material["id"],

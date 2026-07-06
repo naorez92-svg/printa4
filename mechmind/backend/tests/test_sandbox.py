@@ -19,8 +19,17 @@ ATTACKS = [
     ("import from sys", "from sys import path\nresult = 1"),
     ("importlib", "import importlib\nresult = 1"),
     ("socket", "import socket\nresult = 1"),
-    ("type()", "t = type('X', (), {})\nresult = 1"),
     ("global stmt", "def f():\n    global result\n    result = 1\nf()"),
+    # בריחת frame-walk דרך רפלקציית גנרטור (האקספלויט שנמצא בסקירת אבטחה)
+    ("gi_frame walk", "def g():\n yield 1\nx = g().gi_frame.f_back\nresult = 1"),
+    ("f_builtins", "def g():\n yield 1\nb = g().gi_frame.f_builtins\nresult = 1"),
+    ("gi_code", "def g():\n yield 1\nc = g().gi_code\nresult = 1"),
+    ("co_consts", "def f(): pass\nx = f.__code__.co_consts\nresult = 1"),
+    # כתיבת קובץ שרירותית דרך ה-API של cadquery (עוקף את חסימת open/os)
+    ("cq export", "import cadquery as cq\nr=cq.Workplane().box(1,1,1)\nr.export('/etc/x')\nresult=r"),
+    ("cq exporters", "import cadquery as cq\ncq.exporters.export(1, '/etc/x')\nresult=1"),
+    ("cq exportStep", "import cadquery as cq\nr=cq.Workplane().box(1,1,1)\nr.val().exportStep('/x')\nresult=r"),
+    ("save", "import cadquery as cq\na=cq.Assembly()\na.save('/etc/x')\nresult=a"),
 ]
 
 
@@ -28,6 +37,37 @@ ATTACKS = [
 def test_attacks_rejected(name, code):
     with pytest.raises(ScriptRejected):
         validate_script(code)
+
+
+def test_frame_walk_rce_exploit_blocked():
+    """האקספלויט המלא מסקירת האבטחה — קריאת בילטינס אמיתיים ו-RCE — חסום."""
+    exploit = (
+        "import math\n"
+        "gref = []; holder = []\n"
+        "def inner():\n"
+        "    cur = gref[0].gi_frame.f_back\n"
+        "    while cur is not None:\n"
+        "        b = cur.f_builtins\n"
+        "        if isinstance(b, dict) and 'open' in b:\n"
+        "            holder.append(b); break\n"
+        "        cur = cur.f_back\n"
+        "    yield 1\n"
+        "g = inner(); gref.append(g); list(g)\n"
+        "result = holder[0]['open']('/etc/passwd').read()\n"
+    )
+    with pytest.raises(ScriptRejected):
+        validate_script(exploit)
+
+
+def test_type_shadowing_allowed():
+    """שם משתנה נפוץ כמו type אינו וקטור בריחה (הראנר לא חושף אותו) — לא נפסל."""
+    validate_script('import cadquery as cq\ntype = "plate"\nresult = cq.Workplane().box(1,1,1)')
+
+
+def test_type_call_blocked_at_runtime(tmp_path):
+    """type() אינו נחסם ב-AST אך הראנר (allowlist) חוסם אותו בזמן ריצה."""
+    out = run_cadquery_script("t = type('X', (), {})\nresult = 1", tmp_path)
+    assert not out["ok"]
 
 
 def test_missing_result_rejected():

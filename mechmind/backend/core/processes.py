@@ -14,14 +14,23 @@ def load_processes() -> list[dict]:
         return json.load(f)["processes"]
 
 
+# פחת חומר גלם (חיתוך/שבבים) — מקדם יחיד המשמש גם באומדן התהליך וגם בכתב
+# הכמויות, כדי שלא ייווצר פער בין העלויות ששני המודולים מציגים לאותו חלק.
+RAW_STOCK_FACTOR = 1.6
+
+
+def material_cost_ils(mass_kg: float, material: dict) -> float:
+    """עלות חומר הגלם ליחידה: מסה × פחת × מחיר לק"ג. מקור אמת יחיד."""
+    return mass_kg * RAW_STOCK_FACTOR * material["price_ils_per_kg"]
+
+
 def estimate_cost(process: dict, material: dict, volume_cm3: float, quantity: int) -> dict:
     """אומדן עלות ליחידה ולסדרה. נוסחאות שקופות, כל מספר מהנתונים.
 
     מחזיר dict עם פירוק מלא של העלות כדי שהמשתמש יראה מאיפה כל שקל מגיע.
     """
     mass_kg = volume_cm3 * material["density_g_cm3"] / 1000.0
-    # חומר גלם: מקדם 1.6 על נפח החלק (פחת חיתוך/שבבים)
-    material_cost = mass_kg * 1.6 * material["price_ils_per_kg"]
+    material_cost = material_cost_ils(mass_kg, material)
 
     machining_min = 0.0
     process_cost = 0.0

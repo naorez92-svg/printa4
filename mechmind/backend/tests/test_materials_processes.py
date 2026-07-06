@@ -26,6 +26,15 @@ def test_find_material():
     assert find_material_by_name("לא קיים בכלל") is None
 
 
+def test_find_material_no_dangerous_short_substring():
+    """'AL' לא יתלכד לפלדה ('structuraL'), 'פלדה' עמום → None, לא ניחוש מסוכן."""
+    from backend.core.materials import resolve_material
+    assert find_material_by_name("AL") is None          # קצר מדי (2 תווים)
+    assert find_material_by_name("פלדה") is None         # רב-משמעי (מספר פלדות)
+    assert resolve_material("al6061")["id"] == "al6061"  # מדויק עדיין עובד
+    assert resolve_material("") is None
+
+
 def test_rank_filters_hard():
     # דרישת קורוזיה 5 → רק 316L, טיטניום, POM
     ranked = rank_materials(min_corrosion_resistance=5)

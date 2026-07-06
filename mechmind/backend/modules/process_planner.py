@@ -1,8 +1,15 @@
 """M-04 · מתכנן תהליך ייצור — התאמה ואומדן עלות בקוד; הערות DFM מהקטלוג + LLM."""
 from __future__ import annotations
 
-from ..core.materials import find_material_by_name, get_material
+from ..core.materials import resolve_material
 from ..core.processes import recommend_processes
+from ..llm import LLMUnavailable, complete, text_of
+
+_DFM_SYSTEM = (
+    "אתה מהנדס ייצור. קיבלת תהליך ייצור מומלץ שכבר נבחר אלגוריתמית, וההקשר "
+    "מהמשתמש. נסח משפט או שניים של המלצת DFM ממוקדת בעברית על בסיס הנתונים בלבד. "
+    "אל תמציא מספרים, מחירים או זמנים. עד 60 מילים."
+)
 
 
 def plan_process(
@@ -12,10 +19,10 @@ def plan_process(
     volume_cm3: float,
     context_he: str = "",
 ) -> dict:
-    material = get_material(material_id) or find_material_by_name(material_id)
+    material = resolve_material(material_id)
     if material is None:
         return {"status": "error",
-                "summary_he": f"חומר לא מוכר: '{material_id}'. בחר חומר מהקטלוג.",
+                "summary_he": f"חומר לא מוכר או רב-משמעי: '{material_id}'. ציין מזהה חומר מדויק מהקטלוג.",
                 "data": {}}
     if quantity < 1 or volume_cm3 <= 0:
         return {"status": "error",
@@ -57,9 +64,22 @@ def plan_process(
         lines.append("")
         lines.append(f"חלופה: {alt['name_he']} — ‏{alt['unit_cost_ils']:,} ₪ ליחידה.")
 
+    # משוב DFM מותאם-הקשר מה-LLM (אופציונלי — הכל עובד גם בלי מפתח API)
+    dfm_llm = ""
+    if context_he.strip():
+        try:
+            resp = complete(_DFM_SYSTEM, [{"role": "user", "content":
+                f"הקשר: {context_he}\nתהליך: {best['name_he']} · חומר: {material['name_he']} · "
+                f"גאומטריה: {geometry_names[geometry]} · כמות: {quantity}"}], max_tokens=300)
+            dfm_llm = text_of(resp).strip()
+            if dfm_llm:
+                lines += ["", f"המלצת DFM ממוקדת: {dfm_llm}"]
+        except LLMUnavailable:
+            pass
+
     return {
         "status": "ok",
         "summary_he": "\n".join(lines),
-        "data": {"recommended": best, "options": options,
+        "data": {"recommended": best, "options": options, "dfm_note_he": dfm_llm,
                  "material_he": material["name_he"], "quantity": quantity},
     }

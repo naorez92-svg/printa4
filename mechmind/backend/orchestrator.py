@@ -26,6 +26,8 @@ _ORCHESTRATOR_SYSTEM = """אתה MechMind — "מהנדס-העל": עוזר הנ
 3. ענה תמיד בעברית, תמציתי ומקצועי. הפנה את המשתמש לקבצים שנוצרו (STEP/DXF/PDF/Excel) — הם מופיעים אצלו בקנבס התוצרים.
 4. חסרים נתונים להפעלת כלי? שאל את המשתמש במקום לנחש.
 5. אל תבטיח יכולות שאין לך: אתה עוזר תכן ראשוני, לא תחליף למהנדס רשוי.
+6. בבדיקת חוזק — אם המשתמש מזכיר עומס מחזורי/דינמי/הלם/רטט/עייפות או לחץ/כלי לחץ, חובה להעביר את הדגל המתאים (is_dynamic_load / is_fatigue / is_pressure_vessel = true). אל תריץ חישוב סטטי על מקרה כזה.
+7. השתמש במזהה חומר מדויק מהקטלוג. אם המשתמש נתן שם עמום ('פלדה', 'אלומיניום') — שאל איזה חומר ספציפי, אל תנחש.
 
 קטלוג חומרים (material_id): s235jr, s355j2, c45, 42crmo4, ss304, ss316l, al6061, al7075, al5083, brass_cw614n, ti6al4v, pom_c, pa6, abs, pla."""
 
@@ -150,7 +152,7 @@ def run_chat(history: list[dict], user_message: str) -> dict:
     messages = [*history, {"role": "user", "content": user_message}]
     collected_artifacts: list[dict] = []
     jobs: list[dict] = []
-    strength_flagged = False
+    needs_engineer = False
 
     for _ in range(MAX_TOOL_ROUNDS):
         response = complete(_ORCHESTRATOR_SYSTEM, messages, max_tokens=4096, tools=TOOLS)
@@ -180,11 +182,11 @@ def run_chat(history: list[dict], user_message: str) -> dict:
                          "status": result.get("status", "error"),
                          "summary": result.get("summary_he", "")[:500]})
             collected_artifacts.extend(result.get("artifacts") or [])
-            if block.name == "check_strength" and (
-                result.get("status") == "needs_engineer"
-                or result.get("data", {}).get("red_flag")
-            ):
-                strength_flagged = True
+            # דגל 'נדרש מהנדס' נאסף מ-כל כלי (לא רק חוזק) — גם M-03/M-04
+            # יכולים להחזיר needs_engineer, וחובה להציף אותו למשתמש.
+            if (result.get("status") == "needs_engineer"
+                    or result.get("data", {}).get("red_flag")):
+                needs_engineer = True
 
             payload = {k: v for k, v in result.items() if k != "artifacts"}
             if result.get("artifacts"):
@@ -198,14 +200,17 @@ def run_chat(history: list[dict], user_message: str) -> dict:
     else:
         reply = "העיבוד מורכב מדי לסבב אחד — פצל את הבקשה לשלבים קטנים יותר."
 
-    # אכיפת קו הבטיחות בקוד — לא סומכים על המודל
+    # אכיפת קו הבטיחות בקוד — לא סומכים על ניסוח המודל.
+    # בודקים נוכחות של הקו *המלא* (לא תחילית) — מודל שמצטט חצי מהאזהרה
+    # לא ימנע את הוספת הקו השלם.
     used_strength = any(j["module"] == "M-02" for j in jobs)
-    if used_strength and SAFETY_LINE[:20] not in reply:
+    if used_strength and SAFETY_LINE not in reply:
         reply = f"{reply}\n\n{SAFETY_LINE}"
-    if strength_flagged and "🔴" not in reply:
-        reply = f"🔴 שים לב: המקרה סומן כדורש מהנדס רשוי.\n\n{reply}"
+    if needs_engineer and "🔴" not in reply:
+        reply = f"🔴 שים לב: אחד מהכלים סימן שהמקרה דורש מהנדס רשוי.\n\n{reply}"
 
-    return {"reply_he": reply, "artifacts": collected_artifacts, "jobs": jobs}
+    return {"reply_he": reply, "artifacts": collected_artifacts, "jobs": jobs,
+            "needs_engineer": needs_engineer}
 
 
 def _module_of(tool_name: str) -> str:

@@ -33,8 +33,7 @@ ALLOWED_MIME = {"image/jpeg", "image/png", "image/webp", "image/gif", "applicati
 MAX_UPLOAD_BYTES = 10 * 1024 * 1024
 
 
-def read_drawing(file_bytes: bytes, mime_type: str,
-                 user_note_he: str = "", session_id: int | None = None) -> dict:
+def read_drawing(file_bytes: bytes, mime_type: str, user_note_he: str = "") -> dict:
     if mime_type not in ALLOWED_MIME:
         return {"status": "error",
                 "summary_he": "פורמט לא נתמך. העלה JPG, PNG, WEBP, GIF או PDF.",

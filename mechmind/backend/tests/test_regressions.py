@@ -1,6 +1,7 @@
 """רגרסיות מ-code review — כל בדיקה כאן מגנה על תיקון ספציפי."""
+from backend.llm import extract_json
 from backend.modules.cad_engine import _strip_code
-from backend.modules.project_translator import _schedule
+from backend.modules.project_translator import _coerce_days, _normalize_tasks, _schedule
 from backend.modules.strength_engine import check_strength
 
 
@@ -32,6 +33,39 @@ def test_strip_python_fence():
 
 def test_strip_bare_fence():
     assert _strip_code('```\nresult = 1\n```') == "result = 1"
+
+
+def test_normalize_tasks_coerces_bad_llm_output():
+    """LLM שמחזיר days כמחרוזת/טווח או משימה בלי id — לא מפיל 500."""
+    tasks = _normalize_tasks([
+        {"name_he": "א", "days": "2-3", "depends_on": ["x", 2]},
+        {"days": 5},  # אין id, אין שם
+        "not a dict",
+    ])
+    assert len(tasks) == 2
+    assert tasks[0]["days"] == 3 and tasks[0]["depends_on"] == [2]
+    assert all(isinstance(t["id"], int) for t in tasks)
+    # לוח הזמנים מחושב בלי חריגה
+    assert _schedule(tasks)
+
+
+def test_coerce_days():
+    assert _coerce_days(3) == 3
+    assert _coerce_days("2-3 ימים") == 3
+    assert _coerce_days("hello") == 1
+    assert _coerce_days(0) == 1
+
+
+def test_normalize_tasks_empty_on_garbage():
+    assert _normalize_tasks("not a list") == []
+    assert _normalize_tasks([1, 2, "x"]) == []
+
+
+def test_extract_json_stops_at_first_object():
+    """raw_decode עוצר באובייקט התקין הראשון גם עם טקסט נגרר (בלי O(n²))."""
+    assert extract_json('{"a": 1} ואז הערה בעברית') == {"a": 1}
+    assert extract_json('```json\n{"need": ["x"]}\n```') == {"need": ["x"]}
+    assert extract_json("אין כאן JSON") is None
 
 
 def test_beam_custom_rejects_distributed_load():

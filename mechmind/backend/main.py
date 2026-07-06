@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import secrets
 import threading
 import time
 from pathlib import Path
@@ -44,8 +45,17 @@ _last_request: dict[str, float] = {}
 _rate_lock = threading.Lock()
 
 
+def _client_ip(request: Request) -> str:
+    # מאחורי reverse proxy (Render/Vercel) request.client.host הוא ה-proxy —
+    # כל המשתמשים היו נופלים לאותה מכסה. משתמשים ב-IP הראשון ב-X-Forwarded-For.
+    xff = request.headers.get("x-forwarded-for")
+    if xff:
+        return xff.split(",")[0].strip()
+    return request.client.host if request.client else "unknown"
+
+
 def rate_limit(request: Request) -> None:
-    ip = request.client.host if request.client else "unknown"
+    ip = _client_ip(request)
     now = time.time()
     # check-then-set אטומי — נקודות הקצה רצות ב-threadpool, בלי הנעילה
     # שתי בקשות במקביל מאותו IP היו עוקפות את ההגבלה
@@ -71,6 +81,7 @@ def _llm_unavailable(e: LLMUnavailable) -> HTTPException:
 class ChatRequest(BaseModel):
     message: str = Field(min_length=1, max_length=8000)
     session_id: int | None = None
+    session_token: str | None = None
 
 
 class CadRequest(BaseModel):
@@ -78,6 +89,7 @@ class CadRequest(BaseModel):
     material_id: str = "al6061"
     quantity: int = Field(default=1, ge=1, le=1_000_000)
     session_id: int | None = None
+    session_token: str | None = None
 
 
 class StrengthRequest(BaseModel):
@@ -95,6 +107,7 @@ class StrengthRequest(BaseModel):
     is_fatigue: bool = False
     is_pressure_vessel: bool = False
     session_id: int | None = None
+    session_token: str | None = None
 
 
 class MaterialRequest(BaseModel):
@@ -107,6 +120,7 @@ class MaterialRequest(BaseModel):
     classes: list[str] | None = None
     context_he: str = ""
     session_id: int | None = None
+    session_token: str | None = None
 
 
 class ProcessRequest(BaseModel):
@@ -116,20 +130,25 @@ class ProcessRequest(BaseModel):
     volume_cm3: float = Field(gt=0)
     context_he: str = ""
     session_id: int | None = None
+    session_token: str | None = None
 
 
 class ProjectRequest(BaseModel):
     source_description_he: str = Field(min_length=3, max_length=12000)
     session_id: int | None = None
+    session_token: str | None = None
 
 
 # ---------------------------------------------------------------------------
 # עזרי DB
 # ---------------------------------------------------------------------------
-def _ensure_session(db: DBSession, session_id: int | None) -> ChatSession:
-    if session_id is not None:
+def _ensure_session(db: DBSession, session_id: int | None,
+                    session_token: str | None = None) -> ChatSession:
+    """מחזיר סשן קיים רק אם ה-token תואם — מונע חטיפת סשן ע"י ניחוש מזהה סדרתי.
+    אחרת פותח סשן חדש עם token חדש."""
+    if session_id is not None and session_token:
         existing = db.get(ChatSession, session_id)
-        if existing:
+        if existing and secrets.compare_digest(existing.token, session_token):
             return existing
     session = ChatSession()
     db.add(session)
@@ -137,28 +156,41 @@ def _ensure_session(db: DBSession, session_id: int | None) -> ChatSession:
     return session
 
 
-def _persist_result(db: DBSession, session_id: int, module: str, result: dict) -> list[dict]:
-    """שומר Job + Artifacts ומחזיר רשימת קבצים עם קישורי הורדה."""
-    db.add(Job(session_id=session_id, module=module,
-               status=result.get("status", "error"),
-               summary=result.get("summary_he", "")[:2000]))
+def _artifact_dict(row: Artifact) -> dict:
+    return {"id": row.id, "kind": row.kind, "filename": row.filename,
+            "module": row.module, "download_url": f"/api/artifacts/{row.token}/download"}
+
+
+def _persist_artifacts(db: DBSession, session_id: int, default_module: str,
+                       artifacts: list[dict]) -> list[dict]:
     saved = []
-    for a in result.get("artifacts") or []:
-        row = Artifact(session_id=session_id, module=a.get("module", module),
+    for a in artifacts or []:
+        row = Artifact(session_id=session_id, module=a.get("module", default_module),
                        kind=a["kind"], filename=a["filename"], path=a["path"],
                        meta_json=json.dumps(a.get("meta", {}), ensure_ascii=False))
         db.add(row)
         db.flush()
-        saved.append({"id": row.id, "kind": row.kind, "filename": row.filename,
-                      "module": row.module, "download_url": f"/api/artifacts/{row.id}/download"})
+        saved.append(_artifact_dict(row))
+    return saved
+
+
+def _persist_result(db: DBSession, session_id: int, module: str, result: dict) -> list[dict]:
+    """שומר Job + Artifacts ומחזיר רשימת קבצים עם קישורי הורדה (מבוססי token)."""
+    db.add(Job(session_id=session_id, module=module,
+               status=result.get("status", "error"),
+               summary=result.get("summary_he", "")[:2000]))
+    saved = _persist_artifacts(db, session_id, module, result.get("artifacts") or [])
     db.commit()
     return saved
 
 
-def _module_response(db: DBSession, session_id: int | None, module: str, result: dict) -> dict:
-    session = _ensure_session(db, session_id)
+def _module_response(db: DBSession, session_id: int | None, session_token: str | None,
+                     module: str, result: dict) -> dict:
+    session = _ensure_session(db, session_id, session_token)
     files = _persist_result(db, session.id, module, result)
-    return {"session_id": session.id, "status": result.get("status"),
+    return {"session_id": session.id, "session_token": session.token,
+            "status": result.get("status"),
+            "safety_required": module == "M-02" or result.get("status") == "needs_engineer",
             "summary_he": result.get("summary_he"), "data": result.get("data"),
             "artifacts": files}
 
@@ -181,7 +213,7 @@ def catalog() -> dict:
 @app.post("/api/chat")
 def chat(req: ChatRequest, request: Request, db: DBSession = Depends(get_db)):
     rate_limit(request)
-    session = _ensure_session(db, req.session_id)
+    session = _ensure_session(db, req.session_id, req.session_token)
     # 40 ההודעות האחרונות (לא הראשונות) — בסדר כרונולוגי
     history_rows = (db.query(Message).filter(Message.session_id == session.id)
                     .order_by(Message.id.desc()).limit(40).all())
@@ -196,18 +228,15 @@ def chat(req: ChatRequest, request: Request, db: DBSession = Depends(get_db)):
     db.add(Message(session_id=session.id, role="assistant", content=result["reply_he"]))
     for j in result["jobs"]:
         db.add(Job(session_id=session.id, module=j["module"], status=j["status"],
-                   summary=j["summary"]))
-    files = []
-    for a in result["artifacts"]:
-        row = Artifact(session_id=session.id, module=a.get("module", "M-00"),
-                       kind=a["kind"], filename=a["filename"], path=a["path"])
-        db.add(row)
-        db.flush()
-        files.append({"id": row.id, "kind": row.kind, "filename": row.filename,
-                      "module": row.module, "download_url": f"/api/artifacts/{row.id}/download"})
+                   summary=j["summary"][:2000]))
+    files = _persist_artifacts(db, session.id, "M-00", result["artifacts"])
     db.commit()
 
-    return {"session_id": session.id, "reply_he": result["reply_he"],
+    safety_required = any(
+        j["module"] == "M-02" or j["status"] == "needs_engineer" for j in result["jobs"]
+    )
+    return {"session_id": session.id, "session_token": session.token,
+            "reply_he": result["reply_he"], "safety_required": safety_required,
             "artifacts": files, "jobs": result["jobs"]}
 
 
@@ -218,43 +247,47 @@ def cad(req: CadRequest, request: Request, db: DBSession = Depends(get_db)):
         result = generate_cad(req.description_he, req.material_id, req.quantity)
     except LLMUnavailable as e:
         raise _llm_unavailable(e) from e
-    return _module_response(db, req.session_id, "M-01", result)
+    return _module_response(db, req.session_id, req.session_token, "M-01", result)
 
 
 @app.post("/api/strength")
 def strength(req: StrengthRequest, db: DBSession = Depends(get_db)):
-    result = check_strength(**req.model_dump(exclude={"session_id"}))
-    return _module_response(db, req.session_id, "M-02", result)
+    result = check_strength(**req.model_dump(exclude={"session_id", "session_token"}))
+    return _module_response(db, req.session_id, req.session_token, "M-02", result)
 
 
 @app.post("/api/material")
 def material(req: MaterialRequest, request: Request, db: DBSession = Depends(get_db)):
     rate_limit(request)  # advise_material עשוי לבצע קריאת LLM חיה
-    result = advise_material(**req.model_dump(exclude={"session_id"}))
-    return _module_response(db, req.session_id, "M-03", result)
+    result = advise_material(**req.model_dump(exclude={"session_id", "session_token"}))
+    return _module_response(db, req.session_id, req.session_token, "M-03", result)
 
 
 @app.post("/api/process")
-def process(req: ProcessRequest, db: DBSession = Depends(get_db)):
-    result = plan_process(**req.model_dump(exclude={"session_id"}))
-    return _module_response(db, req.session_id, "M-04", result)
+def process(req: ProcessRequest, request: Request, db: DBSession = Depends(get_db)):
+    rate_limit(request)  # plan_process עשוי לבצע קריאת LLM חיה (משוב DFM)
+    result = plan_process(**req.model_dump(exclude={"session_id", "session_token"}))
+    return _module_response(db, req.session_id, req.session_token, "M-04", result)
 
 
 @app.post("/api/drawing")
-async def drawing(request: Request,
-                  file: UploadFile = File(...),
-                  note: str = Form(default=""),
-                  session_id: int | None = Form(default=None),
-                  db: DBSession = Depends(get_db)):
+def drawing(request: Request,
+            file: UploadFile = File(...),
+            note: str = Form(default=""),
+            session_id: int | None = Form(default=None),
+            session_token: str | None = Form(default=None),
+            db: DBSession = Depends(get_db)):
+    # sync def במכוון — read_drawing חוסם (קריאת LLM); async def היה מקפיא את
+    # לולאת האירועים כולה. FastAPI מריץ נקודות sync ב-threadpool.
     rate_limit(request)
-    content = await file.read()
+    content = file.file.read()
     if len(content) > MAX_UPLOAD_BYTES:
         raise HTTPException(413, detail="הקובץ גדול מ-10MB.")
     try:
         result = read_drawing(content, file.content_type or "", user_note_he=note[:2000])
     except LLMUnavailable as e:
         raise _llm_unavailable(e) from e
-    return _module_response(db, session_id, "M-05", result)
+    return _module_response(db, session_id, session_token, "M-05", result)
 
 
 @app.post("/api/project")
@@ -264,12 +297,14 @@ def project(req: ProjectRequest, request: Request, db: DBSession = Depends(get_d
         result = translate_to_project(req.source_description_he)
     except LLMUnavailable as e:
         raise _llm_unavailable(e) from e
-    return _module_response(db, req.session_id, "M-06", result)
+    return _module_response(db, req.session_id, req.session_token, "M-06", result)
 
 
-@app.get("/api/artifacts/{artifact_id}/download")
-def download_artifact(artifact_id: int, db: DBSession = Depends(get_db)):
-    row = db.get(Artifact, artifact_id)
+@app.get("/api/artifacts/{token}/download")
+def download_artifact(token: str, db: DBSession = Depends(get_db)):
+    # גישה לפי אסימון בלתי-נחיש בלבד — מזהים סדרתיים היו מאפשרים מנייה
+    # והורדת תוצרים של סשנים אחרים.
+    row = db.query(Artifact).filter(Artifact.token == token).first()
     if row is None:
         raise HTTPException(404, detail="הקובץ לא נמצא.")
     file_path = Path(row.path).resolve()
@@ -286,10 +321,12 @@ def download_artifact(artifact_id: int, db: DBSession = Depends(get_db)):
 
 
 @app.get("/api/sessions/{session_id}/artifacts")
-def session_artifacts(session_id: int, db: DBSession = Depends(get_db)):
+def session_artifacts(session_id: int, token: str, db: DBSession = Depends(get_db)):
+    # דורש את אסימון הסשן — מונע מנייה של תוצרי סשנים אחרים לפי מזהה רץ.
+    session = db.get(ChatSession, session_id)
+    if session is None or not secrets.compare_digest(session.token, token):
+        raise HTTPException(404, detail="הסשן לא נמצא.")
     rows = (db.query(Artifact).filter(Artifact.session_id == session_id)
             .order_by(Artifact.id.desc()).limit(100).all())
     return {"artifacts": [
-        {"id": r.id, "kind": r.kind, "filename": r.filename, "module": r.module,
-         "created_at": r.created_at.isoformat(),
-         "download_url": f"/api/artifacts/{r.id}/download"} for r in rows]}
+        {**_artifact_dict(r), "created_at": r.created_at.isoformat()} for r in rows]}

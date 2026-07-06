@@ -16,9 +16,13 @@ const STATUS_META = {
   error: { color: 'text-danger', label: 'שגיאה' },
 }
 
-export default function Canvas({ artifacts, jobs }) {
-  const hasStrength = jobs.some((j) => j.module === 'M-02')
-  const previews = artifacts.filter((a) => a.kind === 'svg')
+const MAX_PREVIEWS = 8
+
+export default function Canvas({ artifacts, jobs, safetyRequired }) {
+  // הבאנר נגזר מדגל השרת (safety_required) ולא רק ממצב הלקוח,
+  // כדי שהאזהרה לא תיעלם אם ה-jobs לא נטענו
+  const hasStrength = safetyRequired || jobs.some((j) => j.module === 'M-02')
+  const previews = artifacts.filter((a) => a.kind === 'svg').slice(0, MAX_PREVIEWS)
   const files = artifacts.filter((a) => a.kind !== 'svg')
 
   return (
@@ -74,7 +78,7 @@ export default function Canvas({ artifacts, jobs }) {
         <div className="space-y-1.5">
           <h3 className="text-sm font-medium text-slate-400 mt-2">יומן הרצות</h3>
           {jobs.slice(0, 8).map((j, i) => {
-            const s = STATUS_META[j.status] || STATUS_META.error
+            const s = STATUS_META[j.status] || { color: 'text-slate-400', label: j.status }
             return (
               <div key={i} className="flex items-center gap-2 text-xs bg-panel/60 border border-line rounded-lg px-3 py-1.5">
                 <span className="font-mono text-slate-500">{j.module}</span>

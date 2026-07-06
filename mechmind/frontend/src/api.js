@@ -14,17 +14,22 @@ async function handle(res) {
 
 export const api = {
   health: () => fetch(`${BASE}/health`).then(handle),
-  chat: (message, sessionId) =>
+  chat: (message, session) =>
     fetch(`${BASE}/api/chat`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message, session_id: sessionId }),
+      body: JSON.stringify({
+        message,
+        session_id: session?.id ?? null,
+        session_token: session?.token ?? null,
+      }),
     }).then(handle),
-  drawing: (file, note, sessionId) => {
+  drawing: (file, note, session) => {
     const form = new FormData()
     form.append('file', file)
     form.append('note', note || '')
-    if (sessionId) form.append('session_id', sessionId)
+    if (session?.id) form.append('session_id', session.id)
+    if (session?.token) form.append('session_token', session.token)
     return fetch(`${BASE}/api/drawing`, { method: 'POST', body: form }).then(handle)
   },
   downloadUrl: (artifact) => `${BASE}${artifact.download_url}`,

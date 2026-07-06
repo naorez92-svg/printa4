@@ -19,15 +19,35 @@ def get_material(material_id: str) -> dict | None:
 
 
 def find_material_by_name(name: str) -> dict | None:
-    """חיפוש גמיש לפי שם עברי/אנגלי/מזהה."""
+    """חיפוש לפי שם עברי/אנגלי/מזהה.
+
+    התאמה מדויקת קודמת. התאמת-משנה מותרת רק אם המחרוזת ארוכה מספיק (≥3)
+    ותואמת חומר *יחיד* — אחרת מחזיר None. זה מונע ניחוש מסוכן כמו 'AL'
+    שמתלכד ל-'structuraL steel' (מחזיר פלדה במקום אלומיניום) או 'פלדה'
+    שמתלכד למספר פלדות; במקרים כאלה הקורא יבקש מזהה מדויק במקום לנחש.
+    """
     name_l = name.strip().lower()
+    if not name_l:
+        return None
     for m in load_materials():
         if name_l in (m["id"].lower(), m["name_he"].lower(), m["name_en"].lower()):
             return m
-    for m in load_materials():
-        if name_l in m["name_he"].lower() or name_l in m["name_en"].lower():
-            return m
-    return None
+    if len(name_l) < 3:
+        return None
+    matches = [m for m in load_materials()
+               if name_l in m["name_he"].lower() or name_l in m["name_en"].lower()]
+    return matches[0] if len(matches) == 1 else None
+
+
+def resolve_material(material_id: str) -> dict | None:
+    """נקודת הכניסה היחידה לפתרון מזהה/שם חומר — משמשת את כל המודולים."""
+    if not material_id:
+        return None
+    return get_material(material_id) or find_material_by_name(material_id)
+
+
+def material_ids() -> list[str]:
+    return [m["id"] for m in load_materials()]
 
 
 def rank_materials(

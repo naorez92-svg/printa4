@@ -1,5 +1,4 @@
 """הגדרות MechMind — כל הסודות מגיעים מ-.env, לעולם לא מהקוד."""
-import os
 from pathlib import Path
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -33,4 +32,4 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
-os.makedirs(settings.artifacts_path, exist_ok=True)
+settings.artifacts_path  # יוצר את תיקיית התוצרים בעליית האפליקציה (ה-property עושה mkdir)
