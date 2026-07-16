@@ -8,6 +8,10 @@ on:
 jobs:
   report:
     runs-on: ubuntu-latest
+    # The report step creates issues; the default read-only GITHUB_TOKEN gets
+    # 403 "Resource not accessible by integration" (same fix as health-check).
+    permissions:
+      issues: write
     steps:
       - name: Fetch stats from admin-stats Edge Function
         id: stats
