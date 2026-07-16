@@ -7,7 +7,7 @@ import UpgradeModal from "./UpgradeModal";
 import { FREE_LIMIT } from "../hooks/useProfile";
 import { useChildren } from "../hooks/useChildren";
 import { track } from "../hooks/useEvents";
-import { IS_INAPP } from "../lib/inapp";
+import { IS_INAPP, openExternal } from "../lib/inapp";
 
 const WORLDS = [
   "כדורגל", "גיימינג", "כדורסל", "מינקראפט", "פוקימון",
@@ -117,6 +117,11 @@ export default function Create({ onSaved, remaining, isPro, plan = "free", activ
   const [showRating, setShowRating] = useState(false);
   const [saveWarning, setSaveWarning] = useState(false);   // generated OK but cloud-save failed
   const [cappedPages, setCappedPages] = useState(null);    // in-app cap shortened the booklet
+  // In-app browsers are capped at 3 pages server-side. Asking for more must be
+  // stopped BEFORE generation — otherwise a paying teacher burns a booklet from
+  // her monthly quota and gets 3 pages instead of 20 (real customer complaint).
+  const [inappCapWarn, setInappCapWarn] = useState(false);
+  const inappCapAckRef = useRef(false);                    // user chose "create 3 pages anyway"
   const [error, setError]         = useState(null); // null | "quota" | "quota_monthly" | "rate:{wait}" | "generic:{msg}"
   const [rateCountdown, setRateCountdown] = useState(null);
   const [childSaved, setChildSaved] = useState(false);
@@ -225,6 +230,17 @@ export default function Create({ onSaved, remaining, isPro, plan = "free", activ
 
   const create = useCallback(async () => {
     if (!canSubmit || creatingRef.current) return;
+    // Block BEFORE anything is spent: in-app browsers (WhatsApp/Instagram/
+    // Facebook webview) get a server-side 3-page cap, so a 4+ page request
+    // would silently produce 3 pages AND consume a booklet from the quota.
+    // Let the user escape to a real browser or knowingly accept 3 pages.
+    // (quick mode always sends pageCount: 1 — the selector value is irrelevant there)
+    if (IS_INAPP && mode !== "quick" && pageCount > 3 && !inappCapAckRef.current) {
+      setInappCapWarn(true);
+      track("inapp_cap_warning_shown", { pageCount });
+      return;
+    }
+    setInappCapWarn(false);
     creatingRef.current = true;
     const startedAt = Date.now();   // true generation duration (not the stale loadingElapsed closure)
     setLoading(true);
@@ -587,7 +603,9 @@ export default function Create({ onSaved, remaining, isPro, plan = "free", activ
     setBookletTitle(title);
     setShowRating(true);
     setHtml(generatedHtml);
-    track("booklet_completed", { booklet_id: inserted?.id, pages: pageCount, mode, durationSec: Math.round((Date.now() - startedAt) / 1000), chars: htmlAccumulated.length, partial: streamAborted, withAnswerKey, booklet_index: bookletCount + 1 });
+    // pagesDelivered vs pages(requested): the field that reveals whether long
+    // (15–20 page) requests actually complete or get cut by token/time limits.
+    track("booklet_completed", { booklet_id: inserted?.id, pages: pageCount, pagesDelivered: countPages(htmlAccumulated), mode, durationSec: Math.round((Date.now() - startedAt) / 1000), chars: htmlAccumulated.length, partial: streamAborted, withAnswerKey, booklet_index: bookletCount + 1 });
     onSaved?.();
 
     // Notify user if they switched away during generation
@@ -737,7 +755,7 @@ export default function Create({ onSaved, remaining, isPro, plan = "free", activ
         {cappedPages && (
           <div className="bg-blue-50 border border-blue-200 rounded-2xl px-5 py-4 text-right">
             <p className="font-bold text-blue-800 text-sm">ℹ️ נוצרו {cappedPages} עמודים (במקום המספר שביקשת)</p>
-            <p className="text-xs text-blue-700 mt-1">בתוך פייסבוק מוגבל ל-{cappedPages} עמודים. לחוברת המלאה — פתחי בדפדפן רגיל (הכפתור למעלה) ונסי שוב.</p>
+            <p className="text-xs text-blue-700 mt-1">בדפדפן פנימי (וואטסאפ/אינסטגרם/פייסבוק) מוגבל ל-{cappedPages} עמודים. לחוברת המלאה — פתחי את beshvili.com ב-Chrome/Safari ונסי שוב.</p>
           </div>
         )}
 
@@ -1424,6 +1442,24 @@ export default function Create({ onSaved, remaining, isPro, plan = "free", activ
                 {fastMode ? "מהיר" : "מלא"}
               </span>
             </button>
+          )}
+          {inappCapWarn && (
+            <div className="mb-3 bg-amber-50 border border-amber-300 rounded-2xl px-5 py-4 text-right space-y-3">
+              <p className="font-bold text-amber-900 text-sm">📱 את/ה בדפדפן פנימי (וואטסאפ/אינסטגרם/פייסבוק)</p>
+              <p className="text-xs text-amber-800">
+                כאן אפשר ליצור עד 3 עמודים בלבד. חוברת של {pageCount} עמודים דורשת דפדפן רגיל (Chrome/Safari) — שנייה לפתוח, ואותה חוברת בדיוק.
+              </p>
+              <div className="flex flex-col sm:flex-row gap-2">
+                <button onClick={() => { track("inapp_cap_open_browser", { pageCount }); openExternal(window.location.href); }}
+                  className="flex-1 bg-magic text-white rounded-xl py-2.5 px-4 text-sm font-bold hover:opacity-90">
+                  🌐 פתחי בדפדפן רגיל — לחוברת המלאה
+                </button>
+                <button onClick={() => { inappCapAckRef.current = true; setInappCapWarn(false); track("inapp_cap_proceed_3", { pageCount }); create(); }}
+                  className="flex-1 bg-white border border-amber-300 text-amber-900 rounded-xl py-2.5 px-4 text-sm font-semibold hover:bg-amber-100">
+                  להמשיך כאן עם 3 עמודים
+                </button>
+              </div>
+            </div>
           )}
           <button id="create-submit-btn" onClick={create} disabled={!canSubmit}
             className="w-full bg-gradient-to-l from-brand to-magic text-white rounded-2xl py-4 px-6 font-display font-bold text-base disabled:opacity-40 hover:opacity-90 active:scale-[0.98] transition-all shadow-md">

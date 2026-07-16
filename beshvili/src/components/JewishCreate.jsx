@@ -3,7 +3,7 @@ import { supabase } from "../lib/supabase";
 import { sanitizeBookletHtml } from "../lib/sanitize";
 import Preview from "./Preview";
 import { track } from "../hooks/useEvents";
-import { IS_INAPP } from "../lib/inapp";
+import { IS_INAPP, openExternal } from "../lib/inapp";
 
 // ── Curriculum map (מפמ"ר) ───────────────────────────────────────────────────
 const CURRICULUM = {
@@ -152,6 +152,11 @@ export default function JewishCreate({ onSaved, remaining, isPro, bookletCount =
   const [bookletId, setBookletId]   = useState(null);
   const [bookletTitle, setBookletTitle] = useState(null);
 
+  // In-app browsers get a server-side 3-page cap — warn BEFORE generating so a
+  // 4+ page request doesn't silently burn quota on a 3-page result (same guard
+  // as Create.jsx).
+  const [inappCapWarn, setInappCapWarn] = useState(false);
+  const inappCapAckRef = useRef(false);
   const streamAbortRef = useRef(null);
   const creatingRef    = useRef(false);
   const retryCountRef  = useRef(0);
@@ -197,6 +202,12 @@ export default function JewishCreate({ onSaved, remaining, isPro, bookletCount =
 
   const create = useCallback(async () => {
     if (!canSubmit || creatingRef.current) return;
+    if (IS_INAPP && pageCount > 3 && !inappCapAckRef.current) {
+      setInappCapWarn(true);
+      track("inapp_cap_warning_shown", { mode: "jewish", pageCount });
+      return;
+    }
+    setInappCapWarn(false);
     creatingRef.current = true;
     setLoading(true);
     setHtml(null);
@@ -431,7 +442,7 @@ export default function JewishCreate({ onSaved, remaining, isPro, bookletCount =
       if (streamAborted) setSaveWarning(true);
     }
 
-    track("jewish_completed", { subject, grade, topic: effectiveTopic, outputType, level, pageCount, booklet_index: bookletCount + 1 });
+    track("jewish_completed", { subject, grade, topic: effectiveTopic, outputType, level, pageCount, pagesDelivered: countPages(htmlAccumulated), booklet_index: bookletCount + 1 });
     onSaved?.();
   }, [canSubmit, subject, grade, effectiveTopic, outputType, level, notes, pageCount, onSaved, fastMode, bookletCount]);
 
@@ -760,6 +771,25 @@ export default function JewishCreate({ onSaved, remaining, isPro, bookletCount =
               בונה עמוד {Math.min(pageCount, countPages(previewHtml))} מתוך {pageCount} ✍️
             </p>
           )}
+        </div>
+      )}
+
+      {inappCapWarn && (
+        <div className="bg-amber-50 border border-amber-300 rounded-2xl px-5 py-4 text-right space-y-3">
+          <p className="font-bold text-amber-900 text-sm">📱 את/ה בדפדפן פנימי (וואטסאפ/אינסטגרם/פייסבוק)</p>
+          <p className="text-xs text-amber-800">
+            כאן אפשר ליצור עד 3 עמודים בלבד. חוברת של {pageCount} עמודים דורשת דפדפן רגיל (Chrome/Safari) — שנייה לפתוח, ואותה חוברת בדיוק.
+          </p>
+          <div className="flex flex-col sm:flex-row gap-2">
+            <button onClick={() => { track("inapp_cap_open_browser", { mode: "jewish", pageCount }); openExternal(window.location.href); }}
+              className="flex-1 bg-magic text-white rounded-xl py-2.5 px-4 text-sm font-bold hover:opacity-90">
+              🌐 פתחי בדפדפן רגיל — לחוברת המלאה
+            </button>
+            <button onClick={() => { inappCapAckRef.current = true; setInappCapWarn(false); track("inapp_cap_proceed_3", { mode: "jewish", pageCount }); create(); }}
+              className="flex-1 bg-white border border-amber-300 text-amber-900 rounded-xl py-2.5 px-4 text-sm font-semibold hover:bg-amber-100">
+              להמשיך כאן עם 3 עמודים
+            </button>
+          </div>
         </div>
       )}
 
