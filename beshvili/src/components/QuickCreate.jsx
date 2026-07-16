@@ -151,6 +151,11 @@ export default function QuickCreate({ student, onClose, onSaved, remaining, isPr
         setError(`rate:${wait}`);
         return;
       }
+      // Map the server's error codes to honest Hebrew (mirrors Create.jsx) —
+      // "שגיאת שרת 503" told the admin panel nothing and the user less.
+      if (errData?.error === "ai_overloaded") { trackError("ai_overloaded"); setError("השרת עמוס כרגע — נסי שוב בעוד דקה 🙏"); return; }
+      if (errData?.error === "ai_timeout")    { trackError("ai_timeout");    setError("הייצור לקח יותר מדי זמן — נסי עם פחות עמודים"); return; }
+      if (errData?.error === "ai_error")      { trackError("ai_error");      setError("השרת נתקל בבעיה רגעית — נסי שוב 🙏"); return; }
       trackError("server_error", { status: resp.status });
       setError(`שגיאת שרת ${resp.status}`);
       return;

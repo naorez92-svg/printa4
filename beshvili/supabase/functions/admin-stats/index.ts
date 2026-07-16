@@ -100,7 +100,7 @@ Deno.serve(async (req) => {
     admin.from("booklets").select("*", { count: "exact", head: true }).gte("created_at", monthStart),
     admin.from("profiles").select("id, plan, full_name, created_at, followup_sent_at, pro_since"),
     admin.from("feedback").select("message, created_at, user_id").order("created_at", { ascending: false }).limit(15),
-    admin.from("leads").select("user_id, name, phone, email, plan, method, created_at").order("created_at", { ascending: false }).limit(15),
+    admin.from("leads").select("user_id, name, phone, email, plan, method, price, created_at").order("created_at", { ascending: false }).limit(15),
     admin.from("booklets").select("user_id, created_at"),
     admin.from("booklets").select("user_id, title, world, goal, created_at, difficulty_feedback").order("created_at", { ascending: false }).limit(200),
     // Booklet-lifecycle events (last 14d) — used to tell "tried & failed" from

@@ -65,7 +65,9 @@ const esc = (s: string) =>
   s.replace(/<\/?(user_data|expert_analysis|system|instructions?|INST)\b[^>]*>/gi, "");
 
 const clamp = (v: unknown, max = MAX_ANSWER_CHARS) =>
-  esc(String(v ?? "").trim()).substring(0, max);
+  // CR/LF stripped: the name reaches the email SUBJECT header raw — a newline
+  // there is a header-injection vector (esc() alone doesn't cover it).
+  esc(String(v ?? "").replace(/[\r\n]+/g, " ").trim()).substring(0, max);
 
 // ── Serialize the client-computed profile into a Hebrew data block ──────────
 // The profile is the user's own assessment data — we trust its *content* (it
@@ -460,7 +462,10 @@ Deno.serve(async (req) => {
     }
     // Strict >: with N journeys existing, count === N — so ">" allows calls on
     // up to MAX journeys and blocks once an (MAX+1)th row exists.
-    if ((journeysToday ?? 0) > MAX_JOURNEYS_PER_DAY) {
+    // followup is exempt: it runs on an ALREADY-PAID, completed journey and is
+    // independently capped (5 per journey + the ai_calls budget) — the daily
+    // new-journey gate must not lock a paying customer out of what they bought.
+    if (action !== "followup" && (journeysToday ?? 0) > MAX_JOURNEYS_PER_DAY) {
       return new Response(JSON.stringify({ error: "daily_limit" }), { status: 403, headers: cors });
     }
 
@@ -530,7 +535,15 @@ Deno.serve(async (req) => {
 
     // ── interview: one adaptive question, plain JSON response ──
     if (action === "interview") {
-      const asked = Array.isArray(body.interview) ? body.interview.length : 0;
+      // Client-attested turn count is a cost hole (always sending interview:[]
+      // converts the whole 20-call journey budget into free Opus calls) — back
+      // it with the server-tracked ai_calls counter for unpaid journeys.
+      // journey.ai_calls is the PRE-CAS value = successful calls so far; on an
+      // unpaid journey the paywall means those were all interview calls.
+      const asked = Math.max(
+        Array.isArray(body.interview) ? body.interview.length : 0,
+        isPaid ? 0 : Number(journey?.ai_calls ?? 0)
+      );
       if (asked >= INTERVIEW_MAX) {
         await refund();
         return new Response(JSON.stringify({ done: true }), { status: 200, headers: cors });
@@ -725,7 +738,10 @@ Deno.serve(async (req) => {
             .from("career_journeys")
             .update({ report: { raw }, status: "completed", stage: "report", updated_at: new Date().toISOString() })
             .eq("id", journey.id);
-          if (saveErr) console.error("[career-compass] report save failed:", saveErr.message);
+          // A paid report that fails to persist must NOT stream once and vanish
+          // on reload — throw so the client retries synthesis (analyses are
+          // already saved; re-running synthesis is the designed recovery path).
+          if (saveErr) { console.error("[career-compass] report save failed:", saveErr.message); throw new Error("report_save_failed"); }
           // Deliver the permanent link by email — BEFORE the "done" frame, while
           // the response stream (and therefore the isolate) is guaranteed alive.
           // Once per journey: read the stamp, send, and stamp only on success —

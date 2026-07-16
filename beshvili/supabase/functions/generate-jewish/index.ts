@@ -132,7 +132,6 @@ const JEWISH_SYSTEM = `אתה מומחה פדגוגי בחינוך יהודי ד
 • ציטוטי פסוקים ומשניות: מדויקים עם ניקוד מלא. אם אינך בטוח — ציין בסוגריים "לפי..."
 • מקורות תמיד בפורמט: (ספר/מסכת פרק:פסוק/משנה) — מיד אחרי כל ציטוט
 • עברית תקנית ומכובדת — ללא סלנג, ללא אימוג'ים מיותרים
-• כפתור הדפסה class="no-print" בראש הדף בלבד
 • Footer + QR (בעמוד האחרון בלבד, ממורכז בתחתית) — בדיוק כך:
 <div style="position:absolute;bottom:4mm;left:0;right:0;text-align:center;margin:0">
   <img src="https://api.qrserver.com/v1/create-qr-code/?size=120x120&margin=0&data=https%3A%2F%2Fwww.beshvili.com" width="48" height="48" alt="" style="display:inline-block">
@@ -438,7 +437,8 @@ ${notes ? `הוראות נוספות מהמורה: ${esc(notes)}` : ""}
     const hb = setInterval(() => { w.write(KEEP_ALIVE).catch(() => {}); }, 8000);
 
     (async () => {
-      let streamedChars = 0; // hoisted: the catch block gates release/refund on it
+      let streamedChars = 0; // raw SSE bytes — rate-lock release heuristic
+      let contentChars = 0;  // actual HTML delivered — refund decisions (client salvage bar: 6000)
       let clientGone = false; // w.write failed → the CLIENT disconnected (not Anthropic)
       try {
         const ANTHROPIC_BODY = JSON.stringify({
@@ -499,6 +499,7 @@ ${notes ? `הוראות נוספות מהמורה: ${esc(notes)}` : ""}
           if (value) {
             const chunk = streamDecoder.decode(value, { stream: true });
             streamedChars += chunk.length;
+            for (const m of chunk.matchAll(/"text_delta","text":"((?:[^"\\]|\\.)*)"/g)) contentChars += m[1].length;
             if ((tail + chunk).includes('"message_stop"')) receivedMessageStop = true;
             tail = chunk.slice(-20);
           }
@@ -508,17 +509,17 @@ ${notes ? `הוראות נוספות מהמורה: ${esc(notes)}` : ""}
         // Aborting just before message_stop must not hand out a free rate-limit
         // reset after a full generation.
         if (!receivedMessageStop && streamedChars < 2000) releaseLock();
-        // Refund the quota unit when no usable booklet was delivered (30000 SSE
-        // bytes ≈ the client's salvage threshold; see generate-booklet).
-        if (!receivedMessageStop && streamedChars < 30000) refundGeneration();
+        // Refund the quota unit when no usable material was delivered (below the
+        // client's 6000-HTML-char salvage bar; see generate-booklet).
+        if (!receivedMessageStop && contentChars < 6000) refundGeneration();
         clearInterval(hb);
         await w.close();
       } catch (e) {
         clearInterval(hb);
         console.error("[generate-jewish] stream error:", String(e));
-        // Refund when no usable booklet was delivered; release the lock only for
+        // Refund when no usable material was delivered; release the lock only for
         // genuine upstream failures — not client aborts (see generate-booklet).
-        if (streamedChars < 30000) {
+        if (contentChars < 6000) {
           refundGeneration();
           if (!clientGone) releaseLock();
         }

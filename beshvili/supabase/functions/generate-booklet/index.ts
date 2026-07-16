@@ -126,7 +126,7 @@ const BOOKLET_SYSTEM = `אתה "יוצר החוברות של חני 2.0" — מ�
 </div>
 
 === חוקי CSS A4 (חובה בכל עמוד!) ===
-• כל div עמוד: width:210mm; height:296mm; margin:10px auto; overflow:hidden; page-break-after:always; box-sizing:border-box; position:relative; padding:12mm;
+• כל עמוד חייב להיות <div class="page" style="..."> — אסור עמוד ללא class="page" (כללי ההדפסה תלויים בזה!): width:210mm; height:296mm; margin:10px auto; overflow:hidden; page-break-after:always; box-sizing:border-box; position:relative; padding:12mm;
 • סגנון הדפסה (חובה לכלול בדיוק כך ב-<style> בתוך <head>):
   @page{size:A4;margin:0}
   @media print{
@@ -175,7 +175,7 @@ Badge תרגיל — עם letter-spacing (לא rounded-full סתם!):
 === מבנה עמודים (כמות מצויינת בבקשה — חובה לעמוד בה בדיוק!) ===
 • חוברת של 1–2 עמודים: אין עמוד שער נפרד! שלב כותרת קומפקטית + שורת משימה בראש העמוד הראשון (עד 20% מגובה העמוד), והשאר תרגול. שער מלא רק מ-3 עמודים ומעלה.
 • מוני שלבים ("שלב X מתוך Y"): Y = מספר עמודי התרגול שבאמת קיימים בחוברת. אסור להבטיח שלב שלא קיים.
-• [מה אלמד היום] — חובה למלא ב-2–3 מטרות קונקרטיות. אסור להשאיר צ'קליסט/רשימה ריקים בשום מקום.
+• תיבת "מה אלמד היום" חייבת להיות מלאה ב-2–3 מטרות קונקרטיות. שורות כתיבה, מדדי כוכבים ואזורי מילוי לתלמיד — נשארים ריקים בכוונה (הם של הילד).
 עמוד 1 — שער + קובץ משימה (בחוברות של 3+ עמודים):
   • אם יש childPhotoUrl — תמונה עגולה בראש (לפני הכותרת):
     <img src="[ה-URL]" style="width:120px;height:120px;object-fit:cover;object-position:center 15%;border-radius:50%;display:block;margin:0 auto 10px;border:4px solid white;box-shadow:0 4px 15px rgba(0,0,0,0.15);" alt="" onerror="this.style.display='none'">
@@ -239,7 +239,6 @@ Badge תרגיל — עם letter-spacing (לא rounded-full סתם!):
 • קוד HTML גולמי בלבד — החל מ-<!DOCTYPE html> עד </html>
 • ללא \`\`\`html, ללא הסברים, ללא שום טקסט לפני או אחרי
 • כל עמוד חייב להיות מלא בתוכן — אסור בתכלית האיסור להשאיר עמוד ריק או חלקי!
-• כפתור הדפסה ממוסגר עם class="no-print" בראש הדף
 • עברית תקינה, מלאה ועשירה
 • כל העמודים (לפי הכמות שנדרשה) בקובץ HTML אחד
 
@@ -328,7 +327,7 @@ const EXAM_SYSTEM = `אתה "יוצר מבחנים של חני" — מומחה �
 • הניקוד סביר ופרופורציונלי לקושי ולאורך הצפוי של התשובה
 
 === חוקי CSS A4 (חובה בכל עמוד!) ===
-• כל div עמוד: width:210mm; height:296mm; margin:10px auto; overflow:hidden; page-break-after:always; box-sizing:border-box; position:relative; padding:12mm;
+• כל עמוד חייב להיות <div class="page" style="..."> — אסור עמוד ללא class="page" (כללי ההדפסה תלויים בזה!): width:210mm; height:296mm; margin:10px auto; overflow:hidden; page-break-after:always; box-sizing:border-box; position:relative; padding:12mm;
 • @page{size:A4;margin:0}
 • @media print{.no-print{display:none!important}body{margin:0!important;padding:0!important;background:white!important}.page{margin:0!important;box-shadow:none!important;border:none!important}.page:last-child{page-break-after:avoid!important}}
 • -webkit-print-color-adjust:exact!important; print-color-adjust:exact!important
@@ -353,7 +352,6 @@ const EXAM_SYSTEM = `אתה "יוצר מבחנים של חני" — מומחה �
 • קוד HTML גולמי בלבד — מ-<!DOCTYPE html> עד </html>
 • ללא \`\`\`html, ללא הסברים, ללא שום טקסט לפני או אחרי
 • כל עמוד חייב להיות מלא בתוכן — אסור להשאיר עמוד ריק או חלקי
-• כפתור הדפסה (class="no-print") בראש הדף
 • עברית תקינה ורשמית
 • כל העמודים בקובץ HTML אחד
 • בתחתית עמוד אחרון בלבד:
@@ -520,7 +518,9 @@ Deno.serve(async (req) => {
 
     const maxPages = isTeacher ? TEACHER_MAX_PAGES : isParent ? PARENT_MAX_PAGES : FREE_MAX_PAGES;
     const pageCount = Math.min(maxPages, Math.max(1, Number.isInteger(body.pageCount) ? body.pageCount : 5));
-    const withAnswerKey = body.withAnswerKey === true;
+    // Answer key is a PAID feature (sold as such in every plan card/email) —
+    // enforce server-side, not just by hiding the toggle.
+    const withAnswerKey = isPaid && body.withAnswerKey === true;
     const noStream = body.noStream === true; // in-app browsers (FB/IG webview)
     // No-stream holds ONE request open for the whole generation, bounded by the
     // platform wall-clock limit — cap the size so it reliably finishes. Each
@@ -698,7 +698,11 @@ Deno.serve(async (req) => {
     const hb = setInterval(() => { w.write(KEEP_ALIVE).catch(() => {}); }, 8000);
 
     (async () => {
-      let streamedChars = 0; // hoisted: the catch block gates release/refund on it
+      let streamedChars = 0; // raw SSE bytes — rate-lock release heuristic
+      // Actual HTML delivered (sum of text_delta payloads). SSE framing inflates
+      // raw bytes 3-8x, so refund decisions must use CONTENT chars, mirroring
+      // the client's salvage threshold (>8000 HTML chars = keeps the partial).
+      let contentChars = 0;
       let clientGone = false; // w.write failed → the CLIENT disconnected (not Anthropic)
       try {
         const ANTHROPIC_BODY = JSON.stringify({
@@ -762,6 +766,9 @@ Deno.serve(async (req) => {
           if (value) {
             const chunk = streamDecoder.decode(value, { stream: true });
             streamedChars += chunk.length;
+            // Content accounting (boundary-straddling texts undercount slightly
+            // — fine for a threshold heuristic).
+            for (const m of chunk.matchAll(/"text_delta","text":"((?:[^"\\]|\\.)*)"/g)) contentChars += m[1].length;
             if ((tail + chunk).includes('"message_stop"')) receivedMessageStop = true;
             tail = chunk.slice(-20);
           }
@@ -773,20 +780,20 @@ Deno.serve(async (req) => {
         // rate-limit reset after receiving a full booklet (abuse loop).
         if (!receivedMessageStop && streamedChars < 2000) releaseLock();
         // Refund the quota unit when the stream ended without delivering a
-        // usable booklet. 30000 SSE bytes ≈ the client's 8000-HTML-char salvage
-        // threshold (SSE JSON framing inflates content ~3x) — below it the user
-        // got nothing they could keep. Abuse stays bounded: the 60s stamp holds.
-        if (!receivedMessageStop && streamedChars < 30000) refundGeneration();
+        // usable booklet: below the client's 8000-char salvage threshold the
+        // user keeps nothing. Abuse stays bounded: the 60s stamp holds.
+        if (!receivedMessageStop && contentChars < 8000) refundGeneration();
         clearInterval(hb);
         await w.close();
       } catch (e) {
         clearInterval(hb);
         console.error("[generate-booklet] stream error:", String(e));
-        // Refund when no usable booklet was delivered. Release the 60s lock only
-        // for genuine upstream failures (timeout/overload) so the client's 2s
-        // auto-retry works — NOT on client abort (w.write threw), where
-        // refund+release together would allow an unthrottled request→abort loop.
-        if (streamedChars < 30000) {
+        // Refund when no usable booklet was delivered (mirrors the client's
+        // 8000-HTML-char salvage bar). Release the 60s lock only for genuine
+        // upstream failures (timeout/overload) so the client's 2s auto-retry
+        // works — NOT on client abort (w.write threw), where refund+release
+        // together would allow an unthrottled request→abort loop.
+        if (contentChars < 8000) {
           refundGeneration();
           if (!clientGone) releaseLock();
         }

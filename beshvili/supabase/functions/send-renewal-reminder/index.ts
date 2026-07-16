@@ -108,6 +108,7 @@ Deno.serve(async (req) => {
       המנוי שלך לבשבילי מסתיים בעוד ~5 ימים.<br>
       כדי להמשיך ליצור חוברות, שלחי ${profile.plan === "parent" ? "19" : profile.plan === "teacher" ? "59" : "30"} ₪ בביט למספר <strong>050-913-9137</strong> ואז וואטסאפ לאישור.
     </p>
+    ${profile.plan === "teacher" || profile.plan === "parent" ? `<p style="color:#999;font-size:12px;margin:0 0 16px;">💡 אם החודש הראשון שלך היה במחיר מבצע — זהו המחיר הרגיל של התוכנית מהחודש השני.</p>` : ""}
     <div style="background:#F7F6FB;border-radius:12px;padding:16px;margin-bottom:24px;">
       <p style="margin:0 0 8px;font-weight:bold;color:#20184A;font-size:14px;">התוכנית שלך — ${profile.plan === "parent" ? "הורה 🌟" : profile.plan === "teacher" ? "מורה 🚀" : "פרו 🚀"}:</p>
       <ul style="margin:0;padding-right:20px;color:#555;font-size:14px;line-height:2;">
@@ -153,5 +154,43 @@ Deno.serve(async (req) => {
     }
   }
 
-  return new Response(JSON.stringify({ sent, total: pendingProfiles.length, errors }), { status: 200, headers: cors });
+  // ── Revenue-leak guard: paid subscribers past D+40 who never renewed ──────
+  // Nothing auto-downgrades (a business decision the owner makes), but the
+  // owner must SEE the list — otherwise unpaid subscriptions run forever.
+  let overdueNotified = 0;
+  try {
+    const fortyDaysAgo = new Date(now.getTime() - 40 * 24 * 3600 * 1000).toISOString();
+    const { data: overdue } = await admin
+      .from("profiles")
+      .select("id, plan, pro_since, full_name")
+      .in("plan", ["teacher", "parent", "pro"])
+      .lt("pro_since", fortyDaysAgo)
+      .not("renewal_reminder_sent_at", "is", null);
+    if (overdue?.length) {
+      const { data: authList } = await admin.auth.admin.listUsers({ perPage: 1000 });
+      const emailOf = (id: string) => authList?.users?.find((u) => u.id === id)?.email ?? id;
+      const rows = overdue.map((p) =>
+        `<tr><td style="padding:6px 0;">${emailOf(p.id)}</td><td style="padding:6px 0;">${p.plan}</td><td style="padding:6px 0;">${(p.pro_since ?? "").slice(0, 10)}</td></tr>`
+      ).join("");
+      const r = await fetch("https://api.resend.com/emails", {
+        method: "POST",
+        headers: { "Authorization": `Bearer ${resendKey}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          from: "בשבילי <hello@beshvili.com>",
+          to: ["naorez92@gmail.com"],
+          subject: `⚠️ ${overdue.length} מנויים עברו 40 יום בלי חידוש`,
+          html: `<div dir="rtl" style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;padding:20px;color:#20184A;">
+<h3>מנויים שלא חידשו (40+ יום מההפעלה, אחרי תזכורת)</h3>
+<p style="font-size:13px;color:#666;">אם לא שילמו — בטל בדף הניהול: ⚡ הפעלת מנוי → "חינם (ביטול)". אם שילמו — הפעל מחדש כדי לאפס את מחזור החידוש.</p>
+<table style="width:100%;font-size:13px;border-collapse:collapse;"><tr style="color:#888;"><td>מייל</td><td>תוכנית</td><td>הופעל</td></tr>${rows}</table>
+</div>`,
+        }),
+      });
+      if (r.ok) overdueNotified = overdue.length;
+    }
+  } catch (e) {
+    console.error("overdue check failed:", e);
+  }
+
+  return new Response(JSON.stringify({ sent, total: pendingProfiles.length, errors, overdueNotified }), { status: 200, headers: cors });
 });

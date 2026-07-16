@@ -65,6 +65,10 @@ Deno.serve(async (req) => {
     const phone   = clean(body.phone, 40) || null;
     const planId  = ["parent", "teacher", "pro", "compass"].includes(body.plan) ? body.plan : "teacher";
     const method  = body.method === "bit" ? "bit" : body.method === "whatsapp" ? "whatsapp" : "unknown";
+    // The price PROMISED at click time (sale first month ₪29/₪9) — dropping it
+    // meant payment emails later demanded full price from sale-price leads.
+    const price   = Number.isFinite(Number(body.price)) && Number(body.price) > 0 && Number(body.price) <= 500
+      ? Number(body.price) : null;
     const bookletCount = Number.isInteger(body.bookletCount) ? body.bookletCount : 0;
 
     // Pull the user's plan so the email shows free vs already-paid.
@@ -99,6 +103,7 @@ Deno.serve(async (req) => {
         email:   user.email ?? null,
         plan:    planId,
         method,
+        price,
       });
       if (insertErr) {
         // Migration 0037 not applied yet (missing columns) — never lose a lead
@@ -127,6 +132,7 @@ Deno.serve(async (req) => {
       <tr><td style="padding:8px 0;color:#888;">אימייל</td><td style="padding:8px 0;"><a href="mailto:${esc(userEmail)}" style="color:#6C5CE7;">${esc(userEmail)}</a></td></tr>
       ${phone ? `<tr><td style="padding:8px 0;color:#888;">טלפון</td><td style="padding:8px 0;font-weight:bold;">${esc(phone)}</td></tr>` : ""}
       <tr><td style="padding:8px 0;color:#888;">תוכנית מבוקשת</td><td style="padding:8px 0;font-weight:bold;color:#6C5CE7;">${esc(planLabel)}</td></tr>
+      ${price ? `<tr><td style="padding:8px 0;color:#888;">מחיר שהובטח</td><td style="padding:8px 0;font-weight:bold;">₪${price}${price < 50 ? " (מבצע חודש ראשון)" : ""}</td></tr>` : ""}
       <tr><td style="padding:8px 0;color:#888;">אמצעי תשלום</td><td style="padding:8px 0;">${esc(methodLabel)}</td></tr>
       <tr><td style="padding:8px 0;color:#888;">תוכנית נוכחית</td><td style="padding:8px 0;">${esc(currentPlan)}</td></tr>
       <tr><td style="padding:8px 0;color:#888;">חוברות שיצר/ה</td><td style="padding:8px 0;">${bookletCount}</td></tr>

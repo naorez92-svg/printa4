@@ -1295,7 +1295,7 @@ function LeadsCard({ leads, fmt }) {
     setSendState(s => ({ ...s, [key]: "sending" }));
     try {
       const { data: res, error } = await supabase.functions.invoke("send-payment-instructions", {
-        body: { email: l.email, name: l.name || "", plan: l.plan || "teacher" },
+        body: { email: l.email, name: l.name || "", plan: l.plan || "teacher", ...(l.price ? { price: l.price } : {}) },
       });
       if (error || !res?.ok) throw new Error(error?.message || "failed");
       setSendState(s => ({ ...s, [key]: "sent" }));
@@ -1307,14 +1307,19 @@ function LeadsCard({ leads, fmt }) {
 
   const activatePlan = async (key, l) => {
     if (!l.email || activateState[key] === "sending" || activateState[key] === "sent") return;
-    const plan = l.plan && l.plan !== "compass" ? l.plan : "teacher";
-    if (!confirm(`להפעיל מנוי ${plan === "teacher" ? "מורה" : plan === "parent" ? "הורה" : plan} עבור ${l.email}?\nהלקוח/ה יקבל/תקבל מייל אישור.`)) return;
+    const isCompass = l.plan === "compass";
+    const plan = isCompass ? null : (l.plan || "teacher");
+    const label = isCompass ? "מצפן (דוח ₪49)" : plan === "teacher" ? "מורה" : plan === "parent" ? "הורה" : plan;
+    if (!confirm(`להפעיל ${label} עבור ${l.email}?\nהלקוח/ה יקבל/תקבל אישור.`)) return;
     setActivateState(s => ({ ...s, [key]: "sending" }));
     try {
-      const { data: res, error } = await supabase.functions.invoke("admin-set-plan", {
-        body: { email: l.email, plan },
-      });
-      if (error || !res?.ok) throw new Error(error?.message || "failed");
+      // A compass lead bought a one-time report entitlement (compass_paid), NOT
+      // a teacher subscription — activating it as 'teacher' left the report
+      // paywalled and billed the wrong product.
+      const { data: res, error } = isCompass
+        ? await supabase.functions.invoke("career-compass", { body: { action: "admin_set_paid", email: l.email, paid: true } })
+        : await supabase.functions.invoke("admin-set-plan", { body: { email: l.email, plan } });
+      if (error || (!res?.ok && !res?.success)) throw new Error(error?.message || "failed");
       setActivateState(s => ({ ...s, [key]: "sent" }));
     } catch {
       setActivateState(s => ({ ...s, [key]: "failed" }));

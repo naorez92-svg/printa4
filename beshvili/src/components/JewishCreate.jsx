@@ -203,6 +203,9 @@ export default function JewishCreate({ onSaved, remaining, isPro, bookletCount =
     setPreviewHtml("");
     setError(null);
     setSaveWarning(false);
+    // booklet_started/booklet_error are what the admin reliability panel counts —
+    // without them the entire Jewish product was invisible to monitoring.
+    track("booklet_started", { mode: "jewish", subject, grade, outputType, pageCount });
 
     const { data } = await supabase.auth.getSession();
     const session = data?.session;
@@ -250,7 +253,14 @@ export default function JewishCreate({ onSaved, remaining, isPro, bookletCount =
       creatingRef.current = false;
       track("jewish_error", { kind: "server", status: resp.status, code: code ?? null, inapp: useNoStream });
       if (code === "quota_exceeded") { const monthly = errData?.period === "monthly"; setError(monthly ? "quota_monthly" : "quota"); return; }
-      if (code === "rate_limited") { setError(`rate:${errData?.wait ?? 60}`); return; }
+      if (code === "rate_limited") {
+        const wait = errData?.wait ?? 60;
+        if (retryCountRef.current > 0 && wait <= 60) {
+          retryTimerRef.current = setTimeout(() => createRef.current?.(), (wait + 1) * 1000);
+          return;
+        }
+        setError(`rate:${wait}`); return;
+      }
       if (code === "ai_overloaded") { setError("generic:השרת עמוס כרגע — נסי שוב בעוד דקה 🙏"); return; }
       if (code === "ai_timeout")    { setError(useNoStream
         ? "generic:הייצור ארוך מדי לדפדפן של פייסבוק — פתחי בדפדפן (הכפתור למעלה) או בחרי פחות עמודים 🙏"
@@ -268,6 +278,7 @@ export default function JewishCreate({ onSaved, remaining, isPro, bookletCount =
     let streamHadError = false;
     let streamErrorMsg = null;
     let streamAborted = false;
+    let stopReason = null;
 
     if (useNoStream) {
       try {
@@ -317,6 +328,8 @@ export default function JewishCreate({ onSaved, remaining, isPro, bookletCount =
               const now = Date.now();
               if (now - updateTimer > 100) { setStreamChars(htmlAccumulated.length); updateTimer = now; }
               if (now - previewTimer > 2000) { setPreviewHtml(htmlAccumulated); previewTimer = now; }
+            } else if (ev.type === "message_delta" && ev.delta?.stop_reason) {
+              stopReason = ev.delta.stop_reason;
             } else if (ev.type === "error") {
               streamHadError = true;
               streamErrorMsg = ev.error?.type === "overloaded_error"
@@ -350,6 +363,7 @@ export default function JewishCreate({ onSaved, remaining, isPro, bookletCount =
         retryCountRef.current = 0;
         setLoading(false);
         creatingRef.current = false;
+        track("booklet_error", { type: "stream_dropped", mode: "jewish" });
         setError(`generic:החיבור נקטע — לחצי שוב על "צור חומר" כדי לנסות שוב`);
         return;
       }
@@ -362,10 +376,18 @@ export default function JewishCreate({ onSaved, remaining, isPro, bookletCount =
     creatingRef.current = false;
     // Successful stream — restore the auto-retry budget for the next generation.
     retryCountRef.current = 0;
-    if (streamHadError) { setError(streamErrorMsg); return; }
+    if (streamHadError) { track("booklet_error", { type: "stream_error", mode: "jewish" }); setError(streamErrorMsg); return; }
+
+    // Token-budget truncation ends the stream "normally" but the material is
+    // incomplete — close the tags and mark it partial (saveWarning shows).
+    if (stopReason === "max_tokens") {
+      streamAborted = true;
+      const t = htmlAccumulated.trim();
+      if (!t.includes("</html>")) htmlAccumulated = t + "\n</body></html>";
+    }
 
     const generatedHtml = sanitizeBookletHtml(htmlAccumulated.trim());
-    if (!generatedHtml || !generatedHtml.includes("<")) { setError("generic:לא התקבל HTML תקין מהשרת"); return; }
+    if (!generatedHtml || !generatedHtml.includes("<")) { track("booklet_error", { type: "empty_html", mode: "jewish" }); setError("generic:לא התקבל HTML תקין מהשרת"); return; }
 
     const outputLabel = OUTPUT_TYPES.find(o => o.id === outputType)?.label ?? outputType;
     const title = `${subject} כיתה ${grade} — ${effectiveTopic.substring(0, 50)}${streamAborted ? " (חלקי)" : ""} (${outputLabel})`;
