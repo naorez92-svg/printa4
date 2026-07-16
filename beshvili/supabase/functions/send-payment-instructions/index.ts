@@ -11,7 +11,7 @@ const WA_LINK = "https://wa.me/972509139137";
 const PLANS: Record<string, { label: string; price: string; period: string }> = {
   teacher: { label: "מורה פרטית", price: "59",  period: "לחודש" },
   parent:  { label: "הורה",        price: "19",  period: "לחודש" },
-  pro:     { label: "פרו",         price: "59",  period: "לחודש" },
+  pro:     { label: "פרו",         price: "30",  period: "לחודש" }, // legacy pro pays 30 (matches renewal email + P&L)
   compass: { label: "מצפן — דוח",  price: "49",  period: "חד־פעמי" },
 };
 
@@ -66,7 +66,13 @@ Deno.serve(async (req) => {
     const resendKey = Deno.env.get("RESEND_API_KEY");
     if (!resendKey) return new Response(JSON.stringify({ error: "internal_error" }), { status: 500, headers: cors });
 
-    const p = PLANS[plan];
+    // Honor the price PROMISED at click time (first-month sale ₪29/₪9) — the
+    // customer must never be emailed a bigger number than the one they saw.
+    const priceOverride = Number.isFinite(Number(body?.price)) && Number(body.price) > 0 && Number(body.price) <= 500
+      ? String(Number(body.price)) : null;
+    const base = PLANS[plan];
+    const p = priceOverride ? { ...base, price: priceOverride } : base;
+    const isSale = priceOverride && Number(priceOverride) < Number(base.price);
     const esc = (v: string) => v.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
     const hi = name ? `היי ${esc(name)},` : "היי,";
 
@@ -76,7 +82,7 @@ Deno.serve(async (req) => {
     <hr style="border:none;border-top:1px solid #ece9f6;margin:12px 0 20px;">
     <h2 style="color:#20184A;margin:0 0 14px;">ההפעלה שלך — צעד אחד ואת/ה בפנים 🎉</h2>
     <p style="font-size:15px;color:#333;">${hi}</p>
-    <p style="font-size:15px;color:#333;">איזה כיף שבחרת בתוכנית <strong style="color:#6C5CE7;">${p.label}</strong> — <strong>₪${p.price} ${p.period}</strong>. ככה מפעילים, לוקח דקה:</p>
+    <p style="font-size:15px;color:#333;">איזה כיף שבחרת בתוכנית <strong style="color:#6C5CE7;">${p.label}</strong> — <strong>₪${p.price} ${p.period}</strong>${isSale ? ` <span style="color:#F4A02C;font-weight:bold;">(מחיר מבצע לחודש הראשון — מהחודש השני ₪${base.price})</span>` : ""}. ככה מפעילים, לוקח דקה:</p>
 
     <div style="background:#F7F6FB;border-radius:12px;padding:16px 18px;margin:18px 0;">
       <p style="font-size:15px;color:#20184A;margin:0 0 10px;"><strong>1.</strong> 💙 שלחו <strong>₪${p.price}</strong> בביט למספר <strong dir="ltr">${BIT_PHONE}</strong></p>

@@ -51,6 +51,16 @@ export function useProfile() {
 
   useEffect(() => { refresh(); }, [refresh]);
 
+  // Refresh on tab refocus: the typical activation flow is "hit quota wall →
+  // pay on the phone → get activated within the hour" with the app still open.
+  // Without this the newly-paying customer keeps seeing the free plan until a
+  // hard reload.
+  useEffect(() => {
+    const onVis = () => { if (document.visibilityState === "visible") refresh(); };
+    document.addEventListener("visibilitychange", onVis);
+    return () => document.removeEventListener("visibilitychange", onVis);
+  }, [refresh]);
+
   const plan    = profile?.plan ?? "free";
   const isAdmin = plan === "admin";
   const isPro   = plan === "parent" || plan === "teacher" || plan === "pro" || isAdmin;

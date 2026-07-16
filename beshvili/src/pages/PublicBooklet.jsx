@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { sanitizeBookletHtml } from "../lib/sanitize";
 import { track } from "../hooks/useEvents";
 import { IS_INAPP, openExternal } from "../lib/inapp";
+import { buildPrintHtml } from "../lib/printHtml";
 
 const A4_PX = 794;
 const A4_H  = 1123; // A4 at 96dpi: 297mm × (96/25.4) ≈ 1123px
@@ -91,11 +92,9 @@ export default function PublicBooklet({ token }) {
       openExternal(`${window.location.href.split("#")[0]}${sep}print=1`);
       return;
     }
-    // Inject A4 + exact-color print CSS so the recipient's PDF matches the
-    // owner's (without this the public page printed with margins and no colors).
-    const printHtml = booklet.html.includes("@page")
-      ? booklet.html
-      : booklet.html.replace("</head>", "<style>@page{size:A4;margin:0}*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}</style></head>");
+    // Shared print builder — the recipient gets every print fix the owner has
+    // (blank-page guard, Jewish flow layout, feedback QR). See lib/printHtml.js.
+    const printHtml = buildPrintHtml(booklet.html, token);
     const blob = new Blob([printHtml], { type: "text/html;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const w = window.open(url, "_blank");

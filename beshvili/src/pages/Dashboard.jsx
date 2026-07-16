@@ -86,7 +86,7 @@ export default function Dashboard() {
 
   const tabs = [
     ...NAV,
-    ...(isPro ? [["branding", "🎨", "מיתוג"]] : []),
+    ...(plan === "teacher" || plan === "pro" || isAdmin ? [["branding", "🎨", "מיתוג"]] : []),
     ...(isAdmin ? [["admin", "🔐", "ניהול"]] : []),
   ];
 
@@ -239,7 +239,7 @@ export default function Dashboard() {
               preserve in-progress generation when switching tabs — a sibling lazy
               chunk suspending must never unmount it. */}
           <div className={tab === "create" ? "" : "hidden"}>
-            <Create active={tab === "create"} onSaved={() => refresh()} remaining={remaining} isPro={isPro} bookletCount={bookletCount} onUpgrade={() => setShowUpgrade(true)}
+            <Create active={tab === "create"} onSaved={() => refresh()} remaining={remaining} isPro={isPro} plan={plan} bookletCount={bookletCount} onUpgrade={() => setShowUpgrade(true)}
               pendingStarter={pendingStarter} onStarterConsumed={() => setPendingStarter(null)} />
           </div>
           {tab === "history" && <History isPro={isPro} onUpgrade={() => setShowUpgrade(true)} onCreateNew={() => setTab("create")}
@@ -248,7 +248,7 @@ export default function Dashboard() {
           <Suspense fallback={<div className="py-12 text-center text-ink/40 text-sm">טוען…</div>}>
             {tab === "jewish" && <JewishCreate onSaved={() => refresh()} remaining={remaining} isPro={isPro} bookletCount={bookletCount} onUpgrade={() => setShowUpgrade(true)} />}
             {tab === "students" && <Students onBookletSaved={() => { refresh(); setTab("history"); }} remaining={remaining} isPro={isPro} bookletCount={bookletCount} />}
-            {tab === "branding" && isPro && <BrandingSettings profile={profile} onSaved={refresh} />}
+            {tab === "branding" && (plan === "teacher" || plan === "pro" || isAdmin) && <BrandingSettings profile={profile} onSaved={refresh} />}
             {tab === "admin" && isAdmin && <AdminPanel />}
           </Suspense>
         </main>
@@ -291,7 +291,7 @@ export default function Dashboard() {
         ))}
       </nav>
 
-      {showUpgrade && <UpgradeModal onClose={() => setShowUpgrade(false)} bookletCount={bookletCount} source="dashboard" />}
+      {showUpgrade && <UpgradeModal onClose={() => { setShowUpgrade(false); refresh(); }} bookletCount={bookletCount} source="dashboard" />}
       {showSurvey && <SurveyModal questionKey="use_case" onClose={() => setShowSurvey(false)} />}
       {!loading && !isPro && bookletCount === 0 && !onboarded && tab === "create" && (
         <OnboardingModal

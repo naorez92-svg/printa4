@@ -70,9 +70,15 @@ Deno.serve(async (req) => {
     }
     if (!target) return new Response(JSON.stringify({ error: "user_not_found" }), { status: 404, headers: cors });
 
+    // Stamp the billing cycle explicitly: the 0010 trigger sets pro_since only
+    // on free→paid, so re-activating a RENEWING subscriber (teacher→teacher)
+    // would keep a stale cycle and month-2 renewal reminders would never send.
+    const update = plan === "free"
+      ? { plan }
+      : { plan, pro_since: new Date().toISOString(), renewal_reminder_sent_at: null };
     const { error: updateErr } = await admin
       .from("profiles")
-      .update({ plan })
+      .update(update)
       .eq("id", target.id);
     if (updateErr) {
       console.error("admin-set-plan update:", updateErr.message);

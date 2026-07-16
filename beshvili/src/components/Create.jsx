@@ -63,7 +63,10 @@ const GOAL_PICKS = [
   { icon: "🔢", label: "חיבור וחיסור",     goal: "חיבור וחיסור: אלגוריתמים, מעבר עשרת, בעיות" },
 ];
 const EMPTY = { childName: "", grade: "", world: "כדורגל", goal: "", level: "medium", weaknesses: "" };
-const PAGE_OPTIONS = [2, 5, 7, 10];
+// Page options are plan-aware: the teacher plan is SOLD as "עד 20 עמודים"
+// (server TEACHER_MAX_PAGES=20) — the picker must actually offer it.
+const PAGE_OPTIONS_FREE_PARENT = [2, 5, 7, 10];
+const PAGE_OPTIONS_TEACHER     = [2, 5, 10, 15, 20];
 const LOADING_MSGS = [
   "מכינה את החוברת... ✍️",
   "בונה תרגילים מגוונים...",
@@ -85,7 +88,8 @@ const A4_H  = 1123;
 // engine changes the dimension this just returns 0 and the char bar takes over.
 const countPages = (html) => (html.match(/296mm/g) || []).length;
 
-export default function Create({ onSaved, remaining, isPro, active = true, bookletCount = 0, onUpgrade, pendingStarter = null, onStarterConsumed }) {
+export default function Create({ onSaved, remaining, isPro, plan = "free", active = true, bookletCount = 0, onUpgrade, pendingStarter = null, onStarterConsumed }) {
+  const PAGE_OPTIONS = (plan === "teacher" || plan === "pro" || plan === "admin") ? PAGE_OPTIONS_TEACHER : PAGE_OPTIONS_FREE_PARENT;
   const [showUpgrade, setShowUpgrade] = useState(false);
   const openUpgrade = onUpgrade ?? (() => setShowUpgrade(true));
   const [mode, setMode]           = useState(() => {
@@ -334,7 +338,19 @@ export default function Create({ onSaved, remaining, isPro, active = true, bookl
         setError(monthly ? "quota_monthly" : "quota");
         return;
       }
-      if (code === "rate_limited") { const wait = errData?.wait ?? 60; trackError("rate_limited", { wait }); setError(`rate:${wait}`); return; }
+      if (code === "rate_limited") {
+        const wait = errData?.wait ?? 60;
+        // If this request WAS the auto-retry after a dropped stream, the server
+        // kept the 60s lock on purpose — ride it out and retry once more instead
+        // of dumping a countdown on a user who just lost a generation.
+        if (retryCountRef.current > 0 && wait <= 60) {
+          trackError("rate_limited_retry_wait", { wait });
+          retryTimerRef.current = setTimeout(() => createRef.current?.(), (wait + 1) * 1000);
+          setLoadingMsgIdx(0);
+          return;
+        }
+        trackError("rate_limited", { wait }); setError(`rate:${wait}`); return;
+      }
       if (code === "ai_overloaded") { trackError("ai_overloaded"); setError("generic:השרת עמוס כרגע — נסי שוב בעוד דקה 🙏"); return; }
       if (code === "ai_timeout")    { trackError("ai_timeout", { inapp: useNoStream }); setError(useNoStream
         ? "generic:הייצור ארוך מדי לדפדפן של פייסבוק — פתחי בדפדפן (הכפתור למעלה) או בחרי פחות עמודים 🙏"
@@ -1231,23 +1247,28 @@ export default function Create({ onSaved, remaining, isPro, active = true, bookl
           {!isPro && <p className="text-[10px] text-ink/30 mt-1 text-center">חוברות גדולות יותר (5–10 עמ') זמינות בתוכנית בתשלום</p>}
         </div>}
 
-        {/* Answer key toggle — hidden in quick mode */}
+        {/* Answer key toggle — hidden in quick mode; a PAID selling point, so
+            free users see it locked (tapping opens the upgrade offer) */}
         {mode !== "quick" && (
           <div className="flex items-center justify-between gap-3">
             <div>
-              <span className="text-sm font-medium text-ink">מפתח תשובות</span>
-              <span className="text-xs text-ink/40 mr-2">דף תשובות בסוף החוברת</span>
+              <span className="text-sm font-medium text-ink">מפתח תשובות {!isPro && "🔒"}</span>
+              <span className="text-xs text-ink/40 mr-2">{isPro ? "דף תשובות בסוף החוברת" : "זמין בתוכנית בתשלום"}</span>
             </div>
             <button
               type="button"
               role="switch"
-              aria-checked={withAnswerKey}
+              aria-checked={isPro && withAnswerKey}
               aria-label="מפתח תשובות"
-              onClick={() => !loading && setWithAnswerKey(v => !v)}
+              onClick={() => {
+                if (loading) return;
+                if (!isPro) { track("upgrade_intent_clicked", { source: "answer_key_toggle" }); onUpgrade?.(); return; }
+                setWithAnswerKey(v => !v);
+              }}
               disabled={loading}
-              className={`relative w-11 h-6 rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-magic ${withAnswerKey ? "bg-magic" : "bg-ink/20"}`}
+              className={`relative w-11 h-6 rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-magic ${isPro && withAnswerKey ? "bg-magic" : "bg-ink/20"} ${!isPro ? "opacity-60" : ""}`}
             >
-              <div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all ${withAnswerKey ? "right-0.5" : "left-0.5"}`} />
+              <div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all ${isPro && withAnswerKey ? "right-0.5" : "left-0.5"}`} />
             </button>
           </div>
         )}

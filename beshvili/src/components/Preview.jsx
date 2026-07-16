@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { track } from "../hooks/useEvents";
+import { buildPrintHtml } from "../lib/printHtml";
 import { supabase } from "../lib/supabase";
 import { IS_INAPP, IS_ANDROID, openExternal } from "../lib/inapp";
 
@@ -72,67 +73,9 @@ export default function Preview({ html, onReset, shareToken, title, active = tru
   const scaledW = Math.round(A4_PX * scale);
   const scaledHeight = Math.round(iframeHeight * scale);
 
-  const getPrintHtml = () => {
-    let h = html.includes("@page")
-      ? html
-      : html.replace(
-          "</head>",
-          "<style>@page{size:A4;margin:0}*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}</style></head>"
-        );
-    // The generator often emits page-break-after on EVERY .page including the
-    // last one — printing then appends a blank trailing sheet (users see an
-    // empty page with just the footer/QR stamped on it). Neutralize the break
-    // on the last page; body margins are another blank-page source.
-    const lastPageFix =
-      '<style id="bsv-last-page-fix">@media print{' +
-      '.page:last-of-type,.page:last-child{page-break-after:auto!important;break-after:auto!important}' +
-      'body{margin:0!important;padding:0!important}' +
-      '}</style>';
-    if (!h.includes("bsv-last-page-fix")) {
-      h = h.includes("</head>") ? h.replace("</head>", lastPageFix + "</head>") : lastPageFix + h;
-    }
-    // The feedback loop: a small print-only QR pinned to the bottom-left corner
-    // of every printed sheet, linking to /f/{share_token} — whoever holds the
-    // page (parent/teacher/kid) scans and reports how it went in 10 seconds.
-    // That report feeds the dashboard and the corrective-booklet generator.
-    if (shareToken && !h.includes("bsv-feedback-qr")) {
-      const fUrl = `${window.location.origin}/f/${shareToken}`;
-      const qrImg = `https://api.qrserver.com/v1/create-qr-code/?size=120x120&margin=1&data=${encodeURIComponent(fUrl)}`;
-      const qrBlock =
-        '<div id="bsv-feedback-qr" style="display:none">' +
-          `<img src="${qrImg}" alt="" style="width:13mm;height:13mm;display:block"/>` +
-          '<span style="font-size:6.5px;color:#9ca3af;display:block;text-align:center;line-height:1.25;margin-top:0.5mm">סרקו —<br/>איך הלך?</span>' +
-        '</div>' +
-        '<style>@media print{#bsv-feedback-qr{display:block!important;position:fixed;bottom:4mm;left:5mm;z-index:9999;width:14mm}}</style>';
-      // Inject at the START of <body>, never the end: appended trailing elements
-      // break the generator's `.page:last-child{page-break-after:avoid}` rule and
-      // print gains a blank final sheet. Position:fixed renders it regardless.
-      h = /<body[^>]*>/i.test(h) ? h.replace(/(<body[^>]*>)/i, `$1${qrBlock}`) : qrBlock + h;
-    }
-    // Flow-type worksheets (e.g. Jewish-studies materials) lay each page out with
-    // `.page{min-height:296mm}`. When a page's content is taller than A4 it overflows
-    // onto a second physical sheet, leaving a big gap and an awkward mid-content split
-    // in the saved PDF. For those ONLY, let the content flow and fill each sheet,
-    // breaking between questions/tables. Magazine booklets use fixed `height` +
-    // `overflow:hidden` pages (no min-height) and are intentionally left untouched.
-    if (/\.page\s*\{[^}]*\bmin-height\s*:/i.test(h)) {
-      const flow =
-        '<style id="bsv-print-flow">@media print{' +
-        // Reserve a 20mm bottom band on every sheet for the pinned attribution footer.
-        '@page{size:A4;margin:12mm 12mm 20mm 12mm}' +
-        '.page{min-height:0!important;height:auto!important;padding:0!important;margin:0!important;box-shadow:none!important;page-break-after:auto!important}' +
-        '.q-row,table,tr,thead,tbody,.info-box,.rule-box,blockquote,.header-bar,.checkbox-row{break-inside:avoid!important;page-break-inside:avoid!important}' +
-        '.section-title{break-after:avoid!important;page-break-after:avoid!important}' +
-        // The attribution footer (QR + "נוצר עם beshvili.com") is authored as an
-        // absolutely-positioned element on the last page. Once the page height is
-        // auto (above), `bottom` no longer reaches the sheet bottom, so it floated
-        // mid-content. Pin it to the bottom of every printed sheet instead.
-        '.page div[style*="bottom:4mm"]{position:fixed!important;bottom:5mm!important;left:0!important;right:0!important}' +
-        '}</style>';
-      h = h.includes("</head>") ? h.replace("</head>", flow + "</head>") : flow + h;
-    }
-    return h;
-  };
+  // Shared with PublicBooklet (/b/:token) so every print fix applies to shared
+  // links too — see src/lib/printHtml.js.
+  const getPrintHtml = () => buildPrintHtml(html, shareToken);
 
   // Standalone viewer used whenever the booklet opens in its OWN browser tab
   // (mobile "save as PDF" + the "full screen" button). Two screen-only tweaks —
@@ -150,9 +93,6 @@ export default function Preview({ html, onReset, shareToken, title, active = tru
     h = /<meta\s+name=["']viewport["'][^>]*>/i.test(h)
       ? h.replace(/<meta\s+name=["']viewport["'][^>]*>/i, viewport)
       : h.replace(/<head>/i, `<head>${viewport}`);
-    // Drop the generator's own inline print button so the toolbar is the single
-    // source of truth (avoids two "print" buttons).
-    h = h.replace(/<button[^>]*onclick=["']window\.print\(\)["'][^>]*>[\s\S]*?<\/button>/i, "");
     const bar =
       '<div class="no-print" style="position:fixed;top:0;left:0;right:0;z-index:99999;display:flex;gap:8px;justify-content:center;align-items:center;padding:8px;background:rgba(255,255,255,.97);box-shadow:0 1px 8px rgba(0,0,0,.12);direction:rtl;font-family:Assistant,Arial,sans-serif">' +
         '<button onclick="window.print()" style="background:#1FB58F;color:#fff;border:none;border-radius:10px;padding:10px 18px;font-size:15px;font-weight:700;cursor:pointer">🖨️ הדפס / שמור PDF</button>' +
