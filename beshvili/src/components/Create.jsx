@@ -1245,6 +1245,7 @@ export default function Create({ onSaved, remaining, isPro, plan = "free", activ
             })}
           </div>
           {!isPro && <p className="text-[10px] text-ink/30 mt-1 text-center">חוברות גדולות יותר (5–10 עמ') זמינות בתוכנית בתשלום</p>}
+          {isPro && <p className="text-[10px] text-grow/70 mt-1 text-center">💡 המכסה נספרת בחוברות, לא בעמודים — חוברת של 20 עמודים = חוברת אחת מהמכסה</p>}
         </div>}
 
         {/* Answer key toggle — hidden in quick mode; a PAID selling point, so
