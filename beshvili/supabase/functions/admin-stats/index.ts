@@ -1,6 +1,9 @@
-// redeploy marker v2 — force a fresh bundle: the live worker was returning 503
-// on every request (incl. OPTIONS) with deployment_id:null = a stale/corrupt
-// deployment the CLI kept skipping as "No change found".
+// redeploy marker v3 — force a fresh bundle: the corrupt-deployment symptom
+// returned on 2026-07-16 (browser calls fail with no response at all while
+// server-side POSTs from the daily-report cron return 200 in ~4s). Same
+// signature as v2: a stale worker 503s everything incl. OPTIONS, so the
+// browser preflight dies and supabase-js surfaces the opaque "Failed to send
+// a request". Bumping this comment is what forces the CLI to actually ship.
 import { createClient } from "jsr:@supabase/supabase-js@2";
 
 function getCors(req: Request) {

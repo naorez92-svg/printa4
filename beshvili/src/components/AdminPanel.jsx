@@ -159,10 +159,24 @@ export default function AdminPanel() {
       }
       let detail = "";
       try { detail = (await err.context?.json?.())?.detail || ""; } catch { /* not JSON */ }
+      // Probe the function with a plain GET (a "simple request" — no CORS
+      // preflight): a live worker answers it (401), a dead/corrupt deployment
+      // throws. Turns the opaque "לא הגיב" into an actual diagnosis.
+      let diag = "";
+      if (isFetch && !detail) {
+        try {
+          const r = await fetch(`${import.meta.env.VITE_SUPABASE_URL ?? "https://gywpdzkvkdisonuzhsib.supabase.co"}/functions/v1/admin-stats`);
+          diag = ` (אבחון: השרת חי — ענה ${r.status} — הבעיה בנתיב הדפדפן)`;
+        } catch {
+          diag = navigator.onLine
+            ? " (אבחון: הפונקציה לא מגיבה בכלל — דרושה פריסה מחדש)"
+            : " (אבחון: אין חיבור אינטרנט במכשיר)";
+        }
+      }
       setError(detail
         ? `שגיאת שרת: ${detail}`
         : isFetch
-          ? "השרת לא הגיב אחרי כמה ניסיונות (ייתכן עומס רגעי) — נסי שוב 🔄"
+          ? `השרת לא הגיב אחרי כמה ניסיונות — נסי שוב 🔄${diag}`
           : err.message);
     } else {
       setData(res);

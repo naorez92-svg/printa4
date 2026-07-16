@@ -106,6 +106,31 @@ jobs:
             -d '{"test":true}')
           echo "Status: $S3  Body: $(cat /tmp/body3.txt)"
 
+          echo "=== admin-stats Test 1: OPTIONS preflight (exact browser path) ==="
+          S4=$(curl -s -o /tmp/as-pre.txt -w "%{http_code}" -X OPTIONS \
+            "https://gywpdzkvkdisonuzhsib.supabase.co/functions/v1/admin-stats" \
+            -H "Origin: https://www.beshvili.com" \
+            -H "Access-Control-Request-Method: POST" \
+            -H "Access-Control-Request-Headers: authorization, x-client-info, apikey, content-type")
+          echo "Status: $S4  Body: $(head -c 200 /tmp/as-pre.txt)"
+
+          echo "=== admin-stats Test 2: POST with service key (timed) ==="
+          S5=$(curl -s -o /tmp/as-post.txt -w "%{http_code} time=%{time_total}s" --max-time 90 -X POST \
+            "https://gywpdzkvkdisonuzhsib.supabase.co/functions/v1/admin-stats" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
+            -H "Origin: https://www.beshvili.com" \
+            -H "Content-Type: application/json" -d '{}')
+          # Status + size only — the body holds user emails and this log is public.
+          echo "Status: $S5  BodyBytes: $(wc -c < /tmp/as-post.txt)"
+
+          # A dead admin-stats worker must fail the deploy loudly — this is the
+          # recurring corrupt-deployment failure (503 on OPTIONS kills the
+          # browser preflight and the admin panel shows "השרת לא הגיב").
+          if [ "$S4" != "200" ]; then
+            echo "::error::admin-stats OPTIONS preflight returned $S4 — deployment is broken for browsers"
+            exit 1
+          fi
+
       - name: Done
         run: echo "✅ Edge Function deployed!"
 
