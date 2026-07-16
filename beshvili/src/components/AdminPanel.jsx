@@ -1119,6 +1119,9 @@ export default function AdminPanel() {
         {unsubResult && <p className={`text-xs mt-2 font-medium ${unsubResult.startsWith("✓") ? "text-grow" : "text-red-500"}`}>{unsubResult}</p>}
       </div>
 
+      {/* Manual plan activation — any email, even without a lead row */}
+      <ActivatePlanCard />
+
       {/* User search */}
       <div className="bg-white rounded-2xl p-4 border border-ink/5 shadow-sm">
         <h3 className="font-bold text-ink mb-1 text-sm">🔍 חיפוש משתמש לפי מייל</h3>
@@ -1192,9 +1195,69 @@ export default function AdminPanel() {
   );
 }
 
+function ActivatePlanCard() {
+  const [email, setEmail] = useState("");
+  const [plan, setPlan] = useState("teacher");
+  const [state, setState] = useState("idle"); // idle | sending | done | error
+  const [result, setResult] = useState("");
+
+  const activate = async () => {
+    const e = email.trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e) || state === "sending") return;
+    if (!confirm(`להפעיל מנוי ${plan === "teacher" ? "מורה (₪59)" : plan === "parent" ? "הורה (₪19)" : plan} עבור ${e}?`)) return;
+    setState("sending");
+    setResult("");
+    try {
+      const { data: res, error } = await supabase.functions.invoke("admin-set-plan", { body: { email: e, plan } });
+      if (error || !res?.ok) {
+        const code = res?.error || error?.message || "";
+        throw new Error(code.includes("user_not_found") || code.includes("404") ? "לא נמצא משתמש עם המייל הזה" : "ההפעלה נכשלה — נסה שוב");
+      }
+      setState("done");
+      setResult(`✓ ${e} הופעל/ה כ${plan === "teacher" ? "מורה" : plan === "parent" ? "הורה" : plan}${res.emailed ? " · מייל אישור נשלח 🎉" : ""}`);
+      setEmail("");
+    } catch (err) {
+      setState("error");
+      setResult(String(err.message));
+    }
+  };
+
+  return (
+    <div className="bg-white rounded-2xl p-4 border-2 border-grow/25 shadow-sm">
+      <h3 className="font-bold text-ink mb-1 text-sm">⚡ הפעלת מנוי (אחרי תשלום)</h3>
+      <p className="text-xs text-ink/40 mb-3">קיבלת ביט? הזן את המייל של הלקוח/ה — המנוי יופעל ומייל אישור יישלח אוטומטית.</p>
+      <div className="flex gap-2 flex-wrap">
+        <input
+          type="email" dir="ltr"
+          value={email}
+          onChange={(e) => { setEmail(e.target.value); if (state !== "idle") setState("idle"); }}
+          onKeyDown={(e) => e.key === "Enter" && activate()}
+          placeholder="customer@email.com"
+          className="flex-1 min-w-[180px] border border-ink/15 rounded-xl px-3 py-2 text-sm outline-none focus:border-grow"
+        />
+        <select value={plan} onChange={(e) => setPlan(e.target.value)}
+          className="border border-ink/15 rounded-xl px-2 py-2 text-sm bg-white outline-none focus:border-grow">
+          <option value="teacher">מורה ₪59</option>
+          <option value="parent">הורה ₪19</option>
+          <option value="free">חינם (ביטול)</option>
+        </select>
+        <button
+          onClick={activate}
+          disabled={state === "sending" || !email.trim()}
+          className="bg-grow text-white text-sm font-semibold px-4 py-2 rounded-xl hover:opacity-90 transition-opacity disabled:opacity-40"
+        >
+          {state === "sending" ? "מפעיל…" : "⚡ הפעל"}
+        </button>
+      </div>
+      {result && <p className={`text-xs mt-2 font-medium ${state === "done" ? "text-grow" : "text-red-500"}`}>{result}</p>}
+    </div>
+  );
+}
+
 function LeadsCard({ leads, fmt }) {
-  // Per-lead send state: idle | sending | sent | failed (keyed by email+index)
+  // Per-lead action state: idle | sending | sent | failed (keyed by email+index)
   const [sendState, setSendState] = useState({});
+  const [activateState, setActivateState] = useState({});
 
   const sendInstructions = async (key, l) => {
     if (!l.email || sendState[key] === "sending" || sendState[key] === "sent") return;
@@ -1208,6 +1271,23 @@ function LeadsCard({ leads, fmt }) {
     } catch {
       setSendState(s => ({ ...s, [key]: "failed" }));
       setTimeout(() => setSendState(s => ({ ...s, [key]: "idle" })), 3000);
+    }
+  };
+
+  const activatePlan = async (key, l) => {
+    if (!l.email || activateState[key] === "sending" || activateState[key] === "sent") return;
+    const plan = l.plan && l.plan !== "compass" ? l.plan : "teacher";
+    if (!confirm(`להפעיל מנוי ${plan === "teacher" ? "מורה" : plan === "parent" ? "הורה" : plan} עבור ${l.email}?\nהלקוח/ה יקבל/תקבל מייל אישור.`)) return;
+    setActivateState(s => ({ ...s, [key]: "sending" }));
+    try {
+      const { data: res, error } = await supabase.functions.invoke("admin-set-plan", {
+        body: { email: l.email, plan },
+      });
+      if (error || !res?.ok) throw new Error(error?.message || "failed");
+      setActivateState(s => ({ ...s, [key]: "sent" }));
+    } catch {
+      setActivateState(s => ({ ...s, [key]: "failed" }));
+      setTimeout(() => setActivateState(s => ({ ...s, [key]: "idle" })), 3000);
     }
   };
 
@@ -1248,6 +1328,22 @@ function LeadsCard({ leads, fmt }) {
                   </div>
                 </div>
                 <div className="flex gap-1.5 flex-shrink-0 flex-wrap">
+                  {l.email && (() => {
+                    const at = activateState[key] ?? "idle";
+                    return (
+                      <button
+                        onClick={() => activatePlan(key, l)}
+                        disabled={at === "sending" || at === "sent"}
+                        className={`text-xs px-3 py-1.5 rounded-lg font-semibold transition-all ${
+                          at === "sent" ? "bg-grow text-white cursor-default"
+                          : at === "failed" ? "bg-red-50 text-red-600"
+                          : "bg-grow/15 text-grow border border-grow/30 hover:bg-grow/25 disabled:opacity-60"
+                        }`}
+                      >
+                        {at === "sending" ? "מפעיל…" : at === "sent" ? "✓ המנוי פעיל" : at === "failed" ? "נכשל — נסה שוב" : "⚡ שולם — הפעל מנוי"}
+                      </button>
+                    );
+                  })()}
                   {l.email && (
                     <button
                       onClick={() => sendInstructions(key, l)}
