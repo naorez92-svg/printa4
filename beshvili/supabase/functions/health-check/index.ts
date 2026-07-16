@@ -93,6 +93,30 @@ Deno.serve(async (req) => {
     pass("stream_error_rate", "insufficient data — less than 5 attempts in last 2h");
   }
 
+  // ── 4. admin-stats worker liveness (browser preflight path) ──────────────
+  // The admin panel died twice on 2026-07-16 with the opaque "Failed to send a
+  // request" while server-side POSTs kept returning 200 — the documented
+  // corrupt-deployment state where a stale worker 503s everything including
+  // OPTIONS, killing the browser's CORS preflight. Probe that exact path every
+  // run so a dead worker opens an issue within 2h instead of waiting for the
+  // admin to hit it.
+  try {
+    const r = await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/admin-stats`, {
+      method: "OPTIONS",
+      headers: {
+        "Origin": "https://www.beshvili.com",
+        "Access-Control-Request-Method": "POST",
+        "Access-Control-Request-Headers": "authorization, x-client-info, apikey, content-type",
+      },
+      signal: AbortSignal.timeout(10_000),
+    });
+    await r.body?.cancel();
+    if (r.ok) pass("admin_stats_reachable", `OPTIONS ${r.status}`);
+    else fail("admin_stats_reachable", `OPTIONS returned ${r.status} — corrupt deployment; force a redeploy of admin-stats (bump its marker comment)`);
+  } catch (e) {
+    fail("admin_stats_reachable", `OPTIONS threw ${(e as Error)?.name ?? "error"} — worker not responding; force a redeploy of admin-stats`);
+  }
+
   const result = { ok: allOk, checks, ts: new Date().toISOString() };
   return new Response(JSON.stringify(result, null, 2), {
     status: allOk ? 200 : 500,

@@ -22,20 +22,22 @@ jobs:
             -H "Content-Type: application/json" \
             -d '{"generateProposals":true}')
           HTTP_CODE=$(echo "$RESPONSE" | tail -1)
-          BODY=$(echo "$RESPONSE" | head -n -1)
+          # Hand the body to the next step via a FILE, not a step output/env var:
+          # the repo is public and actions/github-script echoes its env block
+          # into the (public) run log — which was printing every customer email
+          # in recentUsers/recentLeads for anyone to read.
+          echo "$RESPONSE" | head -n -1 > /tmp/stats.json
           echo "http_code=$HTTP_CODE" >> $GITHUB_OUTPUT
-          echo "body<<EOF" >> $GITHUB_OUTPUT
-          echo "$BODY" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+          echo "Fetched stats: HTTP $HTTP_CODE ($(wc -c < /tmp/stats.json) bytes)"
 
       - name: Create daily report issue
         uses: actions/github-script@v7
         env:
-          STATS_BODY: ${{ steps.stats.outputs.body }}
           HTTP_CODE: ${{ steps.stats.outputs.http_code }}
         with:
           script: |
-            const raw = process.env.STATS_BODY || '{}';
+            let raw = '{}';
+            try { raw = require('fs').readFileSync('/tmp/stats.json', 'utf8'); } catch {}
             const httpCode = process.env.HTTP_CODE;
             let s = {};
             try { s = JSON.parse(raw); } catch {}
@@ -74,8 +76,10 @@ jobs:
               .map(f => `- ${f.message.substring(0, 80)}`)
               .join('\n') || '_אין פידבק חדש_';
 
+            // Issues in a public repo are public — mask the phone so customer
+            // PII isn't published. Full details live in the admin panel.
             const leadLines = (s.recentLeads || []).slice(0, 5)
-              .map(l => `- ${l.name || 'ללא שם'} · ${l.phone || '—'}`)
+              .map(l => `- ${l.name || 'ללא שם'} · ${l.phone ? '···' + String(l.phone).slice(-3) : '—'}`)
               .join('\n') || '_אין לידים חדשים_';
 
             // Business funnel (7-day windows from admin-stats)
