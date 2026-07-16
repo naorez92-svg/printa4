@@ -76,6 +76,9 @@ const USER_TABLE_HEAD = (
 
 // P&L constants
 const PLAN_PRICE          = { parent: 19, teacher: 59, pro: 30 };
+// First-calendar-month sale prices (the מבצע in UpgradeModal) — what a new
+// subscriber ACTUALLY pays this month; full price applies from renewal.
+const SALE_PRICE          = { parent: 9, teacher: 29 };
 const COST_PER_BOOKLET_NIS = 0.65;
 const SUPABASE_MONTHLY_NIS = 0;
 const VERCEL_MONTHLY_NIS   = 0;
@@ -293,11 +296,33 @@ export default function AdminPanel() {
   );
   if (!data)   return null;
 
-  // P&L
-  const revenueLines = Object.entries(data.planBreakdown ?? {})
-    .filter(([plan]) => PLAN_PRICE[plan] != null)
-    .map(([plan, count]) => ({ plan, count, price: PLAN_PRICE[plan], total: count * PLAN_PRICE[plan] }));
+  // P&L — price each subscriber by what they ACTUALLY pay this month: the
+  // first calendar month is the sale price (מבצע), full price from renewal.
+  const now = new Date();
+  const isFirstMonth = (proSince) => {
+    if (!proSince) return false;
+    const d = new Date(proSince);
+    return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
+  };
+  const paidProfiles = data.paidProfiles
+    ?? Object.entries(data.planBreakdown ?? {})
+      .filter(([plan]) => PLAN_PRICE[plan] != null)
+      .flatMap(([plan, count]) => Array.from({ length: count }, () => ({ plan, pro_since: null })));
+  const lineMap = {};
+  for (const p of paidProfiles) {
+    if (PLAN_PRICE[p.plan] == null) continue;
+    const firstMonth = isFirstMonth(p.pro_since);
+    const price = firstMonth ? (SALE_PRICE[p.plan] ?? PLAN_PRICE[p.plan]) : PLAN_PRICE[p.plan];
+    const key = `${p.plan}|${firstMonth ? "sale" : "full"}`;
+    lineMap[key] ??= { plan: p.plan, firstMonth, price, count: 0, total: 0, fullTotal: 0 };
+    lineMap[key].count += 1;
+    lineMap[key].total += price;
+    lineMap[key].fullTotal += PLAN_PRICE[p.plan];
+  }
+  const revenueLines = Object.values(lineMap);
   const totalMRR     = revenueLines.reduce((s, r) => s + r.total, 0);
+  // What the same subscribers are worth from next month (post-sale renewals).
+  const nextMonthMRR = revenueLines.reduce((s, r) => s + r.fullTotal, 0);
   const apiCostNIS   = (data.bookletsThisMonth ?? 0) * COST_PER_BOOKLET_NIS;
   const fixedCostNIS = SUPABASE_MONTHLY_NIS + VERCEL_MONTHLY_NIS;
   const totalCostNIS = apiCostNIS + fixedCostNIS;
@@ -847,18 +872,24 @@ export default function AdminPanel() {
         <h3 className="font-bold text-ink mb-3 text-sm">💰 כלכלה — חודש נוכחי</h3>
         <div className="space-y-1.5 mb-3">
           {revenueLines.length === 0 && <p className="text-xs text-ink/30">אין מנויים פעילים עדיין</p>}
-          {revenueLines.map(({ plan, count, price, total }) => (
-            <div key={plan} className="flex justify-between items-center text-xs">
+          {revenueLines.map(({ plan, firstMonth, count, price, total }) => (
+            <div key={`${plan}-${firstMonth}`} className="flex justify-between items-center text-xs">
               <span className="text-ink/50">
-                {plan === "teacher" ? "מורה" : plan === "parent" ? "הורה" : "פרו (ישן)"} × {count} ({price} ₪)
+                {plan === "teacher" ? "מורה" : plan === "parent" ? "הורה" : "פרו (ישן)"} × {count} ({price} ₪{firstMonth ? " — מבצע חודש ראשון" : ""})
               </span>
               <span className="font-semibold text-grow">+{total} ₪</span>
             </div>
           ))}
           <div className="flex justify-between items-center text-sm border-t border-ink/5 pt-1.5">
-            <span className="font-bold text-ink">הכנסות (MRR)</span>
+            <span className="font-bold text-ink">הכנסות החודש (בפועל)</span>
             <span className="font-bold text-grow">+{totalMRR} ₪</span>
           </div>
+          {nextMonthMRR > totalMRR && (
+            <div className="flex justify-between items-center text-[11px]">
+              <span className="text-ink/40">📈 מהחודש הבא (מחיר מלא בחידוש)</span>
+              <span className="font-semibold text-magic">+{nextMonthMRR} ₪</span>
+            </div>
+          )}
         </div>
         <div className="space-y-1.5 mb-3">
           <div className="flex justify-between items-center text-xs">

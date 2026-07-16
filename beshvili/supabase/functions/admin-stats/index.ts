@@ -98,7 +98,7 @@ Deno.serve(async (req) => {
     admin.from("booklets").select("*", { count: "exact", head: true }).gte("created_at", weekAgo),
     admin.from("booklets").select("*", { count: "exact", head: true }).gte("created_at", todayStart),
     admin.from("booklets").select("*", { count: "exact", head: true }).gte("created_at", monthStart),
-    admin.from("profiles").select("id, plan, full_name, created_at, followup_sent_at"),
+    admin.from("profiles").select("id, plan, full_name, created_at, followup_sent_at, pro_since"),
     admin.from("feedback").select("message, created_at, user_id").order("created_at", { ascending: false }).limit(15),
     admin.from("leads").select("user_id, name, phone, email, plan, method, created_at").order("created_at", { ascending: false }).limit(15),
     admin.from("booklets").select("user_id, created_at"),
@@ -718,6 +718,11 @@ Deno.serve(async (req) => {
     bookletsToday:     bookletsToday ?? 0,
     bookletsThisMonth: bookletsThisMonth ?? 0,
     planBreakdown,
+    // Paid subscribers with activation date — lets the client price the FIRST
+    // month at the sale price (₪29/₪9) instead of assuming everyone pays full.
+    paidProfiles: (allProfiles ?? [])
+      .filter((p) => ["teacher", "parent", "pro"].includes(p.plan))
+      .map((p) => ({ plan: p.plan, pro_since: p.pro_since ?? null })),
     topTopics,
     recentUsers,
     searchResults,
