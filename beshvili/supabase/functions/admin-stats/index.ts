@@ -89,6 +89,7 @@ Deno.serve(async (req) => {
     { data: allBookletUserIds },
     { data: allBookletRows },
     { data: lifecycleEvents },
+    { data: monthlyCompletions },
     { count: profilesCount },
     { data: emailLogs },
     { data: surveyRows },
@@ -109,6 +110,11 @@ Deno.serve(async (req) => {
     admin.from("events").select("event, user_id, metadata, created_at")
       .in("event", ["booklet_started", "booklet_error"])
       .gte("created_at", fourteenDaysAgo).order("created_at", { ascending: false }).limit(8000),
+    // Completions this month with page counts — powers the per-paying-customer
+    // API-cost view (are any subscribers costing more than they pay?).
+    admin.from("events").select("user_id, event, metadata")
+      .in("event", ["booklet_completed", "jewish_completed"])
+      .gte("created_at", monthStart).limit(4000),
     // Accurate total-user count (one profile row per user) — listUsers caps at
     // 1000, so the headline number must come from a COUNT, not the capped list.
     admin.from("profiles").select("*", { count: "exact", head: true }),
@@ -723,6 +729,32 @@ Deno.serve(async (req) => {
     paidProfiles: (allProfiles ?? [])
       .filter((p) => ["teacher", "parent", "pro"].includes(p.plan))
       .map((p) => ({ plan: p.plan, pro_since: p.pro_since ?? null })),
+    // Per-paying-customer economics this month: pages generated → estimated
+    // API cost vs. plan price. The unit-economics early-warning ("is anyone
+    // costing more than they pay?") before it shows up on the Anthropic bill.
+    paidUsage: (() => {
+      const pagesByUser: Record<string, number> = {};
+      (monthlyCompletions ?? []).forEach((e: { user_id: string | null; metadata: Record<string, unknown> | null }) => {
+        if (!e.user_id) return;
+        const pages = Number(e.metadata?.pages ?? e.metadata?.pageCount ?? 0) || 2;
+        pagesByUser[e.user_id] = (pagesByUser[e.user_id] ?? 0) + pages;
+      });
+      const COST_PER_PAGE_NIS = 0.2; // ≈ the observed ₪0.65/avg-3-page-booklet
+      const PRICE: Record<string, number> = { teacher: 59, parent: 19, pro: 30 };
+      return (allProfiles ?? [])
+        .filter((p) => ["teacher", "parent", "pro"].includes(p.plan))
+        .map((p) => {
+          const pages = pagesByUser[p.id] ?? 0;
+          const costNIS = Math.round(pages * COST_PER_PAGE_NIS * 10) / 10;
+          return {
+            email: users.find((u) => u.id === p.id)?.email ?? null,
+            plan: p.plan,
+            pages,
+            costNIS,
+            priceNIS: PRICE[p.plan] ?? 0,
+          };
+        });
+    })(),
     topTopics,
     recentUsers,
     searchResults,
