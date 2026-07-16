@@ -907,6 +907,28 @@ export default function AdminPanel() {
             <span className="font-bold text-red-400">−{totalCostNIS.toFixed(1)} ₪</span>
           </div>
         </div>
+        {/* Unit economics per paying customer — the early warning that a
+            subscriber costs more in API than they pay, before the bill says so */}
+        {data.paidUsage?.length > 0 && (
+          <div className="mb-3 space-y-1">
+            <p className="text-[11px] font-semibold text-ink/50">לקוחות משלמות — עלות מול הכנסה החודש</p>
+            {data.paidUsage.map((u, i) => {
+              const ratio = u.priceNIS > 0 ? u.costNIS / u.priceNIS : 0;
+              const health = ratio > 0.5 ? "🔴" : ratio > 0.3 ? "🟡" : "💚";
+              return (
+                <div key={i} className="flex justify-between items-center text-xs bg-canvas rounded-lg px-2.5 py-1.5">
+                  <span className="text-ink/60 truncate max-w-[55%]" dir="ltr">{u.email ?? "—"}</span>
+                  <span className="text-ink/50 whitespace-nowrap">
+                    {u.pages} עמ' · ~{u.costNIS}₪ / {u.priceNIS}₪ {health}
+                  </span>
+                </div>
+              );
+            })}
+            {data.paidUsage.some(u => u.priceNIS > 0 && u.costNIS / u.priceNIS > 0.5) && (
+              <p className="text-[10px] text-red-500">🔴 = עלות API מעל 50% מהמחיר — אם זה דפוס חוזר, לשקול התאמת תמחור</p>
+            )}
+          </div>
+        )}
         <div className={`flex justify-between items-center rounded-xl px-3 py-2 ${netProfitNIS >= 0 ? "bg-grow/10" : "bg-red-50"}`}>
           <span className="font-bold text-sm text-ink">רווח נקי</span>
           <span className={`font-bold text-lg ${netProfitNIS >= 0 ? "text-grow" : "text-red-500"}`}>
