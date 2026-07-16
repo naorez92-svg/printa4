@@ -35,15 +35,21 @@ Deno.serve(async (req) => {
     { auth: { persistSession: false } }
   );
 
-  // Verify caller: must be an admin-plan user (JWT verified by Supabase)
+  // Verify caller: an admin-plan user (JWT verified by Supabase), OR the
+  // service-role key itself — the server-to-server path used by the daily
+  // report cron (it was getting 401 every morning because auth.getUser()
+  // rejects the service key, which is not a user JWT).
   const jwt = req.headers.get("authorization")?.replace("Bearer ", "");
   if (!jwt) return new Response(JSON.stringify({ error: "unauthorized" }), { status: 401, headers: cors });
 
-  const { data: { user }, error: authErr } = await admin.auth.getUser(jwt);
-  if (authErr || !user) return new Response(JSON.stringify({ error: "unauthorized" }), { status: 401, headers: cors });
-  const { data: callerProfile } = await admin.from("profiles").select("plan").eq("id", user.id).single();
-  if (callerProfile?.plan !== "admin") {
-    return new Response(JSON.stringify({ error: "forbidden" }), { status: 403, headers: cors });
+  const isServiceCall = jwt === Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  if (!isServiceCall) {
+    const { data: { user }, error: authErr } = await admin.auth.getUser(jwt);
+    if (authErr || !user) return new Response(JSON.stringify({ error: "unauthorized" }), { status: 401, headers: cors });
+    const { data: callerProfile } = await admin.from("profiles").select("plan").eq("id", user.id).single();
+    if (callerProfile?.plan !== "admin") {
+      return new Response(JSON.stringify({ error: "forbidden" }), { status: 403, headers: cors });
+    }
   }
 
   // Parse body for flags
