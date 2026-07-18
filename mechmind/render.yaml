@@ -1,0 +1,36 @@
+# Render Blueprint ל-MechMind — backend (Docker) + frontend (static).
+# פרוס דרך: Render Dashboard → New → Blueprint → הצבע על הריפו/הענף.
+services:
+  - type: web
+    name: mechmind-backend
+    runtime: docker
+    dockerfilePath: ./mechmind/Dockerfile
+    dockerContext: ./mechmind
+    plan: starter
+    healthCheckPath: /health
+    envVars:
+      - key: ANTHROPIC_API_KEY
+        sync: false            # הזן ידנית ב-Dashboard — לעולם לא בקוד
+      - key: MECHMIND_MODEL
+        value: claude-sonnet-5
+      - key: CORS_ORIGINS
+        sync: false            # כתובת ה-frontend, למשל https://mechmind.onrender.com
+      - key: RATE_LIMIT_SECONDS
+        value: "15"
+    disk:
+      name: mechmind-data
+      mountPath: /app/data     # שמירת ה-SQLite בין פריסות
+      sizeGB: 1
+
+  - type: web
+    name: mechmind-frontend
+    runtime: static
+    buildCommand: cd mechmind/frontend && npm ci && npm run build
+    staticPublishPath: ./mechmind/frontend/dist
+    envVars:
+      - key: VITE_API_URL
+        sync: false            # כתובת ה-backend, למשל https://mechmind-backend.onrender.com
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
