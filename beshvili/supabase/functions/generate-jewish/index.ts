@@ -441,10 +441,16 @@ ${notes ? `הוראות נוספות מהמורה: ${esc(notes)}` : ""}
       let contentChars = 0;  // actual HTML delivered — refund decisions (client salvage bar: 6000)
       let clientGone = false; // w.write failed → the CLIENT disconnected (not Anthropic)
       try {
-        const ANTHROPIC_BODY = JSON.stringify({
+        // 8+ page requests can't finish at standard output speed inside the
+        // 270s fetch cap (~100 tok/s ≈ 27k tokens ≈ 8-9 pages) — use Opus 4.8
+        // fast mode so the full budget completes in time. Same rationale and
+        // fallback as generate-booklet.
+        const useFastSpeed = effPages >= 8;
+        const anthropicBody = (fastSpeed: boolean) => JSON.stringify({
           model: "claude-opus-4-8",
           max_tokens: maxTokens,
           stream: true,
+          ...(fastSpeed ? { speed: "fast" } : {}),
           system: [{ type: "text", text: JEWISH_SYSTEM, cache_control: { type: "ephemeral" } }],
           messages: [{ role: "user", content: userMsg }],
         });
@@ -453,6 +459,8 @@ ${notes ? `הוראות נוספות מהמורה: ${esc(notes)}` : ""}
         // Retry transient Anthropic overload (529/503/429) up to 3 attempts;
         // heartbeats keep the client alive through the backoffs.
         let anthropicResp: Response | null = null;
+        let fastSpeed = useFastSpeed;
+        let fastRetried = false;
         for (let attempt = 1; attempt <= 3; attempt++) {
           try {
             const r = await fetch("https://api.anthropic.com/v1/messages", {
@@ -462,11 +470,30 @@ ${notes ? `הוראות נוספות מהמורה: ${esc(notes)}` : ""}
                 "content-type": "application/json",
                 "x-api-key": apiKey,
                 "anthropic-version": "2023-06-01",
-                "anthropic-beta": "prompt-caching-2024-07-31",
+                "anthropic-beta": fastSpeed
+                  ? "prompt-caching-2024-07-31,fast-mode-2026-02-01"
+                  : "prompt-caching-2024-07-31",
               },
-              body: ANTHROPIC_BODY,
+              body: anthropicBody(fastSpeed),
             });
             if (r.ok) { anthropicResp = r; break; }
+            // 400 = fast-mode beta unavailable → drop to standard at once;
+            // 429 = retry once STILL fast (see generate-booklet), fall back
+            // only on the second one.
+            if (fastSpeed && r.status === 400 && attempt < 3) {
+              console.warn(`[generate-jewish] fast-mode 400, falling back to standard speed`);
+              fastSpeed = false;
+              await r.body?.cancel().catch(() => {});
+              await sleep(600);
+              continue;
+            }
+            if (fastSpeed && r.status === 429 && attempt < 3) {
+              if (fastRetried) fastSpeed = false; else fastRetried = true;
+              console.warn(`[generate-jewish] fast-mode 429, ${fastSpeed ? "retrying fast" : "falling back to standard"}`);
+              await r.body?.cancel().catch(() => {});
+              await sleep(1200 * attempt);
+              continue;
+            }
             if ((r.status === 529 || r.status === 503 || r.status === 429) && attempt < 3) {
               console.warn(`[generate-jewish] Anthropic ${r.status}, retry ${attempt}`);
               await r.body?.cancel().catch(() => {});

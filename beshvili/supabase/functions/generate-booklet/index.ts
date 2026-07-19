@@ -705,10 +705,20 @@ Deno.serve(async (req) => {
       let contentChars = 0;
       let clientGone = false; // w.write failed → the CLIENT disconnected (not Anthropic)
       try {
-        const ANTHROPIC_BODY = JSON.stringify({
+        // Long booklets physically can't finish at standard output speed: the
+        // Anthropic fetch is capped at 270s (Deno wall clock is 300s), and at
+        // the observed ~100 tok/s that yields ~27k tokens ≈ 8-9 rich pages —
+        // a 15-20 page request ALWAYS died mid-stream (the paying-teacher
+        // headline feature). Opus 4.8 fast mode streams up to 2.5× faster, so
+        // the full 64k budget (≈18-20 pages) completes in ~250s. Premium
+        // output pricing — enabled only where the booklet is otherwise
+        // impossible; per-customer cost is watched in the admin economics card.
+        const useFastSpeed = effPages >= 8;
+        const anthropicBody = (fastSpeed: boolean) => JSON.stringify({
           model: "claude-opus-4-8",
           max_tokens: maxTokens,
           stream: true,
+          ...(fastSpeed ? { speed: "fast" } : {}),
           system: [{ type: "text", text: activeSystem, cache_control: { type: "ephemeral" } }],
           messages: [{ role: "user", content: activeUserMsg }],
         });
@@ -720,6 +730,8 @@ Deno.serve(async (req) => {
         // invisible to the user. A real 270s timeout is NOT retried (it already
         // consumed the budget).
         let anthropicResp: Response | null = null;
+        let fastSpeed = useFastSpeed;
+        let fastRetried = false;
         for (let attempt = 1; attempt <= 3; attempt++) {
           try {
             const r = await fetch("https://api.anthropic.com/v1/messages", {
@@ -729,11 +741,35 @@ Deno.serve(async (req) => {
                 "content-type": "application/json",
                 "x-api-key": apiKey,
                 "anthropic-version": "2023-06-01",
-                "anthropic-beta": "prompt-caching-2024-07-31",
+                "anthropic-beta": fastSpeed
+                  ? "prompt-caching-2024-07-31,fast-mode-2026-02-01"
+                  : "prompt-caching-2024-07-31",
               },
-              body: ANTHROPIC_BODY,
+              body: anthropicBody(fastSpeed),
             });
             if (r.ok) { anthropicResp = r; break; }
+            // 400 with fast mode = the beta isn't available to this org —
+            // drop to standard speed immediately (a content-caused 400 will
+            // simply resurface there and be reported normally).
+            if (fastSpeed && r.status === 400 && attempt < 3) {
+              console.warn(`[generate-booklet] fast-mode 400, falling back to standard speed`);
+              fastSpeed = false;
+              await r.body?.cancel().catch(() => {});
+              await sleep(600);
+              continue;
+            }
+            // 429 with fast mode may be a transient blip OR the separate
+            // fast-mode rate limit: retry once STILL in fast mode (dropping it
+            // on the first 429 would force the long booklet onto standard
+            // speed, where it dies inside the 270s cap — the exact failure
+            // fast mode exists to prevent); fall back only on the second.
+            if (fastSpeed && r.status === 429 && attempt < 3) {
+              if (fastRetried) fastSpeed = false; else fastRetried = true;
+              console.warn(`[generate-booklet] fast-mode 429, ${fastSpeed ? "retrying fast" : "falling back to standard"}`);
+              await r.body?.cancel().catch(() => {});
+              await sleep(1200 * attempt);
+              continue;
+            }
             if ((r.status === 529 || r.status === 503 || r.status === 429) && attempt < 3) {
               console.warn(`[generate-booklet] Anthropic ${r.status}, retry ${attempt}`);
               await r.body?.cancel().catch(() => {});

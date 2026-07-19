@@ -228,7 +228,9 @@ export default function Create({ onSaved, remaining, isPro, plan = "free", activ
     })();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const create = useCallback(async () => {
+  // isAutoRetry: strict-true only when invoked by the auto-retry timers below —
+  // onClick passes a SyntheticEvent here, which must NOT read as a retry.
+  const create = useCallback(async (isAutoRetry = false) => {
     if (!canSubmit || creatingRef.current) return;
     // Block BEFORE anything is spent: in-app browsers (WhatsApp/Instagram/
     // Facebook webview) get a server-side 3-page cap, so a 4+ page request
@@ -249,7 +251,14 @@ export default function Create({ onSaved, remaining, isPro, plan = "free", activ
     setError(null);
     const effectiveWorld = f.world === "אחר" ? customWorld.trim() || "נושא חופשי" : f.world;
     const trackError = (type, extra = {}) => track("booklet_error", { type, mode, pageCount, ...extra });
-    track("booklet_started", { mode, goal: mode === "exam" ? examTopic : f.goal, grade: mode === "exam" ? examGrade : f.grade, world: mode === "exam" ? null : effectiveWorld, pageCount, withAnswerKey, photo: !!photoUrl });
+    // retry:true = an automatic re-attempt after a dropped stream — the admin
+    // reliability card excludes these so one flaky connection doesn't read as
+    // a 50% success rate when the user actually got their booklet. Manual
+    // clicks also RESET the auto-retry budget: without this, a retry that hit
+    // a terminal error left retryCountRef stuck at 1, silently tagging the
+    // user's next genuine attempt as a retry and denying it its own auto-retry.
+    if (isAutoRetry !== true) retryCountRef.current = 0;
+    track("booklet_started", { mode, goal: mode === "exam" ? examTopic : f.goal, grade: mode === "exam" ? examGrade : f.grade, world: mode === "exam" ? null : effectiveWorld, pageCount, withAnswerKey, photo: !!photoUrl, retry: isAutoRetry === true });
 
     // Ask for notification permission so we can alert when done (non-blocking)
     if ("Notification" in window && Notification.permission === "default") {
@@ -321,7 +330,7 @@ export default function Create({ onSaved, remaining, isPro, plan = "free", activ
         // retried create() bails at the canSubmit guard and the spinner freezes forever.
         setLoading(false);
         setStreamChars(0); setLoadingElapsed(0); setLoadingMsgIdx(0);
-        retryTimerRef.current = setTimeout(() => createRef.current?.(), 2000);
+        retryTimerRef.current = setTimeout(() => createRef.current?.(true), 2000);
         return;
       }
       netRetryRef.current = 0;
@@ -361,7 +370,7 @@ export default function Create({ onSaved, remaining, isPro, plan = "free", activ
         // of dumping a countdown on a user who just lost a generation.
         if (retryCountRef.current > 0 && wait <= 60) {
           trackError("rate_limited_retry_wait", { wait });
-          retryTimerRef.current = setTimeout(() => createRef.current?.(), (wait + 1) * 1000);
+          retryTimerRef.current = setTimeout(() => createRef.current?.(true), (wait + 1) * 1000);
           setLoadingMsgIdx(0);
           return;
         }
@@ -515,7 +524,7 @@ export default function Create({ onSaved, remaining, isPro, plan = "free", activ
         setLoadingMsgIdx(0);
         creatingRef.current = false;
         setLoading(false);
-        retryTimerRef.current = setTimeout(() => createRef.current?.(), 2000);
+        retryTimerRef.current = setTimeout(() => createRef.current?.(true), 2000);
         return;
       } else {
         retryCountRef.current = 0;

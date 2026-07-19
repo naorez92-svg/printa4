@@ -200,7 +200,9 @@ export default function JewishCreate({ onSaved, remaining, isPro, bookletCount =
   const effectiveTopic = topic === "__custom__" ? customTopic.trim() : topic;
   const canSubmit = !loading && subject && grade && effectiveTopic.length > 2;
 
-  const create = useCallback(async () => {
+  // isAutoRetry: strict-true only from the auto-retry timers — onClick passes
+  // a SyntheticEvent, which must NOT read as a retry.
+  const create = useCallback(async (isAutoRetry = false) => {
     if (!canSubmit || creatingRef.current) return;
     if (IS_INAPP && pageCount > 3 && !inappCapAckRef.current) {
       setInappCapWarn(true);
@@ -208,6 +210,7 @@ export default function JewishCreate({ onSaved, remaining, isPro, bookletCount =
       return;
     }
     setInappCapWarn(false);
+    if (isAutoRetry !== true) retryCountRef.current = 0; // manual click = fresh retry budget + honest analytics
     creatingRef.current = true;
     setLoading(true);
     setHtml(null);
@@ -216,7 +219,7 @@ export default function JewishCreate({ onSaved, remaining, isPro, bookletCount =
     setSaveWarning(false);
     // booklet_started/booklet_error are what the admin reliability panel counts —
     // without them the entire Jewish product was invisible to monitoring.
-    track("booklet_started", { mode: "jewish", subject, grade, outputType, pageCount });
+    track("booklet_started", { mode: "jewish", subject, grade, outputType, pageCount, retry: isAutoRetry === true });
 
     const { data } = await supabase.auth.getSession();
     const session = data?.session;
@@ -267,7 +270,7 @@ export default function JewishCreate({ onSaved, remaining, isPro, bookletCount =
       if (code === "rate_limited") {
         const wait = errData?.wait ?? 60;
         if (retryCountRef.current > 0 && wait <= 60) {
-          retryTimerRef.current = setTimeout(() => createRef.current?.(), (wait + 1) * 1000);
+          retryTimerRef.current = setTimeout(() => createRef.current?.(true), (wait + 1) * 1000);
           return;
         }
         setError(`rate:${wait}`); return;
@@ -368,7 +371,7 @@ export default function JewishCreate({ onSaved, remaining, isPro, bookletCount =
         setStreamChars(0); setLoadingElapsed(0); setLoadingMsgIdx(0);
         creatingRef.current = false;
         setLoading(false);
-        retryTimerRef.current = setTimeout(() => createRef.current?.(), 2000);
+        retryTimerRef.current = setTimeout(() => createRef.current?.(true), 2000);
         return;
       } else {
         retryCountRef.current = 0;
