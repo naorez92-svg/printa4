@@ -472,7 +472,12 @@ Deno.serve(async (req) => {
 
       // ── TODAY reliability ────────────────────────────────────────────────
       const today = ev.filter(e => (e.created_at as string) >= todayStart);
-      const startedToday   = today.filter(e => e.event === "booklet_started").length;
+      // retry:true = automatic re-attempt after a dropped stream. Excluded so
+      // the success rate reflects USERS who got a booklet, not raw attempts —
+      // one flaky connection with a successful auto-retry is a success, not
+      // a 50% failure.
+      const startedToday   = today.filter(e => e.event === "booklet_started"
+        && (e.metadata as Record<string, unknown> | null)?.retry !== true).length;
       const completedToday = today.filter(e => e.event === "booklet_completed").length;
       const errToday: Record<string, { count: number; inapp: number }> = {};
       for (const e of today.filter(e => e.event === "booklet_error")) {
@@ -492,7 +497,10 @@ Deno.serve(async (req) => {
         startedToday,
         completedToday,
         errorsToday: today.filter(e => e.event === "booklet_error").length,
-        successRate: startedToday > 0 ? Math.round((completedToday / startedToday) * 100) : 0,
+        // Capped at 100: completions have no retry flag, so a completed
+        // auto-retry (excluded from startedToday) could otherwise push the
+        // ratio past 100%.
+        successRate: startedToday > 0 ? Math.min(100, Math.round((completedToday / startedToday) * 100)) : 0,
         errorsByType: Object.entries(errToday).map(([type, x]) => ({ type, count: x.count, inapp: x.inapp })).sort((a, b) => b.count - a.count),
         versions: Object.entries(verMap).map(([v, count]) => ({ v, count })).sort((a, b) => b.count - a.count).slice(0, 6),
       };
