@@ -165,7 +165,7 @@ Deno.serve(async (req) => {
 
     const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString();
     const [profileResult, { count: monthlyCount }] = await Promise.all([
-      admin.from("profiles").select("plan, total_booklets_created").eq("id", user.id).single(),
+      admin.from("profiles").select("plan, total_booklets_created, booklet_credits_granted").eq("id", user.id).single(),
       admin.from("booklets").select("*", { count: "exact", head: true }).eq("user_id", user.id).gte("created_at", startOfMonth),
     ]);
     // PGRST116 = no row found (new user) — treat as free. Any other error = 503.
@@ -183,9 +183,16 @@ Deno.serve(async (req) => {
     const usedTotal   = profile?.total_booklets_created ?? 0;
     const usedMonthly = monthlyCount ?? 0;
 
-    if (!isPaid && usedTotal >= FREE_BOOKLET_LIMIT) {
+    // One-time pack credits (migration 0044): cumulative-grant model — the
+    // free lifetime allowance is 2 + booklet_credits_granted; consumption is
+    // implicit via total_booklets_created. Same semantics as generate-booklet.
+    const creditsGranted = profile?.booklet_credits_granted ?? 0;
+    const freeAllowance  = FREE_BOOKLET_LIMIT + creditsGranted;
+    const usingCredit    = !isPaid && usedTotal >= FREE_BOOKLET_LIMIT && usedTotal < freeAllowance;
+
+    if (!isPaid && usedTotal >= freeAllowance) {
       return new Response(
-        JSON.stringify({ error: "quota_exceeded", used: usedTotal, limit: FREE_BOOKLET_LIMIT }),
+        JSON.stringify({ error: "quota_exceeded", used: usedTotal, limit: freeAllowance }),
         { status: 403, headers: cors }
       );
     }
@@ -248,11 +255,11 @@ Deno.serve(async (req) => {
       const genRow = Array.isArray(genData) ? genData[0] : genData;
       const gTotal   = genRow?.total_gens ?? 0;
       const gMonthly = genRow?.monthly_gens ?? 0;
-      if (!isPaid && gTotal > FREE_BOOKLET_LIMIT) {
+      if (!isPaid && gTotal > freeAllowance) {
         await releaseLock();
         refundGeneration(); // rejected — don't let retries inflate the counter
         return new Response(
-          JSON.stringify({ error: "quota_exceeded", used: gTotal - 1, limit: FREE_BOOKLET_LIMIT }),
+          JSON.stringify({ error: "quota_exceeded", used: gTotal - 1, limit: freeAllowance }),
           { status: 403, headers: cors }
         );
       }
@@ -294,7 +301,7 @@ Deno.serve(async (req) => {
     const level       = ["basic", "medium", "advanced"].includes(body.level) ? body.level : "medium";
     const notes       = clean(body.notes, MAX_NOTES_LEN);
 
-    const maxPages = isTeacher ? TEACHER_MAX_PAGES : isParent ? PARENT_MAX_PAGES : FREE_MAX_PAGES;
+    const maxPages = isTeacher ? TEACHER_MAX_PAGES : (isParent || usingCredit) ? PARENT_MAX_PAGES : FREE_MAX_PAGES;
     const pageCount = Math.min(maxPages, Math.max(1, Number.isInteger(body.pageCount) ? body.pageCount : 2));
     const noStream = body.noStream === true; // in-app browsers (FB/IG webview)
     // No-stream holds ONE request open for the whole generation, so it's bounded
@@ -374,7 +381,7 @@ ${notes ? `הוראות נוספות מהמורה: ${esc(notes)}` : ""}
       ? Math.min(40000, Math.max(5000, effPages * 4000))   // fast: lighter, ~half the output
       : Math.min(64000, Math.max(8000, effPages * 7000));   // match generate-booklet ceiling
 
-    const monthlyLimit = isAdmin ? -1 : isTeacher ? TEACHER_MONTHLY_LIMIT : isParent ? PARENT_MONTHLY_LIMIT : FREE_BOOKLET_LIMIT;
+    const monthlyLimit = isAdmin ? -1 : isTeacher ? TEACHER_MONTHLY_LIMIT : isParent ? PARENT_MONTHLY_LIMIT : freeAllowance;
     const remaining = isAdmin ? -1 : monthlyLimit - (isPaid ? usedMonthly : usedTotal) - 1;
 
     // No-stream mode (in-app browsers: Facebook/Instagram webview can't read SSE).

@@ -59,7 +59,9 @@ export default function Dashboard() {
     try { localStorage.setItem("beshvili_onboarded", "1"); } catch {}
     setOnboarded(true);
   };
-  const { profile, plan, bookletCount, monthlyBookletCount, monthlyLimit, remaining, isPro, isAdmin, loading, refresh } = useProfile();
+  const { profile, plan, bookletCount, monthlyBookletCount, monthlyLimit, remaining, freeRemaining, packCredits, isPro, isAdmin, loading, refresh } = useProfile();
+  // The NEXT booklet will spend a pack credit (free quota exhausted, credits left)
+  const packActive = !isPro && freeRemaining === 0 && packCredits > 0;
 
   const prevBookletCountRef = useRef(null);
   useEffect(() => {
@@ -162,7 +164,7 @@ export default function Dashboard() {
             ) : (
               <button onClick={() => setShowUpgrade(true)}
                 className="text-xs text-white/60 bg-white/10 border border-white/20 rounded-full px-2.5 py-1">
-                {remaining > 0 ? `נותרו ${remaining} חינם ✨` : "שדרגי לפרו ↑"}
+                {packActive ? `🎟️ ${packCredits} בחבילה` : remaining > 0 ? `נותרו ${remaining} חינם ✨` : "שדרגי לפרו ↑"}
               </button>
             ))}
             <button onClick={() => supabase.auth.signOut()}
@@ -221,7 +223,9 @@ export default function Dashboard() {
               </div>
               <div className="flex items-center justify-between gap-3">
                 <p className="text-xs text-ink/50">
-                  {remaining === 1
+                  {packActive
+                    ? `🎟️ נותרו לך ${packCredits} חוברות בחבילה (עד 10 עמודים + מפתח תשובות)`
+                    : remaining === 1
                     ? "⚠️ נשארה לך חוברת חינמית אחת בלבד"
                     : `נותרו לך ${remaining} חוברות חינמיות`}
                 </p>
@@ -239,14 +243,14 @@ export default function Dashboard() {
               preserve in-progress generation when switching tabs — a sibling lazy
               chunk suspending must never unmount it. */}
           <div className={tab === "create" ? "" : "hidden"}>
-            <Create active={tab === "create"} onSaved={() => refresh()} remaining={remaining} isPro={isPro} plan={plan} bookletCount={bookletCount} onUpgrade={() => setShowUpgrade(true)}
+            <Create active={tab === "create"} onSaved={() => refresh()} remaining={remaining} isPro={isPro} plan={plan} packCredit={packActive} bookletCount={bookletCount} onUpgrade={() => setShowUpgrade(true)}
               pendingStarter={pendingStarter} onStarterConsumed={() => setPendingStarter(null)} />
           </div>
           {tab === "history" && <History isPro={isPro} onUpgrade={() => setShowUpgrade(true)} onCreateNew={() => setTab("create")}
             onCreateSimilar={(b, extras = {}) => { setPendingStarter({ childName: b.child_name || "", grade: b.grade || "", world: b.world || "כדורגל", goal: b.goal || "", level: b.level || "medium", weaknesses: extras.weaknesses || "", ...(extras.weaknesses ? { mode: "form" } : {}) }); setTab("create"); }}
           />}
           <Suspense fallback={<div className="py-12 text-center text-ink/40 text-sm">טוען…</div>}>
-            {tab === "jewish" && <JewishCreate onSaved={() => refresh()} remaining={remaining} isPro={isPro} bookletCount={bookletCount} onUpgrade={() => setShowUpgrade(true)} />}
+            {tab === "jewish" && <JewishCreate onSaved={() => refresh()} remaining={remaining} isPro={isPro} packCredit={packActive} bookletCount={bookletCount} onUpgrade={() => setShowUpgrade(true)} />}
             {tab === "students" && <Students onBookletSaved={() => { refresh(); setTab("history"); }} remaining={remaining} isPro={isPro} bookletCount={bookletCount} />}
             {tab === "branding" && (plan === "teacher" || plan === "pro" || isAdmin) && <BrandingSettings profile={profile} onSaved={refresh} />}
             {tab === "admin" && isAdmin && <AdminPanel />}

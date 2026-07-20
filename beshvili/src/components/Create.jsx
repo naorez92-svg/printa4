@@ -88,8 +88,12 @@ const A4_H  = 1123;
 // engine changes the dimension this just returns 0 and the char bar takes over.
 const countPages = (html) => (html.match(/296mm/g) || []).length;
 
-export default function Create({ onSaved, remaining, isPro, plan = "free", active = true, bookletCount = 0, onUpgrade, pendingStarter = null, onStarterConsumed }) {
+export default function Create({ onSaved, remaining, isPro, plan = "free", packCredit = false, active = true, bookletCount = 0, onUpgrade, pendingStarter = null, onStarterConsumed }) {
   const PAGE_OPTIONS = (plan === "teacher" || plan === "pro" || plan === "admin") ? PAGE_OPTIONS_TEACHER : PAGE_OPTIONS_FREE_PARENT;
+  // packCredit: the next booklet spends a one-time pack credit — parent-tier
+  // benefits (up to 10 pages + answer key) without a subscription. Server
+  // enforces independently; this only unlocks the UI.
+  const paidBenefits = isPro || packCredit;
   const [showUpgrade, setShowUpgrade] = useState(false);
   const openUpgrade = onUpgrade ?? (() => setShowUpgrade(true));
   const [mode, setMode]           = useState(() => {
@@ -1251,7 +1255,7 @@ export default function Create({ onSaved, remaining, isPro, plan = "free", activ
           <p className="text-xs text-ink/40 mb-2 font-medium">כמות עמודים</p>
           <div className="flex gap-2">
             {PAGE_OPTIONS.map((n) => {
-              const isLocked = !isPro && n > 2;
+              const isLocked = !paidBenefits && n > 2;
               return (
                 <button
                   key={n}
@@ -1271,7 +1275,8 @@ export default function Create({ onSaved, remaining, isPro, plan = "free", activ
               );
             })}
           </div>
-          {!isPro && <p className="text-[10px] text-ink/30 mt-1 text-center">חוברות גדולות יותר (5–10 עמ') זמינות בתוכנית בתשלום</p>}
+          {!paidBenefits && <p className="text-[10px] text-ink/30 mt-1 text-center">חוברות גדולות יותר (5–10 עמ') זמינות בתוכנית בתשלום</p>}
+          {packCredit && <p className="text-[10px] text-magic/70 mt-1 text-center">🎟️ חוברת מהחבילה שלך — עד 10 עמודים + מפתח תשובות</p>}
           {isPro && <p className="text-[10px] text-grow/70 mt-1 text-center">💡 המכסה נספרת בחוברות, לא בעמודים — חוברת של 20 עמודים = חוברת אחת מהמכסה</p>}
         </div>}
 
@@ -1280,23 +1285,23 @@ export default function Create({ onSaved, remaining, isPro, plan = "free", activ
         {mode !== "quick" && (
           <div className="flex items-center justify-between gap-3">
             <div>
-              <span className="text-sm font-medium text-ink">מפתח תשובות {!isPro && "🔒"}</span>
-              <span className="text-xs text-ink/40 mr-2">{isPro ? "דף תשובות בסוף החוברת" : "זמין בתוכנית בתשלום"}</span>
+              <span className="text-sm font-medium text-ink">מפתח תשובות {!paidBenefits && "🔒"}</span>
+              <span className="text-xs text-ink/40 mr-2">{paidBenefits ? "דף תשובות בסוף החוברת" : "זמין בתוכנית בתשלום"}</span>
             </div>
             <button
               type="button"
               role="switch"
-              aria-checked={isPro && withAnswerKey}
+              aria-checked={paidBenefits && withAnswerKey}
               aria-label="מפתח תשובות"
               onClick={() => {
                 if (loading) return;
-                if (!isPro) { track("upgrade_intent_clicked", { source: "answer_key_toggle" }); onUpgrade?.(); return; }
+                if (!paidBenefits) { track("upgrade_intent_clicked", { source: "answer_key_toggle" }); onUpgrade?.(); return; }
                 setWithAnswerKey(v => !v);
               }}
               disabled={loading}
-              className={`relative w-11 h-6 rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-magic ${isPro && withAnswerKey ? "bg-magic" : "bg-ink/20"} ${!isPro ? "opacity-60" : ""}`}
+              className={`relative w-11 h-6 rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-magic ${paidBenefits && withAnswerKey ? "bg-magic" : "bg-ink/20"} ${!paidBenefits ? "opacity-60" : ""}`}
             >
-              <div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all ${isPro && withAnswerKey ? "right-0.5" : "left-0.5"}`} />
+              <div className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all ${paidBenefits && withAnswerKey ? "right-0.5" : "left-0.5"}`} />
             </button>
           </div>
         )}
