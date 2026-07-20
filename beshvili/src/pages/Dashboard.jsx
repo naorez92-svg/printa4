@@ -51,7 +51,26 @@ export default function Dashboard() {
   const [tab, setTab]             = useState("create");
   const [showUpgrade, setShowUpgrade] = useState(false);
   const [showSurvey, setShowSurvey]   = useState(false);
-  const [pendingStarter, setPendingStarter] = useState(null);
+  // Weekly-nudge deep link (?wk=1&child=..&grade=..&goal=..&level=..&weak=..):
+  // the email's CTA lands here with the create form pre-filled — one tap from
+  // inbox to "צור". Parsed once, then stripped from the URL so a refresh
+  // doesn't re-apply it.
+  const [pendingStarter, setPendingStarter] = useState(() => {
+    try {
+      const q = new URLSearchParams(window.location.search);
+      if (q.get("wk") !== "1") return null;
+      const starter = {
+        childName: q.get("child") || undefined,
+        grade: q.get("grade") || undefined,
+        goal: q.get("goal") || undefined,
+        level: q.get("level") || undefined,
+        weaknesses: q.get("weak") || undefined,
+      };
+      window.history.replaceState({}, "", window.location.pathname);
+      track("weekly_nudge_link_opened", { hasChild: !!starter.childName });
+      return starter;
+    } catch { return null; }
+  });
   const [onboarded, setOnboarded] = useState(() => {
     try { return !!localStorage.getItem("beshvili_onboarded"); } catch { return true; }
   });
