@@ -53,24 +53,37 @@ export default function Dashboard() {
   const [showSurvey, setShowSurvey]   = useState(false);
   // Weekly-nudge deep link (?wk=1&child=..&grade=..&goal=..&level=..&weak=..):
   // the email's CTA lands here with the create form pre-filled — one tap from
-  // inbox to "צור". Parsed once, then stripped from the URL so a refresh
-  // doesn't re-apply it.
+  // inbox to "צור". Sources, in order: the live URL, or the localStorage stash
+  // App.jsx saves when a logged-OUT user clicks the link (the magic-link
+  // redirect drops query params, so without the stash the CTA silently
+  // degraded to a blank form). The initializer is pure — URL-stripping,
+  // stash cleanup, and analytics happen in the mount effect below.
   const [pendingStarter, setPendingStarter] = useState(() => {
     try {
-      const q = new URLSearchParams(window.location.search);
+      let search = window.location.search;
+      if (!new URLSearchParams(search).get("wk")) {
+        const stash = JSON.parse(localStorage.getItem("beshvili_wk_starter") || "null");
+        if (!stash || Date.now() - (stash.at ?? 0) > 24 * 3600 * 1000) return null;
+        search = stash.search;
+      }
+      const q = new URLSearchParams(search);
       if (q.get("wk") !== "1") return null;
-      const starter = {
+      return {
+        fromWeeklyNudge: true,
         childName: q.get("child") || undefined,
         grade: q.get("grade") || undefined,
         goal: q.get("goal") || undefined,
         level: q.get("level") || undefined,
         weaknesses: q.get("weak") || undefined,
       };
-      window.history.replaceState({}, "", window.location.pathname);
-      track("weekly_nudge_link_opened", { hasChild: !!starter.childName });
-      return starter;
     } catch { return null; }
   });
+  useEffect(() => {
+    if (!pendingStarter?.fromWeeklyNudge) return;
+    try { window.history.replaceState({}, "", window.location.pathname); } catch {}
+    try { localStorage.removeItem("beshvili_wk_starter"); } catch {}
+    track("weekly_nudge_link_opened", { hasChild: !!pendingStarter.childName });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const [onboarded, setOnboarded] = useState(() => {
     try { return !!localStorage.getItem("beshvili_onboarded"); } catch { return true; }
   });

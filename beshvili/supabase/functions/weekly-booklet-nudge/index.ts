@@ -23,6 +23,10 @@ const MAX_SENDS    = 300; // hard cap per run — a bug can never mail-bomb the 
 const esc = (s: string) =>
   String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
+// User-entered names/topics go into the email SUBJECT too — strip control
+// chars so a crafted child name can't smuggle newlines into headers.
+const oneLine = (s: string) => String(s ?? "").replace(/[\r\n\t]+/g, " ").trim();
+
 function buildEmail(opts: {
   firstName: string;
   childName: string;
@@ -107,8 +111,18 @@ Deno.serve(async (req) => {
     return new Response(JSON.stringify({ error: "query_failed" }), { status: 500 });
   }
 
+  // Wall-clock guard: MAX_SENDS caps sends but not loop iterations — at scale
+  // the per-candidate queries could push past the edge-function time limit.
+  // Bail with whatever was sent; next week's run picks up the rest.
+  const startedAt = Date.now();
+  const TIME_BUDGET_MS = 240_000;
+
   for (const p of candidates ?? []) {
     if (stats.sent >= MAX_SENDS) break;
+    if (Date.now() - startedAt > TIME_BUDGET_MS) {
+      console.warn("[weekly-nudge] time budget reached — stopping early");
+      break;
+    }
 
     // Weekly dedupe (time-windowed — unlike the one-shot followup types).
     const { data: recentLog } = await admin
@@ -155,10 +169,10 @@ Deno.serve(async (req) => {
       .limit(1)
       .maybeSingle();
 
-    const childName = child?.name ?? lastBooklet?.child_name ?? "";
-    const grade     = child?.grade ?? lastBooklet?.grade ?? "";
-    const level     = lastBooklet?.level ?? child?.level ?? "medium";
-    const lastGoal  = lastBooklet?.goal ?? lastBooklet?.world ?? "";
+    const childName = oneLine(child?.name ?? lastBooklet?.child_name ?? "");
+    const grade     = oneLine(child?.grade ?? lastBooklet?.grade ?? "");
+    const level     = oneLine(lastBooklet?.level ?? child?.level ?? "medium");
+    const lastGoal  = oneLine(lastBooklet?.goal ?? lastBooklet?.world ?? "");
 
     // Difficulty-aware suggestion (from the printed-QR feedback loop).
     const fb = lastBooklet?.difficulty_feedback;

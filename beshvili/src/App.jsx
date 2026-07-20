@@ -13,6 +13,16 @@ const Dashboard = lazy(() => import("./pages/Dashboard"));
 const PublicBooklet = lazy(() => import("./pages/PublicBooklet"));
 const BookletFeedback = lazy(() => import("./pages/BookletFeedback"));
 
+// Weekly-nudge deep link survival: the email CTA carries ?wk=1&child=... but a
+// logged-OUT recipient goes through magic-link auth, whose redirect drops the
+// query string. Stash it before anything else runs; Dashboard consumes and
+// clears it after login (24h freshness guard there).
+try {
+  if (new URLSearchParams(window.location.search).get("wk") === "1") {
+    localStorage.setItem("beshvili_wk_starter", JSON.stringify({ search: window.location.search, at: Date.now() }));
+  }
+} catch { /* storage blocked — deep link degrades gracefully */ }
+
 // /b/:token — public booklet share page (no auth needed)
 const shareMatch = window.location.pathname.match(/^\/b\/([0-9a-f-]{36})$/i);
 // /f/:token — printed-booklet feedback form, reached via the QR on the page
