@@ -7,6 +7,19 @@ const BIT_PHONE = "0509139137";
 const SALE_EXPIRY_KEY = "beshvili_sale_expiry";
 const SALE_HOURS = 48;
 
+// One-time pack — the no-commitment offer for users who won't subscribe yet.
+// Matches the payment rail (Bit = one-time payment); credits are added by the
+// admin via admin-set-plan and consumed server-side (migration 0044).
+const PACK = {
+  id: "pack5",
+  icon: "🎟️",
+  title: "חבילת 5 חוברות",
+  price: 15,
+  booklets: 5,
+  color: "blue",
+  features: ["5 חוברות מלאות — תשלום אחד, בלי מנוי", "עד 10 עמודים לחוברת", "מפתח תשובות", "בלי תאריך תפוגה — מתי שנוח לך"],
+};
+
 const PLANS = [
   {
     id: "parent",
@@ -66,9 +79,11 @@ export default function UpgradeModal({ onClose, bookletCount = 0, source = "unkn
   const [lockedPrice, setLockedPrice] = useState(null);
   const dialogRef = useRef(null);
 
-  const plan = PLANS.find(p => p.id === selectedPlan);
+  const plan = selectedPlan === "pack5" ? PACK : PLANS.find(p => p.id === selectedPlan);
   const saleActive = secondsLeft > 0;
-  const effectivePrice = saleActive ? plan.salePrice : plan.price;
+  // The pack has no sale price (it IS the low-friction offer) — guard so
+  // selecting it during an active sale doesn't produce an undefined price.
+  const effectivePrice = saleActive && plan.salePrice ? plan.salePrice : plan.price;
   // Snapshot at click time so the sent-state UI never changes price after timer expires.
   const displayPrice = lockedPrice ?? effectivePrice;
 
@@ -134,10 +149,12 @@ export default function UpgradeModal({ onClose, bookletCount = 0, source = "unkn
   };
 
   const payWithBit = () => {
-    const planLabel = plan.id === "teacher" ? "מורה" : "הורה";
-    const saleNote = saleActive ? " (מחיר מבצע לחודש ראשון)" : "";
+    const orderText = plan.id === "pack5"
+      ? "אני רוצה לקנות חבילת 5 חוברות (תשלום חד-פעמי)"
+      : `אני רוצה לשדרג לתוכנית ${plan.id === "teacher" ? "מורה" : "הורה"}`;
+    const saleNote = saleActive && plan.salePrice ? " (מחיר מבצע לחודש ראשון)" : "";
     const msg = encodeURIComponent(
-      `שלום! אני רוצה לשדרג לתוכנית ${planLabel} בבשבילי ${plan.icon}\nשלחתי ${effectivePrice} ₪ בביט${saleNote}${name.trim() ? `\nשם: ${name.trim()}` : ""}`
+      `שלום! ${orderText} בבשבילי ${plan.icon}\nשלחתי ${effectivePrice} ₪ בביט${saleNote}${name.trim() ? `\nשם: ${name.trim()}` : ""}`
     );
     setLockedPrice(effectivePrice);
     saveLead("bit");
@@ -146,9 +163,11 @@ export default function UpgradeModal({ onClose, bookletCount = 0, source = "unkn
   };
 
   const sendWhatsApp = () => {
-    const planLabel = plan.id === "teacher" ? "מורה" : "הורה";
-    const parts = [`שלום! אני רוצה לשדרג לתוכנית ${planLabel} בבשבילי ${plan.icon}`];
-    if (saleActive) parts.push(`(ראיתי את מחיר המבצע — ₪${effectivePrice} לחודש ראשון)`);
+    const orderText = plan.id === "pack5"
+      ? "אני רוצה לקנות חבילת 5 חוברות (תשלום חד-פעמי, ₪15)"
+      : `אני רוצה לשדרג לתוכנית ${plan.id === "teacher" ? "מורה" : "הורה"}`;
+    const parts = [`שלום! ${orderText} בבשבילי ${plan.icon}`];
+    if (saleActive && plan.salePrice) parts.push(`(ראיתי את מחיר המבצע — ₪${effectivePrice} לחודש ראשון)`);
     if (name.trim()) parts.push(`שם: ${name.trim()}`);
     setLockedPrice(effectivePrice);
     saveLead("whatsapp");
@@ -166,8 +185,10 @@ export default function UpgradeModal({ onClose, bookletCount = 0, source = "unkn
         {/* Scrollable content area */}
         <div className="flex-1 overflow-y-auto p-6 pb-3 space-y-4">
 
-        {/* Sale countdown banner */}
-        {saleActive && (
+        {/* Sale countdown banner — hidden for the one-time pack (it has no
+            first-month semantics; showing a subscription-sale timer over it
+            would be misleading) */}
+        {saleActive && !!plan.salePrice && (
           <div className="bg-gradient-to-l from-red-500 to-orange-400 rounded-2xl px-4 py-2.5 text-white text-center -mx-2">
             <p className="text-[11px] font-bold tracking-wide">🔥 מחיר מיוחד לחודש הראשון — נגמר בעוד</p>
             <p className="font-mono text-2xl font-bold tracking-widest leading-tight">{formatCountdown(secondsLeft)}</p>
@@ -194,7 +215,14 @@ export default function UpgradeModal({ onClose, bookletCount = 0, source = "unkn
         )}
 
         {/* Value hook — dynamic per plan */}
-        {selectedPlan === "teacher" ? (
+        {selectedPlan === "pack5" ? (
+          <div className="bg-blue-50 border border-blue-200 rounded-2xl px-3 py-2.5 text-right">
+            <p className="text-xs font-semibold text-blue-800">🎟️ בלי מנוי, בלי התחייבות</p>
+            <p className="text-xs text-blue-700 mt-0.5">
+              תשלום אחד של ₪15 — 5 חוברות מלאות (<strong>₪3 לחוברת</strong>), מתי שנוח לך
+            </p>
+          </div>
+        ) : selectedPlan === "teacher" ? (
           <div className="bg-magic/8 border border-magic/20 rounded-2xl px-3 py-2.5 text-right">
             <p className="text-xs font-semibold text-magic">20 חוברות = 20 שעות הכנה שנחסכות 💡</p>
             <p className="text-xs text-ink/60 mt-0.5">
@@ -265,6 +293,23 @@ export default function UpgradeModal({ onClose, bookletCount = 0, source = "unkn
           ))}
         </div>
 
+        {/* One-time pack — the no-commitment escape hatch for subscription-averse users */}
+        <button
+          onClick={() => { setSelectedPlan("pack5"); track("pack_option_selected", { source, bookletCount }); }}
+          aria-pressed={selectedPlan === "pack5"}
+          className={`w-full rounded-2xl border-2 px-4 py-3 text-right transition-all ${
+            selectedPlan === "pack5" ? "border-blue-400 bg-blue-50" : "border-dashed border-ink/15 hover:border-ink/30"
+          }`}
+        >
+          <div className="flex items-center justify-between gap-2">
+            <div>
+              <p className="text-sm font-bold text-ink">🎟️ לא מוכנה למנוי? חבילת 5 חוברות</p>
+              <p className="text-[11px] text-ink/50 mt-0.5">תשלום חד-פעמי · בלי התחייבות · עד 10 עמודים + מפתח תשובות</p>
+            </div>
+            <span className="text-lg font-bold text-blue-600 flex-shrink-0">₪15</span>
+          </div>
+        </button>
+
         {/* Selected plan features */}
         <ul className="bg-canvas rounded-2xl p-3 space-y-1.5">
           {plan.features.map(f => (
@@ -317,7 +362,7 @@ export default function UpgradeModal({ onClose, bookletCount = 0, source = "unkn
               className="w-full bg-[#0095FF] text-white rounded-xl p-3.5 font-semibold text-sm hover:opacity-90 transition-opacity shadow-sm flex items-center justify-center gap-2"
             >
               <span className="text-lg">💙</span>
-              <span>ביט — ₪{effectivePrice}{saleActive ? " (מבצע)" : ""}</span>
+              <span>ביט — ₪{effectivePrice}{saleActive && plan.salePrice ? " (מבצע)" : plan.id === "pack5" ? " (חד-פעמי)" : ""}</span>
               <span className="text-white/60 text-xs font-normal mr-1">הכי פשוט</span>
             </button>
 
@@ -329,7 +374,7 @@ export default function UpgradeModal({ onClose, bookletCount = 0, source = "unkn
             </button>
 
             <p className="text-xs text-ink/30 text-center">
-              ביטול בכל עת · פעילה תוך שעה{saleActive ? " · מחיר מיוחד לחודש ראשון" : ""}
+              {plan.id === "pack5" ? "תשלום אחד, בלי מנוי" : "ביטול בכל עת"} · פעילה תוך שעה{saleActive && plan.salePrice ? " · מחיר מיוחד לחודש ראשון" : ""}
             </p>
           </div>
         )}

@@ -1306,6 +1306,7 @@ function ActivatePlanCard() {
           className="border border-ink/15 rounded-xl px-2 py-2 text-sm bg-white outline-none focus:border-grow">
           <option value="teacher">מורה ₪59</option>
           <option value="parent">הורה ₪19</option>
+          <option value="pack5">🎟️ חבילת 5 חוברות ₪15</option>
           <option value="free">חינם (ביטול)</option>
         </select>
         <button
@@ -1345,7 +1346,7 @@ function LeadsCard({ leads, fmt }) {
     if (!l.email || activateState[key] === "sending" || activateState[key] === "sent") return;
     const isCompass = l.plan === "compass";
     const plan = isCompass ? null : (l.plan || "teacher");
-    const label = isCompass ? "מצפן (דוח ₪49)" : plan === "teacher" ? "מורה" : plan === "parent" ? "הורה" : plan;
+    const label = isCompass ? "מצפן (דוח ₪49)" : plan === "teacher" ? "מורה" : plan === "parent" ? "הורה" : plan === "pack5" ? "חבילת 5 חוברות (₪15, +5 קרדיטים)" : plan;
     if (!confirm(`להפעיל ${label} עבור ${l.email}?\nהלקוח/ה יקבל/תקבל אישור.`)) return;
     setActivateState(s => ({ ...s, [key]: "sending" }));
     try {
@@ -1363,7 +1364,7 @@ function LeadsCard({ leads, fmt }) {
     }
   };
 
-  const PLAN_TAG = { teacher: "מורה ₪59", parent: "הורה ₪19", pro: "פרו", compass: "מצפן ₪49" };
+  const PLAN_TAG = { teacher: "מורה ₪59", parent: "הורה ₪19", pro: "פרו", compass: "מצפן ₪49", pack5: "🎟️ חבילת 5 ₪15" };
   const grouped = [];
   for (const l of leads) {
     const prev = grouped[grouped.length - 1];

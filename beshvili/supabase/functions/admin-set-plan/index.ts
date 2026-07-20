@@ -5,10 +5,11 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
 // 0007/0010 stamps pro_since automatically), log an audit event, and send the
 // customer a branded "המנוי פעיל" confirmation email.
 
-const VALID_PLANS = ["teacher", "parent", "pro", "free"] as const;
+const VALID_PLANS = ["teacher", "parent", "pro", "free", "pack5"] as const;
 const PLAN_LABEL: Record<string, string> = {
-  teacher: "מורה פרטית", parent: "הורה", pro: "פרו", free: "חינם",
+  teacher: "מורה פרטית", parent: "הורה", pro: "פרו", free: "חינם", pack5: "חבילת 5 חוברות",
 };
+const PACK5_CREDITS = 5;
 
 function getCors(req: Request) {
   const origin = req.headers.get("origin") ?? "";
@@ -70,25 +71,46 @@ Deno.serve(async (req) => {
     }
     if (!target) return new Response(JSON.stringify({ error: "user_not_found" }), { status: 404, headers: cors });
 
-    // Stamp the billing cycle explicitly: the 0010 trigger sets pro_since only
-    // on free→paid, so re-activating a RENEWING subscriber (teacher→teacher)
-    // would keep a stale cycle and month-2 renewal reminders would never send.
-    const update = plan === "free"
-      ? { plan }
-      : { plan, pro_since: new Date().toISOString(), renewal_reminder_sent_at: null };
-    const { error: updateErr } = await admin
-      .from("profiles")
-      .update(update)
-      .eq("id", target.id);
-    if (updateErr) {
-      console.error("admin-set-plan update:", updateErr.message);
-      return new Response(JSON.stringify({ error: "update_failed" }), { status: 500, headers: cors });
+    if (plan === "pack5") {
+      // One-time pack: ADD +5 to the cumulative granted counter, don't touch
+      // the plan (the user stays free — the pack is the pre-subscription
+      // offer). Read-modify-write is fine: only the admin writes this column,
+      // and consumption is implicit via total_booklets_created (mig. 0044).
+      const { data: cur, error: curErr } = await admin
+        .from("profiles").select("booklet_credits_granted").eq("id", target.id).single();
+      if (curErr) {
+        console.error("admin-set-plan credits read:", curErr.message);
+        return new Response(JSON.stringify({ error: "update_failed" }), { status: 500, headers: cors });
+      }
+      const { error: credErr } = await admin
+        .from("profiles")
+        .update({ booklet_credits_granted: (cur?.booklet_credits_granted ?? 0) + PACK5_CREDITS })
+        .eq("id", target.id);
+      if (credErr) {
+        console.error("admin-set-plan credits update:", credErr.message);
+        return new Response(JSON.stringify({ error: "update_failed" }), { status: 500, headers: cors });
+      }
+    } else {
+      // Stamp the billing cycle explicitly: the 0010 trigger sets pro_since only
+      // on free→paid, so re-activating a RENEWING subscriber (teacher→teacher)
+      // would keep a stale cycle and month-2 renewal reminders would never send.
+      const update = plan === "free"
+        ? { plan }
+        : { plan, pro_since: new Date().toISOString(), renewal_reminder_sent_at: null };
+      const { error: updateErr } = await admin
+        .from("profiles")
+        .update(update)
+        .eq("id", target.id);
+      if (updateErr) {
+        console.error("admin-set-plan update:", updateErr.message);
+        return new Response(JSON.stringify({ error: "update_failed" }), { status: 500, headers: cors });
+      }
     }
 
     // Audit trail — who activated what, visible in events.
     admin.from("events").insert({
       user_id: target.id,
-      event: "plan_activated",
+      event: plan === "pack5" ? "pack_activated" : "plan_activated",
       metadata: { plan, by: caller.email ?? caller.id },
     }).then(() => {}, () => {});
 
@@ -103,14 +125,18 @@ Deno.serve(async (req) => {
           from: "בשבילי <hello@beshvili.com>",
           to: [email],
           reply_to: "naorez92@gmail.com",
-          subject: `המנוי שלך פעיל — ברוכה הבאה לבשבילי ${PLAN_LABEL[plan]} 🎉`,
+          subject: plan === "pack5"
+            ? "החבילה שלך פעילה — 5 חוברות מחכות לך 🎉"
+            : `המנוי שלך פעיל — ברוכה הבאה לבשבילי ${PLAN_LABEL[plan]} 🎉`,
           html: `<!DOCTYPE html><html dir="rtl" lang="he"><body style="font-family:Arial,sans-serif;background:#F7F6FB;margin:0;padding:20px;">
   <div style="max-width:520px;margin:0 auto;background:white;border-radius:16px;padding:28px;border:1px solid #eee;">
     <p style="font-size:22px;font-weight:800;margin:0 0 4px;color:#20184A;">בשבילי<span style="color:#F4A02C;">·</span></p>
     <hr style="border:none;border-top:1px solid #ece9f6;margin:12px 0 20px;">
     <div style="font-size:40px;text-align:center;">🎉</div>
-    <h2 style="color:#20184A;text-align:center;margin:8px 0 14px;">המנוי שלך פעיל!</h2>
-    <p style="font-size:15px;color:#333;text-align:center;">תוכנית <strong style="color:#6C5CE7;">${PLAN_LABEL[plan]}</strong> הופעלה — אפשר להתחיל ליצור עכשיו.</p>
+    <h2 style="color:#20184A;text-align:center;margin:8px 0 14px;">${plan === "pack5" ? "החבילה שלך פעילה!" : "המנוי שלך פעיל!"}</h2>
+    <p style="font-size:15px;color:#333;text-align:center;">${plan === "pack5"
+      ? `<strong style="color:#6C5CE7;">5 חוברות מלאות</strong> נוספו לחשבון (עד 10 עמודים + מפתח תשובות) — בלי מנוי, בלי תפוגה. אפשר להתחיל ליצור עכשיו.`
+      : `תוכנית <strong style="color:#6C5CE7;">${PLAN_LABEL[plan]}</strong> הופעלה — אפשר להתחיל ליצור עכשיו.`}</p>
     <div style="text-align:center;margin:22px 0 8px;">
       <a href="https://beshvili.com" style="display:inline-block;background:#6C5CE7;color:white;padding:13px 30px;border-radius:12px;text-decoration:none;font-weight:bold;font-size:15px;">✨ ליצירת החוברת הבאה</a>
     </div>

@@ -129,7 +129,7 @@ const A4_PX = 794;
 const A4_H  = 1123;
 const countPages = (html) => (html.match(/296mm/g) || []).length;
 
-export default function JewishCreate({ onSaved, remaining, isPro, bookletCount = 0, onUpgrade }) {
+export default function JewishCreate({ onSaved, remaining, isPro, packCredit = false, bookletCount = 0, onUpgrade }) {
   const [subject, setSubject] = useState("הלכה");
   const [grade,   setGrade]   = useState("ה");
   const [topic,   setTopic]   = useState(CURRICULUM["הלכה"]?.["ה"]?.[0] ?? "");
@@ -642,7 +642,7 @@ export default function JewishCreate({ onSaved, remaining, isPro, bookletCount =
         <div className="flex-1 min-w-[120px]">
           <label className="block text-xs font-semibold text-ink/60 mb-2">עמודים</label>
           <div className="flex gap-1.5">
-            {(isPro ? [2, 3, 4, 5] : [1, 2]).map(n => (
+            {((isPro || packCredit) ? [2, 3, 4, 5] : [1, 2]).map(n => (
               <button
                 key={n}
                 onClick={() => setPageCount(n)}

@@ -387,7 +387,7 @@ Deno.serve(async (req) => {
     // usedTotal = lifetime booklets ever created (not current rows) — immune to deletion gaming
     const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString();
     const [profileResult, { count: monthlyCount }] = await Promise.all([
-      admin.from("profiles").select("plan, total_booklets_created, teacher_display_name, teacher_tagline, teacher_phone, teacher_logo_url, teacher_color").eq("id", user.id).single(),
+      admin.from("profiles").select("plan, total_booklets_created, booklet_credits_granted, teacher_display_name, teacher_tagline, teacher_phone, teacher_logo_url, teacher_color").eq("id", user.id).single(),
       admin.from("booklets").select("*", { count: "exact", head: true }).eq("user_id", user.id).gte("created_at", startOfMonth),
     ]);
     // PGRST116 = "no rows found" — a new user who hasn't been profiled yet; treat as free.
@@ -407,9 +407,19 @@ Deno.serve(async (req) => {
     const usedTotal   = profile?.total_booklets_created ?? 0;
     const usedMonthly = monthlyCount ?? 0;
 
-    if (!isPaid && usedTotal >= FREE_BOOKLET_LIMIT) {
+    // One-time pack credits (migration 0044): booklet_credits_granted is a
+    // CUMULATIVE purchased-credits counter, so the free lifetime allowance is
+    // 2 + granted. Credits are consumed implicitly by total_booklets_created
+    // growing — no balance mutation here, no refund races, and the DB-level
+    // enforce_booklet_quota trigger uses the identical formula. A booklet in
+    // the credit range gets parent-tier benefits (pages cap + answer key).
+    const creditsGranted = profile?.booklet_credits_granted ?? 0;
+    const freeAllowance  = FREE_BOOKLET_LIMIT + creditsGranted;
+    const usingCredit    = !isPaid && usedTotal >= FREE_BOOKLET_LIMIT && usedTotal < freeAllowance;
+
+    if (!isPaid && usedTotal >= freeAllowance) {
       return new Response(
-        JSON.stringify({ error: "quota_exceeded", used: usedTotal, limit: FREE_BOOKLET_LIMIT }),
+        JSON.stringify({ error: "quota_exceeded", used: usedTotal, limit: freeAllowance }),
         { status: 403, headers: cors }
       );
     }
@@ -485,11 +495,11 @@ Deno.serve(async (req) => {
       const genRow = Array.isArray(genData) ? genData[0] : genData;
       const gTotal   = genRow?.total_gens ?? 0;
       const gMonthly = genRow?.monthly_gens ?? 0;
-      if (!isPaid && gTotal > FREE_BOOKLET_LIMIT) {
+      if (!isPaid && gTotal > freeAllowance) {
         await releaseLock();
         refundGeneration(); // rejected — don't let retries inflate the counter
         return new Response(
-          JSON.stringify({ error: "quota_exceeded", used: gTotal - 1, limit: FREE_BOOKLET_LIMIT }),
+          JSON.stringify({ error: "quota_exceeded", used: gTotal - 1, limit: freeAllowance }),
           { status: 403, headers: cors }
         );
       }
@@ -516,11 +526,12 @@ Deno.serve(async (req) => {
     const weaknesses = clean(body.weaknesses, 300);
     const level      = ["basic", "medium", "advanced"].includes(body.level) ? body.level : "medium";
 
-    const maxPages = isTeacher ? TEACHER_MAX_PAGES : isParent ? PARENT_MAX_PAGES : FREE_MAX_PAGES;
+    const maxPages = isTeacher ? TEACHER_MAX_PAGES : (isParent || usingCredit) ? PARENT_MAX_PAGES : FREE_MAX_PAGES;
     const pageCount = Math.min(maxPages, Math.max(1, Number.isInteger(body.pageCount) ? body.pageCount : 5));
     // Answer key is a PAID feature (sold as such in every plan card/email) —
-    // enforce server-side, not just by hiding the toggle.
-    const withAnswerKey = isPaid && body.withAnswerKey === true;
+    // enforce server-side, not just by hiding the toggle. A pack credit buys
+    // parent-tier benefits for this booklet, answer key included.
+    const withAnswerKey = (isPaid || usingCredit) && body.withAnswerKey === true;
     const noStream = body.noStream === true; // in-app browsers (FB/IG webview)
     // No-stream holds ONE request open for the whole generation, bounded by the
     // platform wall-clock limit — cap the size so it reliably finishes. Each
@@ -624,7 +635,7 @@ Deno.serve(async (req) => {
       : Math.min(64000, Math.max(8000, effPages * 7000));
 
     // Rate-limit timestamp already stamped atomically above (step 3 CAS).
-    const monthlyLimit = isAdmin ? -1 : isTeacher ? TEACHER_MONTHLY_LIMIT : isParent ? PARENT_MONTHLY_LIMIT : FREE_BOOKLET_LIMIT;
+    const monthlyLimit = isAdmin ? -1 : isTeacher ? TEACHER_MONTHLY_LIMIT : isParent ? PARENT_MONTHLY_LIMIT : freeAllowance;
     const remaining = isAdmin ? -1 : monthlyLimit - (isPaid ? usedMonthly : usedTotal) - 1;
 
     // ── 6.5 No-stream mode (in-app browsers: Facebook/Instagram webview) ───────

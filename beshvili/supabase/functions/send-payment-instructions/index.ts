@@ -13,6 +13,7 @@ const PLANS: Record<string, { label: string; price: string; period: string }> = 
   parent:  { label: "הורה",        price: "19",  period: "לחודש" },
   pro:     { label: "פרו",         price: "30",  period: "לחודש" }, // legacy pro pays 30 (matches renewal email + P&L)
   compass: { label: "מצפן — דוח",  price: "49",  period: "חד־פעמי" },
+  pack5:   { label: "חבילת 5 חוברות", price: "15", period: "חד־פעמי (בלי מנוי)" },
 };
 
 function getCors(req: Request) {

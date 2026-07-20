@@ -27,7 +27,7 @@ export function useProfile() {
       // maybeSingle(): a brand-new user whose profile row isn't visible yet returns
       // null (not an error), so they're treated as a fresh free user, not broken.
       const [{ data: p, error: pErr }, { count: monthly, error: cErr }] = await Promise.all([
-        supabase.from("profiles").select("plan, full_name, total_booklets_created, teacher_display_name, teacher_tagline, teacher_phone, teacher_logo_url, teacher_color").eq("id", user.id).maybeSingle(),
+        supabase.from("profiles").select("plan, full_name, total_booklets_created, booklet_credits_granted, teacher_display_name, teacher_tagline, teacher_phone, teacher_logo_url, teacher_color").eq("id", user.id).maybeSingle(),
         supabase.from("booklets").select("*", { count: "exact", head: true }).eq("user_id", user.id).gte("created_at", monthStart),
       ]);
 
@@ -64,7 +64,14 @@ export function useProfile() {
   const plan    = profile?.plan ?? "free";
   const isAdmin = plan === "admin";
   const isPro   = plan === "parent" || plan === "teacher" || plan === "pro" || isAdmin;
-  const remaining = isPro ? Infinity : Math.max(0, FREE_LIMIT - bookletCount);
+  // One-time pack credits (migration 0044, cumulative-grant model): the free
+  // lifetime allowance is FREE_LIMIT + granted; a credit booklet gets parent-
+  // tier benefits (up to 10 pages + answer key). packCredits = credits still
+  // spendable right now.
+  const creditsGranted = profile?.booklet_credits_granted ?? 0;
+  const freeRemaining = isPro ? Infinity : Math.max(0, FREE_LIMIT - bookletCount);
+  const remaining = isPro ? Infinity : Math.max(0, FREE_LIMIT + creditsGranted - bookletCount);
+  const packCredits = isPro ? 0 : Math.max(0, remaining - freeRemaining);
 
   const monthlyLimit = isAdmin ? null
     : plan === "parent" ? PARENT_MONTHLY_LIMIT
@@ -75,5 +82,5 @@ export function useProfile() {
     ? Math.max(0, monthlyLimit - monthlyBookletCount)
     : null;
 
-  return { profile, plan, bookletCount, monthlyBookletCount, monthlyLimit, monthlyRemaining, remaining, isPro, isAdmin, loading, error, refresh };
+  return { profile, plan, bookletCount, monthlyBookletCount, monthlyLimit, monthlyRemaining, remaining, freeRemaining, packCredits, isPro, isAdmin, loading, error, refresh };
 }
