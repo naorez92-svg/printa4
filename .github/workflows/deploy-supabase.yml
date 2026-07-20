@@ -40,6 +40,7 @@ jobs:
           supabase functions deploy record-survey-answer --project-ref gywpdzkvkdisonuzhsib --no-verify-jwt
           supabase functions deploy record-booklet-result --project-ref gywpdzkvkdisonuzhsib --no-verify-jwt
           supabase functions deploy weekly-marketing-kit --project-ref gywpdzkvkdisonuzhsib --no-verify-jwt
+          supabase functions deploy weekly-booklet-nudge --project-ref gywpdzkvkdisonuzhsib --no-verify-jwt
           supabase functions deploy career-compass --project-ref gywpdzkvkdisonuzhsib --no-verify-jwt
           supabase functions deploy support-chat --project-ref gywpdzkvkdisonuzhsib --no-verify-jwt
           supabase functions deploy send-payment-instructions --project-ref gywpdzkvkdisonuzhsib --no-verify-jwt

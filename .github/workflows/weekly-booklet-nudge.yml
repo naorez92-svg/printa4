@@ -1,0 +1,25 @@
+name: Weekly Booklet Nudge
+
+on:
+  schedule:
+    # Sunday 04:30 UTC = 07:30 Israel — first school-day morning, when parents
+    # and tutors plan the week. The habit engine's weekly heartbeat.
+    - cron: '30 4 * * 0'
+  workflow_dispatch:
+
+jobs:
+  nudge:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger weekly-booklet-nudge Edge Function
+        run: |
+          RESPONSE=$(curl -sS -w "\n%{http_code}" -X POST \
+            "https://gywpdzkvkdisonuzhsib.supabase.co/functions/v1/weekly-booklet-nudge" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            -H "Content-Type: application/json" \
+            -d '{}')
+          HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+          BODY=$(echo "$RESPONSE" | head -n -1)
+          echo "Response: $BODY"
+          echo "Status: $HTTP_CODE"
+          [ "$HTTP_CODE" -eq 200 ] || exit 1
