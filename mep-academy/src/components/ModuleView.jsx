@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { getLesson } from "../data/lessons.js";
+import LessonPlayer from "./LessonPlayer.jsx";
 
 function Section({ icon, title, children }) {
   return (
@@ -67,9 +69,15 @@ function QuizQuestion({ index, item, chosen, onChoose }) {
 
 export default function ModuleView({ module, done, onToggleDone, onBack }) {
   const [answers, setAnswers] = useState({});
+  const [lessonOpen, setLessonOpen] = useState(false);
+  const lesson = getLesson(module.id);
 
   return (
     <div className="space-y-4">
+      {lessonOpen && lesson && (
+        <LessonPlayer lesson={lesson} onClose={() => setLessonOpen(false)} />
+      )}
+
       <button onClick={onBack} className="text-magic font-semibold hover:underline">
         <span aria-hidden>→ </span>חזרה לכל המודולים
       </button>
@@ -78,6 +86,15 @@ export default function ModuleView({ module, done, onToggleDone, onBack }) {
         <div className="text-4xl mb-2" aria-hidden>{module.icon}</div>
         <h1 className="font-bold text-2xl mb-2">{module.title}</h1>
         <p className="text-white/90 leading-relaxed">{module.summary}</p>
+        {lesson && (
+          <button
+            onClick={() => setLessonOpen(true)}
+            className="mt-4 w-full bg-brand text-ink rounded-2xl py-3.5 px-4 font-bold text-lg hover:opacity-90 transition flex items-center justify-center gap-2"
+          >
+            <span aria-hidden>▶️</span>
+            צפייה בשיעור המונפש ({lesson.slides.length} פרקים, ~10 דק')
+          </button>
+        )}
       </header>
 
       <Section icon="🎯" title="נקודות המפתח">

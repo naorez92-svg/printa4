@@ -17,6 +17,48 @@ body {
   border-radius: 0.5rem;
 }
 
+/* תרשימי זרימה: קווים מקווקווים "זורמים" לאורך הצינורות */
+.flow-pipe {
+  animation: flow-dash 1s linear infinite;
+}
+
+@keyframes flow-dash {
+  to {
+    stroke-dashoffset: -24;
+  }
+}
+
+/* אנימציות נגן השיעורים: כניסת שקף וחשיפת נקודות בהדרגה */
+.lesson-slide {
+  animation: lesson-slide-in 0.5s ease-out both;
+}
+
+.lesson-bullet {
+  animation: lesson-bullet-in 0.5s ease-out both;
+}
+
+@keyframes lesson-slide-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes lesson-bullet-in {
+  from {
+    opacity: 0;
+    transform: translateX(18px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
 /* הנגשה: כיבוד העדפת משתמש להפחתת אנימציות */
 @media (prefers-reduced-motion: reduce) {
   html {
