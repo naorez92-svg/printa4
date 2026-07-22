@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { MODULES, getModule } from "./data/modules.js";
+import { getLesson } from "./data/lessons.js";
 import { TOFES4_CHECKLIST } from "./data/tofes4.js";
 import { loadState, saveState } from "./lib/storage.js";
 import ModuleView from "./components/ModuleView.jsx";
@@ -140,7 +141,12 @@ function ModulesList({ completed, onOpenModule }) {
               <div className="flex items-center gap-4">
                 <span className="text-3xl shrink-0" aria-hidden>{m.icon}</span>
                 <div className="flex-1">
-                  <p className="text-xs text-ink/70 font-mono">מודול {i + 1}</p>
+                  <p className="text-xs text-ink/70 font-mono">
+                    מודול {i + 1}
+                    {getLesson(m.id) && (
+                      <span className="mr-2 text-magic font-sans font-bold">▶️ כולל שיעור</span>
+                    )}
+                  </p>
                   <p className="font-bold">{m.title}</p>
                 </div>
                 {done && (
