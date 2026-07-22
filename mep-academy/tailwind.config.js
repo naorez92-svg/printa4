@@ -9,10 +9,10 @@ export default {
         brand: "#F4A02C",
         magic: "#6C5CE7",
         grow: "#1FB58F",
+        growdeep: "#0E7C5F",
         steel: "#2B3A55",
       },
       fontFamily: {
-        display: ['"Baloo 2"', "cursive"],
         sans: ["Assistant", "sans-serif"],
         mono: ["Rubik", "sans-serif"],
       },

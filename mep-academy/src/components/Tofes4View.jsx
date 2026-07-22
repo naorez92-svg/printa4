@@ -7,8 +7,8 @@ export default function Tofes4View({ checked, onToggle }) {
   return (
     <div className="space-y-4">
       <header className="bg-ink text-white rounded-2xl p-6">
-        <h2 className="font-bold text-2xl mb-1">📋 הכנה לטופס 4</h2>
-        <p className="text-white/85">
+        <h1 className="font-bold text-2xl mb-1">📋 הכנה לטופס 4</h1>
+        <p className="text-white/90">
           המסלול המלא לאישור האכלוס: למה הוא נקרא כך, מי צריך לאשר מה, ואיך מנהלים את זה
           בלי לאחר את המסירה.
         </p>
@@ -30,7 +30,7 @@ export default function Tofes4View({ checked, onToggle }) {
             {doneCount}/{TOFES4_CHECKLIST.length}
           </span>
         </div>
-        <p className="text-sm text-ink/60 mb-3">
+        <p className="text-sm text-ink/70 mb-3">
           רשימת הרשויות והאישורים הנפוצים. כל ועדה מקומית רשאית להוסיף דרישות — בדקו את
           גיליון הדרישות של ההיתר שלכם.
         </p>
@@ -41,9 +41,10 @@ export default function Tofes4View({ checked, onToggle }) {
           aria-valuemin={0}
           aria-valuemax={TOFES4_CHECKLIST.length}
           aria-label={`הושלמו ${doneCount} מתוך ${TOFES4_CHECKLIST.length} אישורים`}
+          aria-valuetext={`${pct}%`}
         >
           <div
-            className="h-full bg-grow rounded-full transition-all"
+            className="h-full bg-growdeep rounded-full transition-all"
             style={{ width: `${pct}%` }}
           />
         </div>
@@ -67,7 +68,7 @@ export default function Tofes4View({ checked, onToggle }) {
                     <p className="font-bold">
                       {item.authority} — {item.what}
                     </p>
-                    <p className="text-sm text-ink/70 leading-relaxed mt-1">{item.requires}</p>
+                    <p className="text-sm text-ink/80 leading-relaxed mt-1">{item.requires}</p>
                   </div>
                 </div>
               </button>

@@ -26,6 +26,7 @@ function ProgressRing({ done, total }) {
         aria-valuemin={0}
         aria-valuemax={total}
         aria-label={`הושלמו ${done} מתוך ${total} מודולים`}
+        aria-valuetext={`${pct}%`}
       >
         <svg viewBox="0 0 36 36" className="w-20 h-20 -rotate-90" aria-hidden>
           <circle cx="18" cy="18" r="16" fill="none" stroke="#F7F6FB" strokeWidth="4" />
@@ -34,7 +35,7 @@ function ProgressRing({ done, total }) {
             cy="18"
             r="16"
             fill="none"
-            stroke="#1FB58F"
+            stroke="#0E7C5F"
             strokeWidth="4"
             strokeDasharray={`${pct} 100`}
             pathLength="100"
@@ -47,7 +48,7 @@ function ProgressRing({ done, total }) {
       </div>
       <div>
         <p className="font-bold text-lg">ההתקדמות שלך</p>
-        <p className="text-ink/60 text-sm">
+        <p className="text-ink/70 text-sm">
           הושלמו {done} מתוך {total} מודולים
         </p>
       </div>
@@ -75,13 +76,13 @@ function Home({ completed, bestExam, tofes4Done, onNavigate, onOpenModule }) {
           onClick={() => onOpenModule(nextModule.id)}
           className="w-full bg-magic text-white rounded-2xl p-5 text-right hover:opacity-90 transition"
         >
-          <p className="text-sm text-white/75 mb-1">המודול הבא שלך</p>
+          <p className="text-sm text-white/90 mb-1">המודול הבא שלך</p>
           <p className="font-bold text-lg">
             {nextModule.icon} {nextModule.title}
           </p>
         </button>
       ) : (
-        <div className="w-full bg-grow text-white rounded-2xl p-5 text-center font-bold text-lg">
+        <div className="w-full bg-growdeep text-white rounded-2xl p-5 text-center font-bold text-lg">
           🏆 סיימת את כל המודולים! עכשיו — מבחן.
         </div>
       )}
@@ -93,7 +94,7 @@ function Home({ completed, bestExam, tofes4Done, onNavigate, onOpenModule }) {
         >
           <p className="text-3xl mb-2" aria-hidden>📋</p>
           <p className="font-bold">הכנה לטופס 4</p>
-          <p className="text-sm text-ink/60 font-mono mt-1">
+          <p className="text-sm text-ink/70 font-mono mt-1">
             {tofes4Done}/{TOFES4_CHECKLIST.length} אישורים
           </p>
         </button>
@@ -103,8 +104,8 @@ function Home({ completed, bestExam, tofes4Done, onNavigate, onOpenModule }) {
         >
           <p className="text-3xl mb-2" aria-hidden>🎓</p>
           <p className="font-bold">מבחן תרגול</p>
-          <p className="text-sm text-ink/60 font-mono mt-1">
-            {bestExam > 0 ? `שיא: ${bestExam}%` : "עוד לא ניגשת"}
+          <p className="text-sm text-ink/70 font-mono mt-1">
+            {bestExam !== null ? `שיא: ${bestExam}%` : "עוד לא ניגשת"}
           </p>
         </button>
       </div>
@@ -116,8 +117,8 @@ function ModulesList({ completed, onOpenModule }) {
   return (
     <div className="space-y-4">
       <header className="bg-ink text-white rounded-2xl p-6">
-        <h2 className="font-bold text-2xl mb-1">📚 מודולי הלימוד</h2>
-        <p className="text-white/85">
+        <h1 className="font-bold text-2xl mb-1">📚 מודולי הלימוד</h1>
+        <p className="text-white/90">
           {MODULES.length} מודולים לפי סדר הקורס — מהמבוא ועד קו הסיום: טופס 4.
         </p>
       </header>
@@ -135,7 +136,7 @@ function ModulesList({ completed, onOpenModule }) {
               <div className="flex items-center gap-4">
                 <span className="text-3xl shrink-0" aria-hidden>{m.icon}</span>
                 <div className="flex-1">
-                  <p className="text-xs text-ink/50 font-mono">מודול {i + 1}</p>
+                  <p className="text-xs text-ink/70 font-mono">מודול {i + 1}</p>
                   <p className="font-bold">{m.title}</p>
                 </div>
                 {done && <span className="text-grow text-xl shrink-0">✔️</span>}
@@ -153,11 +154,14 @@ export default function App() {
   const [openModuleId, setOpenModuleId] = useState(null);
   const [completed, setCompleted] = useState(() => loadState("completed", {}));
   const [tofes4Checked, setTofes4Checked] = useState(() => loadState("tofes4", {}));
-  const [bestExam, setBestExam] = useState(() => loadState("bestExam", 0));
+  // null = עוד לא ניגשו למבחן; 0 הוא ציון אמיתי (0%) ולכן מובחן מ-null
+  const [bestExam, setBestExam] = useState(() => loadState("bestExam", null));
 
   useEffect(() => saveState("completed", completed), [completed]);
   useEffect(() => saveState("tofes4", tofes4Checked), [tofes4Checked]);
-  useEffect(() => saveState("bestExam", bestExam), [bestExam]);
+  useEffect(() => {
+    if (bestExam !== null) saveState("bestExam", bestExam);
+  }, [bestExam]);
 
   const openModule = (id) => {
     setOpenModuleId(id);
@@ -167,7 +171,7 @@ export default function App() {
 
   const currentModule = openModuleId ? getModule(openModuleId) : null;
 
-  let content;
+  let content = null;
   if (tab === "home") {
     content = (
       <Home
@@ -200,21 +204,27 @@ export default function App() {
         onToggle={(id) => setTofes4Checked((c) => ({ ...c, [id]: !c[id] }))}
       />
     );
-  } else {
-    content = (
-      <ExamView best={bestExam} onFinish={(pct) => setBestExam((b) => Math.max(b, pct))} />
-    );
   }
 
   return (
-    <div className="min-h-screen pb-24">
+    <div className="min-h-screen pb-24 flex flex-col">
       <a
         href="#main-content"
         className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:right-2 focus:z-50 focus:bg-white focus:px-4 focus:py-2 focus:rounded-xl focus:shadow-lg"
       >
         דילוג לתוכן הראשי
       </a>
-      <main id="main-content" className="max-w-2xl mx-auto px-4 pt-6">{content}</main>
+      <main id="main-content" className="w-full max-w-2xl mx-auto px-4 pt-6 flex-1">
+        {content}
+        {/* המבחן נשאר תמיד ברכיב חי (מוסתר כשלא בטאב שלו) כדי שמעבר טאב
+            בטעות לא ימחק התקדמות של מבחן פעיל */}
+        <div hidden={tab !== "exam"}>
+          <ExamView
+            best={bestExam}
+            onFinish={(pct) => setBestExam((b) => Math.max(b ?? 0, pct))}
+          />
+        </div>
+      </main>
 
       <nav
         aria-label="ניווט ראשי"
@@ -226,12 +236,12 @@ export default function App() {
               key={t.id}
               onClick={() => {
                 setTab(t.id);
-                if (t.id !== "modules") setOpenModuleId(null);
+                setOpenModuleId(null);
                 window.scrollTo({ top: 0 });
               }}
               aria-current={tab === t.id ? "page" : undefined}
               className={`py-3 flex flex-col items-center gap-0.5 text-xs font-semibold transition ${
-                tab === t.id ? "text-magic" : "text-ink/50 hover:text-ink"
+                tab === t.id ? "text-magic" : "text-ink/70 hover:text-ink"
               }`}
             >
               <span className="text-xl" aria-hidden>{t.icon}</span>
@@ -241,7 +251,7 @@ export default function App() {
         </div>
       </nav>
 
-      <footer className="max-w-2xl mx-auto px-4 mt-8 pb-4 text-center text-xs text-ink/40">
+      <footer className="w-full max-w-2xl mx-auto px-4 mt-auto pt-8 pb-4 text-center text-xs text-ink/60">
         אקדמיית MEP · גרסה {__APP_VERSION__} · התכנים להעשרה מקצועית — אינם תחליף לייעוץ
         הנדסי או לנוסח המחייב של התקנים
       </footer>

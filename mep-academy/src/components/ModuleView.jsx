@@ -36,8 +36,10 @@ function QuizQuestion({ index, item, chosen, onChoose }) {
           return (
             <button
               key={i}
-              disabled={answered}
-              onClick={() => onChoose(i)}
+              aria-disabled={answered}
+              onClick={() => {
+                if (!answered) onChoose(i);
+              }}
               className={`text-right rounded-lg border px-3 py-2 transition ${cls}`}
             >
               {opt}
@@ -46,15 +48,19 @@ function QuizQuestion({ index, item, chosen, onChoose }) {
           );
         })}
       </div>
-      {answered && (
-        <p
-          role="status"
-          className={`mt-3 text-sm rounded-lg p-3 ${chosen === item.answer ? "bg-grow/10" : "bg-brand/10"}`}
-        >
-          {chosen === item.answer ? "✔️ נכון! " : "✖️ לא מדויק. "}
-          {item.explain}
-        </p>
-      )}
+      {/* אזור חי קבוע — קיים לפני שיש תוכן, כדי שקוראי מסך יכריזו על המשוב */}
+      <p
+        role="status"
+        className={
+          answered
+            ? `mt-3 text-sm rounded-lg p-3 ${chosen === item.answer ? "bg-grow/10" : "bg-brand/10"}`
+            : "sr-only"
+        }
+      >
+        {answered
+          ? `${chosen === item.answer ? "✔️ נכון! " : "✖️ לא מדויק. "}${item.explain}`
+          : ""}
+      </p>
     </fieldset>
   );
 }
@@ -65,13 +71,13 @@ export default function ModuleView({ module, done, onToggleDone, onBack }) {
   return (
     <div className="space-y-4">
       <button onClick={onBack} className="text-magic font-semibold hover:underline">
-        → חזרה לכל המודולים
+        <span aria-hidden>→ </span>חזרה לכל המודולים
       </button>
 
       <header className="bg-ink text-white rounded-2xl p-6">
         <div className="text-4xl mb-2" aria-hidden>{module.icon}</div>
-        <h2 className="font-bold text-2xl mb-2">{module.title}</h2>
-        <p className="text-white/85 leading-relaxed">{module.summary}</p>
+        <h1 className="font-bold text-2xl mb-2">{module.title}</h1>
+        <p className="text-white/90 leading-relaxed">{module.summary}</p>
       </header>
 
       <Section icon="🎯" title="נקודות המפתח">
@@ -136,10 +142,14 @@ export default function ModuleView({ module, done, onToggleDone, onBack }) {
         onClick={onToggleDone}
         aria-pressed={done}
         className={`w-full rounded-2xl py-4 font-bold text-lg transition ${
-          done ? "bg-grow text-white" : "bg-magic text-white hover:opacity-90"
+          done ? "bg-growdeep text-white" : "bg-magic text-white hover:opacity-90"
         }`}
       >
         {done ? "✔️ המודול הושלם — לחיצה לביטול" : "סיימתי את המודול"}
+      </button>
+
+      <button onClick={onBack} className="w-full text-center text-magic font-semibold hover:underline py-2">
+        <span aria-hidden>→ </span>חזרה לכל המודולים
       </button>
     </div>
   );

@@ -7,7 +7,11 @@ export function loadState(key, fallback) {
   try {
     const raw = localStorage.getItem(PREFIX + key);
     if (raw === null) return fallback;
-    return JSON.parse(raw);
+    const value = JSON.parse(raw);
+    // ערך פגום (null או טיפוס שגוי) לא יפיל את האפליקציה — חוזרים לברירת המחדל
+    if (value === null || value === undefined) return fallback;
+    if (fallback !== null && typeof value !== typeof fallback) return fallback;
+    return value;
   } catch {
     return fallback;
   }
