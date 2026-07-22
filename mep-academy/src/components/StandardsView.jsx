@@ -30,6 +30,7 @@ export default function StandardsView() {
         value={query}
         onChange={(e) => setQuery(e.target.value)}
         placeholder='חיפוש תקן… (למשל: 1596, ממ"ד, חשמל)'
+        aria-label="חיפוש בספריית התקנים"
         className="w-full rounded-2xl border border-ink/15 bg-white px-4 py-3 focus:outline-none focus:ring-2 focus:ring-magic"
       />
 

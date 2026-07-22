@@ -9,3 +9,23 @@ html {
 body {
   @apply bg-canvas text-ink font-sans;
 }
+
+/* הנגשה: טבעת פוקוס ברורה לניווט מקלדת בכל האלמנטים האינטראקטיביים */
+:focus-visible {
+  outline: 3px solid #6c5ce7;
+  outline-offset: 2px;
+  border-radius: 0.5rem;
+}
+
+/* הנגשה: כיבוד העדפת משתמש להפחתת אנימציות */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
+}

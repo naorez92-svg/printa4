@@ -19,8 +19,15 @@ function ProgressRing({ done, total }) {
   const pct = total === 0 ? 0 : Math.round((done / total) * 100);
   return (
     <div className="bg-white rounded-2xl shadow-sm p-5 flex items-center gap-4">
-      <div className="relative w-20 h-20 shrink-0">
-        <svg viewBox="0 0 36 36" className="w-20 h-20 -rotate-90">
+      <div
+        className="relative w-20 h-20 shrink-0"
+        role="progressbar"
+        aria-valuenow={done}
+        aria-valuemin={0}
+        aria-valuemax={total}
+        aria-label={`הושלמו ${done} מתוך ${total} מודולים`}
+      >
+        <svg viewBox="0 0 36 36" className="w-20 h-20 -rotate-90" aria-hidden>
           <circle cx="18" cy="18" r="16" fill="none" stroke="#F7F6FB" strokeWidth="4" />
           <circle
             cx="18"
@@ -201,9 +208,18 @@ export default function App() {
 
   return (
     <div className="min-h-screen pb-24">
-      <main className="max-w-2xl mx-auto px-4 pt-6">{content}</main>
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:right-2 focus:z-50 focus:bg-white focus:px-4 focus:py-2 focus:rounded-xl focus:shadow-lg"
+      >
+        דילוג לתוכן הראשי
+      </a>
+      <main id="main-content" className="max-w-2xl mx-auto px-4 pt-6">{content}</main>
 
-      <nav className="fixed bottom-0 inset-x-0 bg-white border-t border-ink/10 shadow-lg">
+      <nav
+        aria-label="ניווט ראשי"
+        className="fixed bottom-0 inset-x-0 bg-white border-t border-ink/10 shadow-lg"
+      >
         <div className="max-w-2xl mx-auto grid grid-cols-5">
           {TABS.map((t) => (
             <button
@@ -213,6 +229,7 @@ export default function App() {
                 if (t.id !== "modules") setOpenModuleId(null);
                 window.scrollTo({ top: 0 });
               }}
+              aria-current={tab === t.id ? "page" : undefined}
               className={`py-3 flex flex-col items-center gap-0.5 text-xs font-semibold transition ${
                 tab === t.id ? "text-magic" : "text-ink/50 hover:text-ink"
               }`}

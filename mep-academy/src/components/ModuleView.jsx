@@ -15,17 +15,23 @@ function Section({ icon, title, children }) {
 function QuizQuestion({ index, item, chosen, onChoose }) {
   const answered = chosen !== undefined;
   return (
-    <div className="border border-ink/10 rounded-xl p-4">
-      <p className="font-semibold mb-3">
+    <fieldset className="border border-ink/10 rounded-xl p-4">
+      <legend className="sr-only">שאלה {index + 1}</legend>
+      <p className="font-semibold mb-3" id={`quiz-q-${index}`}>
         {index + 1}. {item.q}
       </p>
-      <div className="grid gap-2">
+      <div className="grid gap-2" role="group" aria-labelledby={`quiz-q-${index}`}>
         {item.options.map((opt, i) => {
           let cls = "bg-canvas hover:bg-magic/10 border-transparent";
+          let hint = "";
           if (answered) {
-            if (i === item.answer) cls = "bg-grow/15 border-grow text-ink";
-            else if (i === chosen) cls = "bg-red-100 border-red-400";
-            else cls = "bg-canvas opacity-60 border-transparent";
+            if (i === item.answer) {
+              cls = "bg-grow/15 border-grow text-ink";
+              hint = " (התשובה הנכונה)";
+            } else if (i === chosen) {
+              cls = "bg-red-100 border-red-400";
+              hint = " (התשובה שבחרת)";
+            } else cls = "bg-canvas opacity-60 border-transparent";
           }
           return (
             <button
@@ -35,17 +41,21 @@ function QuizQuestion({ index, item, chosen, onChoose }) {
               className={`text-right rounded-lg border px-3 py-2 transition ${cls}`}
             >
               {opt}
+              {hint && <span className="sr-only">{hint}</span>}
             </button>
           );
         })}
       </div>
       {answered && (
-        <p className={`mt-3 text-sm rounded-lg p-3 ${chosen === item.answer ? "bg-grow/10" : "bg-brand/10"}`}>
+        <p
+          role="status"
+          className={`mt-3 text-sm rounded-lg p-3 ${chosen === item.answer ? "bg-grow/10" : "bg-brand/10"}`}
+        >
           {chosen === item.answer ? "✔️ נכון! " : "✖️ לא מדויק. "}
           {item.explain}
         </p>
       )}
-    </div>
+    </fieldset>
   );
 }
 
@@ -89,12 +99,24 @@ export default function ModuleView({ module, done, onToggleDone, onBack }) {
         <ul className="space-y-2">
           {module.pitfalls.map((p, i) => (
             <li key={i} className="flex gap-2 leading-relaxed text-sm">
-              <span className="text-brand font-bold shrink-0">!</span>
+              <span className="text-brand font-bold shrink-0" aria-hidden>!</span>
               <span>{p}</span>
             </li>
           ))}
         </ul>
       </Section>
+
+      {module.intl?.length > 0 && (
+        <Section icon="🌍" title="העשרה בינלאומית — מותאם לשוק הישראלי">
+          <ul className="space-y-2">
+            {module.intl.map((p, i) => (
+              <li key={i} className="bg-magic/5 border border-magic/20 rounded-lg px-3 py-2 text-sm leading-relaxed">
+                {p}
+              </li>
+            ))}
+          </ul>
+        </Section>
+      )}
 
       <Section icon="✍️" title="תרגול">
         <div className="space-y-4">
@@ -112,6 +134,7 @@ export default function ModuleView({ module, done, onToggleDone, onBack }) {
 
       <button
         onClick={onToggleDone}
+        aria-pressed={done}
         className={`w-full rounded-2xl py-4 font-bold text-lg transition ${
           done ? "bg-grow text-white" : "bg-magic text-white hover:opacity-90"
         }`}

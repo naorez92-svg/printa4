@@ -34,7 +34,14 @@ export default function Tofes4View({ checked, onToggle }) {
           רשימת הרשויות והאישורים הנפוצים. כל ועדה מקומית רשאית להוסיף דרישות — בדקו את
           גיליון הדרישות של ההיתר שלכם.
         </p>
-        <div className="h-2 bg-canvas rounded-full mb-4 overflow-hidden">
+        <div
+          className="h-2 bg-canvas rounded-full mb-4 overflow-hidden"
+          role="progressbar"
+          aria-valuenow={doneCount}
+          aria-valuemin={0}
+          aria-valuemax={TOFES4_CHECKLIST.length}
+          aria-label={`הושלמו ${doneCount} מתוך ${TOFES4_CHECKLIST.length} אישורים`}
+        >
           <div
             className="h-full bg-grow rounded-full transition-all"
             style={{ width: `${pct}%` }}
@@ -47,6 +54,7 @@ export default function Tofes4View({ checked, onToggle }) {
               <button
                 key={item.id}
                 onClick={() => onToggle(item.id)}
+                aria-pressed={isDone}
                 className={`w-full text-right rounded-xl border p-4 transition ${
                   isDone ? "bg-grow/10 border-grow" : "bg-canvas border-transparent hover:border-magic/40"
                 }`}
