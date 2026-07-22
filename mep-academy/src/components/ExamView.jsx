@@ -53,6 +53,8 @@ export default function ExamView({ best, onFinish }) {
     setChosen(null);
     setScore(0);
     setFinished(false);
+    // מסך התוצאות נעלם וכפתור 'מבחן חדש' מתפרק — מחזירים את הפוקוס לראש המבחן
+    requestAnimationFrame(() => counterRef.current?.focus());
   };
 
   if (finished) {
@@ -106,9 +108,9 @@ export default function ExamView({ best, onFinish }) {
           </span>
         </div>
 
-        <p className="font-bold text-lg mb-4">{q.q}</p>
+        <p className="font-bold text-lg mb-4" id="exam-question">{q.q}</p>
 
-        <div className="grid gap-2">
+        <div className="grid gap-2" role="group" aria-labelledby="exam-question">
           {q.options.map((opt, i) => {
             let cls = "bg-canvas hover:bg-magic/10 border-transparent";
             let hint = "";

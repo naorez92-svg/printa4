@@ -43,15 +43,19 @@ export default function StandardsView() {
         className="w-full rounded-2xl border border-ink/15 bg-white px-4 py-3 focus:outline-none focus:ring-2 focus:ring-magic"
       />
 
-      {filtered.length === 0 && (
-        <p role="status" className="text-center text-ink/70 py-8">לא נמצאו תקנים מתאימים לחיפוש.</p>
-      )}
+      {/* אזור חי קבוע — מוכרז גם כשהתוצאה מתרוקנת */}
+      <p
+        role="status"
+        className={filtered.length === 0 ? "text-center text-ink/70 py-8" : "sr-only"}
+      >
+        {filtered.length === 0 ? "לא נמצאו תקנים מתאימים לחיפוש." : ""}
+      </p>
 
       {filtered.map((domain) => (
         <section key={domain.id} className="bg-white rounded-2xl shadow-sm p-5">
-          <h3 className="font-bold text-lg mb-3">
+          <h2 className="font-bold text-lg mb-3">
             <span aria-hidden>{domain.icon}</span> {domain.title}
-          </h3>
+          </h2>
           <div className="space-y-3">
             {domain.items.map((item, i) => (
               <div key={i} className="bg-canvas rounded-xl p-4">

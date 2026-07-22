@@ -3,10 +3,10 @@ import { useState } from "react";
 function Section({ icon, title, children }) {
   return (
     <section className="bg-white rounded-2xl shadow-sm p-5">
-      <h3 className="font-bold text-lg mb-3 flex items-center gap-2">
+      <h2 className="font-bold text-lg mb-3 flex items-center gap-2">
         <span aria-hidden>{icon}</span>
         {title}
-      </h3>
+      </h2>
       {children}
     </section>
   );

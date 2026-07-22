@@ -15,7 +15,7 @@ export default function Tofes4View({ checked, onToggle }) {
       </header>
 
       <section className="bg-white rounded-2xl shadow-sm p-5">
-        <h3 className="font-bold text-lg mb-3">❓ {WHY_TOFES4.title}</h3>
+        <h2 className="font-bold text-lg mb-3">❓ {WHY_TOFES4.title}</h2>
         <div className="space-y-3 leading-relaxed">
           {WHY_TOFES4.paragraphs.map((p, i) => (
             <p key={i}>{p}</p>
@@ -25,7 +25,7 @@ export default function Tofes4View({ checked, onToggle }) {
 
       <section className="bg-white rounded-2xl shadow-sm p-5">
         <div className="flex items-center justify-between mb-1">
-          <h3 className="font-bold text-lg">🗂️ צ'ק־ליסט האישורים</h3>
+          <h2 className="font-bold text-lg">🗂️ צ'ק־ליסט האישורים</h2>
           <span className="font-mono text-sm text-magic font-semibold">
             {doneCount}/{TOFES4_CHECKLIST.length}
           </span>
@@ -78,7 +78,7 @@ export default function Tofes4View({ checked, onToggle }) {
       </section>
 
       <section className="bg-white rounded-2xl shadow-sm p-5">
-        <h3 className="font-bold text-lg mb-3">💡 איך מקבלים את הטופס בזמן</h3>
+        <h2 className="font-bold text-lg mb-3">💡 איך מקבלים את הטופס בזמן</h2>
         <ol className="space-y-2 list-decimal pr-5">
           {TOFES4_TIPS.map((tip, i) => (
             <li key={i} className="leading-relaxed">{tip}</li>

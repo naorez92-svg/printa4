@@ -59,6 +59,10 @@ function ProgressRing({ done, total }) {
 function Home({ completed, bestExam, tofes4Done, onNavigate, onOpenModule }) {
   const doneCount = MODULES.filter((m) => completed[m.id]).length;
   const nextModule = MODULES.find((m) => !completed[m.id]);
+  const goTo = (tabId) => {
+    onNavigate(tabId);
+    window.scrollTo({ top: 0 });
+  };
   return (
     <div className="space-y-4">
       <header className="bg-gradient-to-l from-ink to-steel text-white rounded-2xl p-6">
@@ -89,7 +93,7 @@ function Home({ completed, bestExam, tofes4Done, onNavigate, onOpenModule }) {
 
       <div className="grid grid-cols-2 gap-4">
         <button
-          onClick={() => onNavigate("tofes4")}
+          onClick={() => goTo("tofes4")}
           className="bg-white rounded-2xl shadow-sm p-5 text-right hover:shadow-md transition"
         >
           <p className="text-3xl mb-2" aria-hidden>📋</p>
@@ -99,7 +103,7 @@ function Home({ completed, bestExam, tofes4Done, onNavigate, onOpenModule }) {
           </p>
         </button>
         <button
-          onClick={() => onNavigate("exam")}
+          onClick={() => goTo("exam")}
           className="bg-white rounded-2xl shadow-sm p-5 text-right hover:shadow-md transition"
         >
           <p className="text-3xl mb-2" aria-hidden>🎓</p>
@@ -139,7 +143,12 @@ function ModulesList({ completed, onOpenModule }) {
                   <p className="text-xs text-ink/70 font-mono">מודול {i + 1}</p>
                   <p className="font-bold">{m.title}</p>
                 </div>
-                {done && <span className="text-grow text-xl shrink-0">✔️</span>}
+                {done && (
+                  <span className="text-grow text-xl shrink-0">
+                    <span aria-hidden>✔️</span>
+                    <span className="sr-only">הושלם</span>
+                  </span>
+                )}
               </div>
             </button>
           );
@@ -154,8 +163,12 @@ export default function App() {
   const [openModuleId, setOpenModuleId] = useState(null);
   const [completed, setCompleted] = useState(() => loadState("completed", {}));
   const [tofes4Checked, setTofes4Checked] = useState(() => loadState("tofes4", {}));
-  // null = עוד לא ניגשו למבחן; 0 הוא ציון אמיתי (0%) ולכן מובחן מ-null
-  const [bestExam, setBestExam] = useState(() => loadState("bestExam", null));
+  // null = עוד לא ניגשו למבחן; 0 הוא ציון אמיתי (0%) ולכן מובחן מ-null.
+  // Number.isFinite מסנן ערך פגום שנשמר ידנית ב-storage.
+  const [bestExam, setBestExam] = useState(() => {
+    const v = loadState("bestExam", null);
+    return Number.isFinite(v) ? v : null;
+  });
 
   useEffect(() => saveState("completed", completed), [completed]);
   useEffect(() => saveState("tofes4", tofes4Checked), [tofes4Checked]);
@@ -251,7 +264,7 @@ export default function App() {
         </div>
       </nav>
 
-      <footer className="w-full max-w-2xl mx-auto px-4 mt-auto pt-8 pb-4 text-center text-xs text-ink/60">
+      <footer className="w-full max-w-2xl mx-auto px-4 mt-auto pt-8 pb-4 text-center text-xs text-ink/70">
         אקדמיית MEP · גרסה {__APP_VERSION__} · התכנים להעשרה מקצועית — אינם תחליף לייעוץ
         הנדסי או לנוסח המחייב של התקנים
       </footer>
