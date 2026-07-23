@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { MODULES, getModule } from "./data/modules.js";
 import { getLesson } from "./data/lessons.js";
 import { TOFES4_CHECKLIST } from "./data/tofes4.js";
-import { loadState, saveState } from "./lib/storage.js";
+import { loadState, saveState, clearAllState } from "./lib/storage.js";
 import ModuleView from "./components/ModuleView.jsx";
 import StandardsView from "./components/StandardsView.jsx";
 import Tofes4View from "./components/Tofes4View.jsx";
@@ -60,7 +60,7 @@ function ProgressRing({ done, total }) {
   );
 }
 
-function Home({ completed, bestExam, tofes4Done, onNavigate, onOpenModule, session, onLogin, onLogout }) {
+function Home({ completed, bestExam, tofes4Done, onNavigate, onOpenModule, session, onLogout }) {
   const doneCount = MODULES.filter((m) => completed[m.id]).length;
   const nextModule = MODULES.find((m) => !completed[m.id]);
   const goTo = (tabId) => {
@@ -118,35 +118,20 @@ function Home({ completed, bestExam, tofes4Done, onNavigate, onOpenModule, sessi
         </button>
       </div>
 
-      {authAvailable && (
+      {session && (
         <div className="bg-white rounded-2xl shadow-sm p-5">
-          {session ? (
-            <div className="flex items-center justify-between gap-3 flex-wrap">
-              <div>
-                <p className="font-bold">☁️ מחובר — ההתקדמות מסונכרנת</p>
-                <p className="text-sm text-ink/70 font-mono" dir="ltr">{session.user.email}</p>
-              </div>
-              <button
-                onClick={onLogout}
-                className="rounded-xl border border-ink/15 px-4 py-2 font-semibold hover:border-red-400 hover:text-red-700 transition"
-              >
-                יציאה
-              </button>
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div>
+              <p className="font-bold">☁️ מחובר — ההתקדמות שלך מסונכרנת</p>
+              <p className="text-sm text-ink/70 font-mono" dir="ltr">{session.user.email}</p>
             </div>
-          ) : (
-            <div className="flex items-center justify-between gap-3 flex-wrap">
-              <div>
-                <p className="font-bold">☁️ סנכרון בין מכשירים</p>
-                <p className="text-sm text-ink/70">התחברו באימייל — וההתקדמות תישמר בכל מכשיר.</p>
-              </div>
-              <button
-                onClick={onLogin}
-                className="rounded-xl bg-magic text-white px-4 py-2 font-bold hover:opacity-90 transition"
-              >
-                התחברות
-              </button>
-            </div>
-          )}
+            <button
+              onClick={onLogout}
+              className="rounded-xl border border-ink/15 px-4 py-2 font-semibold hover:border-red-400 hover:text-red-700 transition"
+            >
+              יציאה / החלפת חשבון
+            </button>
+          </div>
         </div>
       )}
     </div>
@@ -218,27 +203,47 @@ export default function App() {
   }, [bestExam]);
 
   // ---- דף נחיתה, התחברות וסנכרון ענן ----
-  const [entered, setEntered] = useState(() => loadState("entered", false));
+  // הכניסה לאפליקציה מחייבת חשבון אישי — כך ההתקדמות של כל משתמש
+  // נשמרת לו בנפרד ולא מתערבבת עם אחרים באותו מכשיר.
   const [session, setSession] = useState(null);
+  const [authLoading, setAuthLoading] = useState(authAvailable);
   const [loginOpen, setLoginOpen] = useState(false);
   const cloudReadyRef = useRef(false); // מותר לדחוף לענן רק אחרי משיכה ומיזוג
+  const lastUserIdRef = useRef(null);
+  const [syncTick, setSyncTick] = useState(0); // מאלץ דחיפה ראשונה אחרי מיזוג
 
-  useEffect(() => saveState("entered", entered), [entered]);
+  // ניקוי המכשיר — ביציאה יזומה וגם בניתוק חיצוני (פקיעת חיבור, יציאה
+  // מלשונית אחרת), כדי שהתקדמות של משתמש אחד לא תדלוף למשתמש הבא.
+  const wipeLocal = () => {
+    clearAllState();
+    setCompleted({});
+    setTofes4Checked({});
+    setBestExam(null);
+    setOpenModuleId(null);
+    setTab("home");
+    setLoginOpen(false);
+  };
 
   useEffect(() => {
     if (!authAvailable) return;
-    supabase.auth.getSession().then(({ data }) => setSession(data.session ?? null));
+    supabase.auth
+      .getSession()
+      .then(({ data }) => setSession(data.session ?? null))
+      .catch(() => {})
+      .finally(() => setAuthLoading(false));
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, s) => {
       setSession(s);
+      setAuthLoading(false);
+      const userId = s?.user?.id ?? null;
+      if (lastUserIdRef.current && lastUserIdRef.current !== userId) {
+        cloudReadyRef.current = false;
+        wipeLocal();
+      }
+      lastUserIdRef.current = userId;
       if (!s) cloudReadyRef.current = false;
     });
     return () => subscription.unsubscribe();
   }, []);
-
-  // מי שמחובר — עבר את דף הנחיתה
-  useEffect(() => {
-    if (session) setEntered(true);
-  }, [session]);
 
   // בכניסה: מושכים את המצב מהענן וממזגים עם המקומי (איחוד השלמות, שיא מקסימלי)
   useEffect(() => {
@@ -246,46 +251,56 @@ export default function App() {
     let cancelled = false;
     (async () => {
       try {
-        const { data } = await supabase
+        const { data, error } = await supabase
           .from("mep_progress")
           .select("data")
           .eq("user_id", session.user.id)
           .maybeSingle();
         if (cancelled) return;
+        // משיכה שנכשלה לא נחשבת "ענן ריק": משאירים את הדחיפה נעולה,
+        // אחרת שינוי מקומי קטן היה דורס את כל ההתקדמות השמורה בענן.
+        if (error) return;
         const remote = data?.data || {};
         if (remote.completed) setCompleted((local) => ({ ...remote.completed, ...local }));
         if (remote.tofes4) setTofes4Checked((local) => ({ ...remote.tofes4, ...local }));
         if (Number.isFinite(remote.bestExam))
           setBestExam((local) => Math.max(local ?? 0, remote.bestExam));
+        cloudReadyRef.current = true;
+        // דחיפה אחת מיד אחרי המיזוג — מכסה גם ענן ריק מול התקדמות מקומית קיימת
+        setSyncTick((t) => t + 1);
       } catch {
-        // אין רשת / טבלה עוד לא קיימת — ממשיכים מקומית, ננסה שוב בכניסה הבאה
+        // אין רשת — ננסה שוב בכניסה הבאה; הדחיפה נשארת נעולה
       }
-      cloudReadyRef.current = true;
     })();
     return () => {
       cancelled = true;
     };
   }, [session]);
 
-  // דחיפה לענן (debounce) על כל שינוי — רק אחרי שהמיזוג הראשוני הסתיים
+  // דחיפה לענן (debounce) על כל שינוי — רק אחרי שהמיזוג הראשוני הסתיים.
+  // התלות היא ב-user id ולא באובייקט session, כדי שרענון טוקן שעתי
+  // לא יגרור כתיבה מיותרת של נתונים זהים.
+  const userId = session?.user?.id ?? null;
   useEffect(() => {
-    if (!session || !cloudReadyRef.current) return;
+    if (!userId || !cloudReadyRef.current) return;
     const t = setTimeout(() => {
       supabase
         .from("mep_progress")
         .upsert({
-          user_id: session.user.id,
+          user_id: userId,
           data: { completed, tofes4: tofes4Checked, bestExam },
           updated_at: new Date().toISOString(),
         })
         .then(() => {}, () => {});
     }, 1500);
     return () => clearTimeout(t);
-  }, [completed, tofes4Checked, bestExam, session]);
+  }, [completed, tofes4Checked, bestExam, userId, syncTick]);
 
   const signOut = () => {
     cloudReadyRef.current = false;
-    supabase?.auth.signOut();
+    supabase?.auth.signOut().catch(() => {});
+    // ההתקדמות של המשתמש שיצא שמורה בענן שלו; המכשיר מתחיל נקי.
+    wipeLocal();
   };
 
   const openModule = (id) => {
@@ -298,8 +313,10 @@ export default function App() {
 
   useEffect(() => {
     const onPop = (e) => {
-      // אם המצב שנחשף הוא מודול (סגרנו שיעור) — נשארים בו; אחרת חוזרים לרשימה
-      if (!e.state?.m) setOpenModuleId(null);
+      // Back מחזיר למסך הקודם: רשומה עם מודול — פותחים אותו, אחרת לרשימה
+      const m = e.state?.m ?? null;
+      setOpenModuleId(m);
+      if (m) setTab("modules");
     };
     window.addEventListener("popstate", onPop);
     return () => window.removeEventListener("popstate", onPop);
@@ -317,7 +334,6 @@ export default function App() {
         onNavigate={setTab}
         onOpenModule={openModule}
         session={session}
-        onLogin={() => setLoginOpen(true)}
         onLogout={signOut}
       />
     );
@@ -329,7 +345,7 @@ export default function App() {
         onToggleDone={() =>
           setCompleted((c) => ({ ...c, [currentModule.id]: !c[currentModule.id] }))
         }
-        onBack={() => setOpenModuleId(null)}
+        onBack={() => window.history.back()}
       />
     ) : (
       <ModulesList completed={completed} onOpenModule={openModule} />
@@ -345,19 +361,27 @@ export default function App() {
     );
   }
 
-  // מבקר חדש (לא נכנס ולא מחובר) — דף הנחיתה
-  if (!entered && !session) {
+  // בזמן שחזור ההתחברות — מסך פתיחה קצר (מונע הבהוב של דף הנחיתה)
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <p className="text-4xl animate-pulse" aria-label="טוען">⚙️</p>
+      </div>
+    );
+  }
+
+  // לא מחובר — דף הנחיתה עם ההרשמה (אין כניסת אורח: לכל אחד המשתמש שלו)
+  if (authAvailable && !session) {
     return (
       <>
         {loginOpen && <LoginDialog onClose={() => setLoginOpen(false)} />}
-        <Landing onStart={() => setEntered(true)} onLogin={() => setLoginOpen(true)} />
+        <Landing onLogin={() => setLoginOpen(true)} />
       </>
     );
   }
 
   return (
     <div className="min-h-screen pb-24 flex flex-col">
-      {loginOpen && <LoginDialog onClose={() => setLoginOpen(false)} />}
       <a
         href="#main-content"
         className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:right-2 focus:z-50 focus:bg-white focus:px-4 focus:py-2 focus:rounded-xl focus:shadow-lg"
@@ -386,7 +410,8 @@ export default function App() {
               key={t.id}
               onClick={() => {
                 setTab(t.id);
-                setOpenModuleId(null);
+                // מודול פתוח נסגר דרך ההיסטוריה — כך לא נשארת רשומת Back יתומה
+                if (openModuleId) window.history.back();
                 window.scrollTo({ top: 0 });
               }}
               aria-current={tab === t.id ? "page" : undefined}

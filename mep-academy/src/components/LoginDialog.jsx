@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { supabase, signInWithGoogle } from "../lib/supabase.js";
 
 // התחברות באימייל: שולחים קוד/קישור חד-פעמי, נכנסים בלי סיסמה.
@@ -12,13 +12,22 @@ export default function LoginDialog({ onClose }) {
   const [error, setError] = useState("");
   const dialogRef = useRef(null);
 
+  // Escape סוגר גם כשהפוקוס מחוץ לדיאלוג (למשל אחרי מעבר לשלב הקוד)
+  useEffect(() => {
+    const onKey = (e) => e.key === "Escape" && onClose();
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
   const googleSignIn = async () => {
     setBusy(true);
     setError("");
-    // בהצלחה הדפדפן עוזב לעמוד של גוגל — לכאן חוזרים רק בשגיאה
+    // בהצלחה הדפדפן עוזב לעמוד של גוגל — הכפתור נשאר נעול עד הניווט
     const err = await signInWithGoogle();
-    setBusy(false);
-    if (err) setError(err);
+    if (err) {
+      setBusy(false);
+      setError(err);
+    }
   };
 
   const sendCode = async (e) => {
@@ -55,7 +64,6 @@ export default function LoginDialog({ onClose }) {
       aria-modal="true"
       aria-label="התחברות"
       className="fixed inset-0 z-50 bg-ink/60 flex items-center justify-center p-4"
-      onKeyDown={(e) => e.key === "Escape" && onClose()}
     >
       <div className="bg-white rounded-3xl shadow-xl w-full max-w-md p-6 space-y-4">
         <div className="flex items-center justify-between">
@@ -124,6 +132,7 @@ export default function LoginDialog({ onClose }) {
               type="text"
               inputMode="numeric"
               autoComplete="one-time-code"
+              autoFocus
               dir="ltr"
               value={code}
               onChange={(e) => setCode(e.target.value)}

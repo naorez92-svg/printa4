@@ -1,13 +1,17 @@
 import { useState } from "react";
 import { MODULES, TOTAL_QUIZ_QUESTIONS } from "../data/modules.js";
+import { LESSONS } from "../data/lessons.js";
 import { authAvailable, signInWithGoogle } from "../lib/supabase.js";
 
 // דף הנחיתה — המסך הראשון למבקר חדש. מציג מה יש בקורס וכפתור כניסה.
 
+const LESSON_COUNT = Object.keys(LESSONS).length;
+const TOTAL_SLIDES = Object.values(LESSONS).reduce((n, l) => n + l.slides.length, 0);
+
 const FEATURES = [
   {
     icon: "🎬",
-    title: "18 שיעורים מונפשים",
+    title: `${LESSON_COUNT} שיעורים מונפשים`,
     desc: "קריינות בעברית, כתוביות ותרשימי זרימה חיים — כמו סרטון, ישר בדפדפן.",
   },
   {
@@ -27,16 +31,25 @@ const FEATURES = [
   },
 ];
 
-export default function Landing({ onStart, onLogin }) {
+const STEPS = [
+  { icon: "1️⃣", title: "נרשמים בחינם", desc: "עם Google או אימייל — בלי סיסמאות" },
+  { icon: "2️⃣", title: "לומדים בקצב שלכם", desc: "שיעורים מונפשים עם קריינות, מכל מכשיר" },
+  { icon: "3️⃣", title: "מתרגלים ומתקדמים", desc: "ההתקדמות האישית שלכם נשמרת ומסתנכרנת" },
+];
+
+export default function Landing({ onLogin }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
   const googleSignIn = async () => {
     setBusy(true);
     setError("");
+    // בהצלחה הדפדפן עוזב לעמוד של גוגל — הכפתור נשאר נעול עד הניווט
     const err = await signInWithGoogle();
-    setBusy(false);
-    if (err) setError(err);
+    if (err) {
+      setBusy(false);
+      setError(err);
+    }
   };
 
   return (
@@ -55,7 +68,7 @@ export default function Landing({ onStart, onLogin }) {
               <p className="text-white/80 text-sm">מודולים</p>
             </div>
             <div>
-              <p className="font-bold text-2xl font-mono">152</p>
+              <p className="font-bold text-2xl font-mono">{TOTAL_SLIDES}</p>
               <p className="text-white/80 text-sm">שקפי שיעור</p>
             </div>
             <div>
@@ -68,6 +81,9 @@ export default function Landing({ onStart, onLogin }) {
         {authAvailable ? (
           <section className="bg-white rounded-2xl shadow-sm p-5 space-y-3" aria-label="כניסה">
             <h2 className="font-bold text-lg text-center">הרשמה / כניסה — חינם</h2>
+            <p className="text-sm text-ink/70 text-center">
+              כל אחד עם המשתמש האישי שלו — ההתקדמות נשמרת רק לך, בכל מכשיר.
+            </p>
             <button
               onClick={googleSignIn}
               disabled={busy}
@@ -90,21 +106,25 @@ export default function Landing({ onStart, onLogin }) {
             <p role="status" className={error ? "text-sm text-red-700 bg-red-50 rounded-xl p-3" : "sr-only"}>
               {error}
             </p>
-            <button
-              onClick={onStart}
-              className="w-full text-magic font-semibold hover:underline py-1"
-            >
-              רק להציץ? המשך ללא חשבון ←
-            </button>
           </section>
         ) : (
-          <button
-            onClick={onStart}
-            className="w-full bg-brand text-ink rounded-2xl py-4 font-bold text-xl hover:opacity-90 transition"
-          >
-            🚀 התחל ללמוד — חינם
-          </button>
+          <p className="bg-white rounded-2xl shadow-sm p-5 text-center text-ink/70">
+            ⚠️ ההתחברות אינה זמינה בסביבה זו.
+          </p>
         )}
+
+        <section className="bg-white rounded-2xl shadow-sm p-5" aria-label="איך זה עובד">
+          <h2 className="font-bold text-lg mb-4 text-center">איך זה עובד?</h2>
+          <div className="grid sm:grid-cols-3 gap-4">
+            {STEPS.map((s) => (
+              <div key={s.title} className="text-center">
+                <p className="text-3xl mb-1" aria-hidden>{s.icon}</p>
+                <p className="font-bold">{s.title}</p>
+                <p className="text-sm text-ink/70 leading-relaxed">{s.desc}</p>
+              </div>
+            ))}
+          </div>
+        </section>
 
         <section className="grid sm:grid-cols-2 gap-4" aria-label="מה מקבלים בקורס">
           {FEATURES.map((f) => (
@@ -114,6 +134,17 @@ export default function Landing({ onStart, onLogin }) {
               <p className="text-ink/80 text-sm leading-relaxed">{f.desc}</p>
             </div>
           ))}
+        </section>
+
+        <section className="bg-white rounded-2xl shadow-sm p-5" aria-label="נושאי הקורס">
+          <h2 className="font-bold text-lg mb-3">📚 מה לומדים? כל 18 המודולים</h2>
+          <div className="flex flex-wrap gap-2">
+            {MODULES.map((m) => (
+              <span key={m.id} className="bg-canvas rounded-full px-3 py-1.5 text-sm font-semibold">
+                <span aria-hidden>{m.icon}</span> {m.title.split(" — ")[0]}
+              </span>
+            ))}
+          </div>
         </section>
 
         <section className="bg-white rounded-2xl shadow-sm p-5">
