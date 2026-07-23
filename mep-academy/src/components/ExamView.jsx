@@ -37,6 +37,7 @@ export default function ExamView({ best, onFinish }) {
   const [chosen, setChosen] = useState(null);
   const [score, setScore] = useState(0);
   const [finished, setFinished] = useState(false);
+  const [mistakes, setMistakes] = useState([]);
   const counterRef = useRef(null);
 
   // הנגשה: בהחלפת שאלה מחזירים את הפוקוס לראש הכרטיס כדי שקוראי מסך
@@ -53,6 +54,7 @@ export default function ExamView({ best, onFinish }) {
     setChosen(null);
     setScore(0);
     setFinished(false);
+    setMistakes([]);
     // מסך התוצאות נעלם וכפתור 'מבחן חדש' מתפרק — מחזירים את הפוקוס לראש המבחן
     requestAnimationFrame(() => counterRef.current?.focus());
   };
@@ -81,6 +83,28 @@ export default function ExamView({ best, onFinish }) {
         >
           מבחן חדש
         </button>
+
+        {mistakes.length > 0 && (
+          <section className="text-right pt-4 border-t border-ink/10">
+            <h2 className="font-bold text-lg mb-3">📝 חזרה על הטעויות ({mistakes.length})</h2>
+            <div className="space-y-3">
+              {mistakes.map((m, i) => (
+                <div key={i} className="bg-canvas rounded-xl p-4 text-sm space-y-2">
+                  <p className="text-xs text-ink/70">
+                    {m.moduleIcon} {m.moduleTitle}
+                  </p>
+                  <p className="font-bold">{m.q}</p>
+                  <p className="text-red-700">✖️ ענית: {m.chosen}</p>
+                  <p className="text-growdeep font-semibold">✔️ הנכון: {m.correct}</p>
+                  <p className="text-ink/80 leading-relaxed">{m.explain}</p>
+                </div>
+              ))}
+            </div>
+            <p className="text-xs text-ink/70 mt-3">
+              💡 טיפ: חזרו למודולים של השאלות שפספסתם — ואז גשו למבחן חדש.
+            </p>
+          </section>
+        )}
       </div>
     );
   }
@@ -131,6 +155,18 @@ export default function ExamView({ best, onFinish }) {
                   if (answered) return;
                   setChosen(i);
                   if (i === q.answer) setScore((s) => s + 1);
+                  else
+                    setMistakes((m) => [
+                      ...m,
+                      {
+                        q: q.q,
+                        chosen: q.options[i],
+                        correct: q.options[q.answer],
+                        explain: q.explain,
+                        moduleTitle: q.moduleTitle,
+                        moduleIcon: q.moduleIcon,
+                      },
+                    ]);
                 }}
                 className={`text-right rounded-lg border px-4 py-3 transition ${cls}`}
               >

@@ -185,8 +185,19 @@ export default function App() {
   const openModule = (id) => {
     setOpenModuleId(id);
     setTab("modules");
+    // כפתור Back של הטלפון יחזיר לרשימת המודולים — לא יעיף מהאתר
+    window.history.pushState({ m: id }, "");
     window.scrollTo({ top: 0 });
   };
+
+  useEffect(() => {
+    const onPop = (e) => {
+      // אם המצב שנחשף הוא מודול (סגרנו שיעור) — נשארים בו; אחרת חוזרים לרשימה
+      if (!e.state?.m) setOpenModuleId(null);
+    };
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, []);
 
   const currentModule = openModuleId ? getModule(openModuleId) : null;
 

@@ -1,6 +1,20 @@
-import { useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { getLesson } from "../data/lessons.js";
 import LessonPlayer from "./LessonPlayer.jsx";
+
+// ערבוב סדר התשובות (Fisher–Yates) — בלעדיו התשובה הנכונה יושבת תמיד באותו מקום
+function shuffleOptions(q) {
+  const order = q.options.map((_, i) => i);
+  for (let i = order.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [order[i], order[j]] = [order[j], order[i]];
+  }
+  return {
+    ...q,
+    options: order.map((i) => q.options[i]),
+    answer: order.indexOf(q.answer),
+  };
+}
 
 function Section({ icon, title, children }) {
   return (
@@ -70,12 +84,24 @@ function QuizQuestion({ index, item, chosen, onChoose }) {
 export default function ModuleView({ module, done, onToggleDone, onBack }) {
   const [answers, setAnswers] = useState({});
   const [lessonOpen, setLessonOpen] = useState(false);
+  const quizRef = useRef(null);
   const lesson = getLesson(module.id);
+  // מערבבים פעם אחת לכל כניסה למודול — סדר יציב בזמן המענה
+  const quiz = useMemo(() => module.quiz.map(shuffleOptions), [module.id]);
 
   return (
     <div className="space-y-4">
       {lessonOpen && lesson && (
-        <LessonPlayer lesson={lesson} onClose={() => setLessonOpen(false)} />
+        <LessonPlayer
+          lesson={lesson}
+          moduleId={module.id}
+          onClose={(reason) => {
+            setLessonOpen(false);
+            // בסיום השיעור — קופצים ישר לתרגול, כמו שהקריינות מבטיחה
+            if (reason === "finished")
+              setTimeout(() => quizRef.current?.scrollIntoView({ block: "start" }), 60);
+          }}
+        />
       )}
 
       <button onClick={onBack} className="text-magic font-semibold hover:underline">
@@ -92,7 +118,8 @@ export default function ModuleView({ module, done, onToggleDone, onBack }) {
             className="mt-4 w-full bg-brand text-ink rounded-2xl py-3.5 px-4 font-bold text-lg hover:opacity-90 transition flex items-center justify-center gap-2"
           >
             <span aria-hidden>▶️</span>
-            צפייה בשיעור המונפש ({lesson.slides.length} פרקים, ~10 דק')
+            צפייה בשיעור המונפש ({lesson.slides.length} פרקים, ~
+            {Math.max(5, Math.round(lesson.slides.length * 0.9))} דק')
           </button>
         )}
       </header>
@@ -141,9 +168,10 @@ export default function ModuleView({ module, done, onToggleDone, onBack }) {
         </Section>
       )}
 
+      <div ref={quizRef} />
       <Section icon="✍️" title="תרגול">
         <div className="space-y-4">
-          {module.quiz.map((item, i) => (
+          {quiz.map((item, i) => (
             <QuizQuestion
               key={i}
               index={i}

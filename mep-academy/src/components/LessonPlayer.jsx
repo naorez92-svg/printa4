@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { DIAGRAMS } from "./diagrams.jsx";
+import { loadState, saveState } from "../lib/storage.js";
 
 // נגן שיעור מונפש: שקפים עם קריינות דפדפן (Web Speech API) וכתוביות.
 // אם אין קול עברי זמין — הנגן עובר אוטומטית למצב מתוזמן (כתוביות בלבד).
@@ -19,8 +20,14 @@ function readingMs(text) {
   return Math.max(7000, (words / 150) * 60000);
 }
 
-export default function LessonPlayer({ lesson, onClose }) {
-  const [index, setIndex] = useState(0);
+export default function LessonPlayer({ lesson, moduleId, onClose }) {
+  // המשך מנקודת העצירה האחרונה — קריטי למי שלומד בנסיעות קצרות
+  const posKey = `lesson-pos:${moduleId}`;
+  const [index, setIndex] = useState(() => {
+    const saved = loadState(posKey, 0);
+    return Number.isInteger(saved) && saved > 0 && saved < lesson.slides.length ? saved : 0;
+  });
+  const resumedRef = useRef(index > 0);
   const [playing, setPlaying] = useState(true);
   const [narrationOn, setNarrationOn] = useState(true);
   const [voiceReady, setVoiceReady] = useState(() => !!pickHebrewVoice());
@@ -91,13 +98,35 @@ export default function LessonPlayer({ lesson, onClose }) {
     dialogRef.current?.focus();
   }, []);
 
+  // שמירת מיקום — כדי שסגירה באמצע לא תאבד את ההתקדמות
+  useEffect(() => {
+    saveState(posKey, index);
+  }, [index, posKey]);
+
+  // כפתור Back של הטלפון סוגר את השיעור — במקום להעיף מהאתר
+  const closeReasonRef = useRef(undefined);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+  useEffect(() => {
+    window.history.pushState({ mepLesson: true }, "");
+    const onPop = () => onCloseRef.current(closeReasonRef.current);
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, []);
+
+  const requestClose = (reason) => {
+    closeReasonRef.current = reason;
+    if (reason === "finished") saveState(posKey, 0); // שיעור שהושלם מתחיל מחדש בפעם הבאה
+    window.history.back();
+  };
+
   const goTo = (i) => {
     stopAll();
     setIndex(Math.max(0, Math.min(slides.length - 1, i)));
   };
 
   const onKeyDown = (e) => {
-    if (e.key === "Escape") onClose();
+    if (e.key === "Escape") requestClose();
     // RTL: חץ שמאלה = קדימה
     else if (e.key === "ArrowLeft") goTo(index + 1);
     else if (e.key === "ArrowRight") goTo(index - 1);
@@ -123,7 +152,7 @@ export default function LessonPlayer({ lesson, onClose }) {
       {/* כותרת עליונה */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
         <button
-          onClick={onClose}
+          onClick={() => requestClose()}
           className="rounded-xl bg-white/10 hover:bg-white/20 px-4 py-2 font-semibold"
         >
           ✕ <span className="sr-only">סגירת השיעור</span>יציאה
@@ -133,6 +162,22 @@ export default function LessonPlayer({ lesson, onClose }) {
           {index + 1}/{slides.length}
         </span>
       </div>
+
+      {/* חיווי המשך מנקודת עצירה */}
+      {resumedRef.current && index > 0 && (
+        <div className="flex items-center justify-center gap-3 py-1.5 bg-brand/15 text-sm">
+          <span>⏯ ממשיכים מאיפה שעצרת (שקף {index + 1})</span>
+          <button
+            onClick={() => {
+              resumedRef.current = false;
+              goTo(0);
+            }}
+            className="underline font-semibold"
+          >
+            מהתחלה
+          </button>
+        </div>
+      )}
 
       {/* פס התקדמות */}
       <div
@@ -198,10 +243,10 @@ export default function LessonPlayer({ lesson, onClose }) {
           {playing ? "⏸ השהיה" : "▶️ המשך"}
         </button>
         <button
-          onClick={() => (isLast ? onClose() : goTo(index + 1))}
+          onClick={() => (isLast ? requestClose("finished") : goTo(index + 1))}
           className="rounded-xl bg-white/10 hover:bg-white/20 px-4 py-3 font-bold"
         >
-          {isLast ? "סיום ✔" : "הבא ←"}
+          {isLast ? "לתרגול ✔" : "הבא ←"}
         </button>
         {ttsSupported && (
           <button
