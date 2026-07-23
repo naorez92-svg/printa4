@@ -209,15 +209,37 @@ export default function App() {
   const [authLoading, setAuthLoading] = useState(authAvailable);
   const [loginOpen, setLoginOpen] = useState(false);
   const cloudReadyRef = useRef(false); // מותר לדחוף לענן רק אחרי משיכה ומיזוג
+  const lastUserIdRef = useRef(null);
+  const [syncTick, setSyncTick] = useState(0); // מאלץ דחיפה ראשונה אחרי מיזוג
+
+  // ניקוי המכשיר — ביציאה יזומה וגם בניתוק חיצוני (פקיעת חיבור, יציאה
+  // מלשונית אחרת), כדי שהתקדמות של משתמש אחד לא תדלוף למשתמש הבא.
+  const wipeLocal = () => {
+    clearAllState();
+    setCompleted({});
+    setTofes4Checked({});
+    setBestExam(null);
+    setOpenModuleId(null);
+    setTab("home");
+    setLoginOpen(false);
+  };
 
   useEffect(() => {
     if (!authAvailable) return;
-    supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session ?? null);
-      setAuthLoading(false);
-    });
+    supabase.auth
+      .getSession()
+      .then(({ data }) => setSession(data.session ?? null))
+      .catch(() => {})
+      .finally(() => setAuthLoading(false));
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, s) => {
       setSession(s);
+      setAuthLoading(false);
+      const userId = s?.user?.id ?? null;
+      if (lastUserIdRef.current && lastUserIdRef.current !== userId) {
+        cloudReadyRef.current = false;
+        wipeLocal();
+      }
+      lastUserIdRef.current = userId;
       if (!s) cloudReadyRef.current = false;
     });
     return () => subscription.unsubscribe();
@@ -229,54 +251,56 @@ export default function App() {
     let cancelled = false;
     (async () => {
       try {
-        const { data } = await supabase
+        const { data, error } = await supabase
           .from("mep_progress")
           .select("data")
           .eq("user_id", session.user.id)
           .maybeSingle();
         if (cancelled) return;
+        // משיכה שנכשלה לא נחשבת "ענן ריק": משאירים את הדחיפה נעולה,
+        // אחרת שינוי מקומי קטן היה דורס את כל ההתקדמות השמורה בענן.
+        if (error) return;
         const remote = data?.data || {};
         if (remote.completed) setCompleted((local) => ({ ...remote.completed, ...local }));
         if (remote.tofes4) setTofes4Checked((local) => ({ ...remote.tofes4, ...local }));
         if (Number.isFinite(remote.bestExam))
           setBestExam((local) => Math.max(local ?? 0, remote.bestExam));
+        cloudReadyRef.current = true;
+        // דחיפה אחת מיד אחרי המיזוג — מכסה גם ענן ריק מול התקדמות מקומית קיימת
+        setSyncTick((t) => t + 1);
       } catch {
-        // אין רשת / טבלה עוד לא קיימת — ממשיכים מקומית, ננסה שוב בכניסה הבאה
+        // אין רשת — ננסה שוב בכניסה הבאה; הדחיפה נשארת נעולה
       }
-      cloudReadyRef.current = true;
     })();
     return () => {
       cancelled = true;
     };
   }, [session]);
 
-  // דחיפה לענן (debounce) על כל שינוי — רק אחרי שהמיזוג הראשוני הסתיים
+  // דחיפה לענן (debounce) על כל שינוי — רק אחרי שהמיזוג הראשוני הסתיים.
+  // התלות היא ב-user id ולא באובייקט session, כדי שרענון טוקן שעתי
+  // לא יגרור כתיבה מיותרת של נתונים זהים.
+  const userId = session?.user?.id ?? null;
   useEffect(() => {
-    if (!session || !cloudReadyRef.current) return;
+    if (!userId || !cloudReadyRef.current) return;
     const t = setTimeout(() => {
       supabase
         .from("mep_progress")
         .upsert({
-          user_id: session.user.id,
+          user_id: userId,
           data: { completed, tofes4: tofes4Checked, bestExam },
           updated_at: new Date().toISOString(),
         })
         .then(() => {}, () => {});
     }, 1500);
     return () => clearTimeout(t);
-  }, [completed, tofes4Checked, bestExam, session]);
+  }, [completed, tofes4Checked, bestExam, userId, syncTick]);
 
   const signOut = () => {
     cloudReadyRef.current = false;
-    supabase?.auth.signOut();
-    // מנקים את המכשיר: ההתקדמות של המשתמש שיצא שמורה בענן שלו,
-    // ומי שייכנס אחריו (גם בחשבון אחר) יתחיל נקי — בלי ערבוב.
-    clearAllState();
-    setCompleted({});
-    setTofes4Checked({});
-    setBestExam(null);
-    setOpenModuleId(null);
-    setTab("home");
+    supabase?.auth.signOut().catch(() => {});
+    // ההתקדמות של המשתמש שיצא שמורה בענן שלו; המכשיר מתחיל נקי.
+    wipeLocal();
   };
 
   const openModule = (id) => {
@@ -289,8 +313,10 @@ export default function App() {
 
   useEffect(() => {
     const onPop = (e) => {
-      // אם המצב שנחשף הוא מודול (סגרנו שיעור) — נשארים בו; אחרת חוזרים לרשימה
-      if (!e.state?.m) setOpenModuleId(null);
+      // Back מחזיר למסך הקודם: רשומה עם מודול — פותחים אותו, אחרת לרשימה
+      const m = e.state?.m ?? null;
+      setOpenModuleId(m);
+      if (m) setTab("modules");
     };
     window.addEventListener("popstate", onPop);
     return () => window.removeEventListener("popstate", onPop);
@@ -319,7 +345,7 @@ export default function App() {
         onToggleDone={() =>
           setCompleted((c) => ({ ...c, [currentModule.id]: !c[currentModule.id] }))
         }
-        onBack={() => setOpenModuleId(null)}
+        onBack={() => window.history.back()}
       />
     ) : (
       <ModulesList completed={completed} onOpenModule={openModule} />
@@ -384,7 +410,8 @@ export default function App() {
               key={t.id}
               onClick={() => {
                 setTab(t.id);
-                setOpenModuleId(null);
+                // מודול פתוח נסגר דרך ההיסטוריה — כך לא נשארת רשומת Back יתומה
+                if (openModuleId) window.history.back();
                 window.scrollTo({ top: 0 });
               }}
               aria-current={tab === t.id ? "page" : undefined}

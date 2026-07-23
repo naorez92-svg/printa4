@@ -32,6 +32,7 @@ export default function LessonPlayer({ lesson, moduleId, onClose }) {
   const [narrationOn, setNarrationOn] = useState(true);
   const [voiceReady, setVoiceReady] = useState(() => !!pickHebrewVoice());
   const timerRef = useRef(null);
+  const utterRef = useRef(null);
   const dialogRef = useRef(null);
   const slideRef = useRef(null);
 
@@ -58,6 +59,10 @@ export default function LessonPlayer({ lesson, moduleId, onClose }) {
   const stopAll = useCallback(() => {
     if (timerRef.current) clearTimeout(timerRef.current);
     timerRef.current = null;
+    // חלק מהדפדפנים (Safari) מפעילים end גם על קריינות שבוטלה —
+    // מנתקים את ה-handler לפני cancel כדי לא לדלג שקף פעמיים
+    if (utterRef.current) utterRef.current.onend = null;
+    utterRef.current = null;
     if (ttsSupported) window.speechSynthesis.cancel();
   }, [ttsSupported]);
 
@@ -82,6 +87,7 @@ export default function LessonPlayer({ lesson, moduleId, onClose }) {
       if (v) u.voice = v;
       u.rate = 1;
       u.onend = () => advance();
+      utterRef.current = u;
       // גיבוי: אם הקריינות נתקעת — ממשיכים לפי זמן קריאה
       timerRef.current = setTimeout(advance, readingMs(slide.narration) * 2.5);
       window.speechSynthesis.speak(u);
@@ -108,13 +114,17 @@ export default function LessonPlayer({ lesson, moduleId, onClose }) {
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
   useEffect(() => {
-    window.history.pushState({ mepLesson: true }, "");
+    // רכיב שעלה מחדש (StrictMode) לא דוחף רשומה שנייה לערימה
+    if (!window.history.state?.mepLesson) window.history.pushState({ mepLesson: true }, "");
     const onPop = () => onCloseRef.current(closeReasonRef.current);
     window.addEventListener("popstate", onPop);
     return () => window.removeEventListener("popstate", onPop);
   }, []);
 
+  const closingRef = useRef(false);
   const requestClose = (reason) => {
+    if (closingRef.current) return; // לחיצה כפולה מהירה לא תצא גם מהמודול
+    closingRef.current = true;
     closeReasonRef.current = reason;
     if (reason === "finished") saveState(posKey, 0); // שיעור שהושלם מתחיל מחדש בפעם הבאה
     window.history.back();

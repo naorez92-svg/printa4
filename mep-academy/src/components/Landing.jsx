@@ -1,13 +1,17 @@
 import { useState } from "react";
 import { MODULES, TOTAL_QUIZ_QUESTIONS } from "../data/modules.js";
+import { LESSONS } from "../data/lessons.js";
 import { authAvailable, signInWithGoogle } from "../lib/supabase.js";
 
 // דף הנחיתה — המסך הראשון למבקר חדש. מציג מה יש בקורס וכפתור כניסה.
 
+const LESSON_COUNT = Object.keys(LESSONS).length;
+const TOTAL_SLIDES = Object.values(LESSONS).reduce((n, l) => n + l.slides.length, 0);
+
 const FEATURES = [
   {
     icon: "🎬",
-    title: "18 שיעורים מונפשים",
+    title: `${LESSON_COUNT} שיעורים מונפשים`,
     desc: "קריינות בעברית, כתוביות ותרשימי זרימה חיים — כמו סרטון, ישר בדפדפן.",
   },
   {
@@ -40,9 +44,12 @@ export default function Landing({ onLogin }) {
   const googleSignIn = async () => {
     setBusy(true);
     setError("");
+    // בהצלחה הדפדפן עוזב לעמוד של גוגל — הכפתור נשאר נעול עד הניווט
     const err = await signInWithGoogle();
-    setBusy(false);
-    if (err) setError(err);
+    if (err) {
+      setBusy(false);
+      setError(err);
+    }
   };
 
   return (
@@ -61,7 +68,7 @@ export default function Landing({ onLogin }) {
               <p className="text-white/80 text-sm">מודולים</p>
             </div>
             <div>
-              <p className="font-bold text-2xl font-mono">152</p>
+              <p className="font-bold text-2xl font-mono">{TOTAL_SLIDES}</p>
               <p className="text-white/80 text-sm">שקפי שיעור</p>
             </div>
             <div>
