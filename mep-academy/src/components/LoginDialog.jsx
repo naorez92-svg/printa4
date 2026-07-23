@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { supabase } from "../lib/supabase.js";
+import { supabase, signInWithGoogle } from "../lib/supabase.js";
 
 // התחברות באימייל: שולחים קוד/קישור חד-פעמי, נכנסים בלי סיסמה.
 // תומך בשני המסלולים: הקלדת הקוד מהמייל, או לחיצה על הקישור שבו.
@@ -12,21 +12,13 @@ export default function LoginDialog({ onClose }) {
   const [error, setError] = useState("");
   const dialogRef = useRef(null);
 
-  const signInWithGoogle = async () => {
+  const googleSignIn = async () => {
     setBusy(true);
     setError("");
-    const { error: err } = await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: { redirectTo: window.location.origin },
-    });
     // בהצלחה הדפדפן עוזב לעמוד של גוגל — לכאן חוזרים רק בשגיאה
+    const err = await signInWithGoogle();
     setBusy(false);
-    if (err)
-      setError(
-        err.message?.includes("not enabled")
-          ? "כניסת Google עוד לא הופעלה בהגדרות — אפשר להיכנס בינתיים עם אימייל."
-          : "הכניסה עם Google נכשלה — נסו שוב או היכנסו עם אימייל."
-      );
+    if (err) setError(err);
   };
 
   const sendCode = async (e) => {
@@ -83,7 +75,7 @@ export default function LoginDialog({ onClose }) {
             </p>
             <button
               type="button"
-              onClick={signInWithGoogle}
+              onClick={googleSignIn}
               disabled={busy}
               className="w-full bg-white border-2 border-ink/15 rounded-2xl py-3 font-bold hover:border-magic transition flex items-center justify-center gap-2 disabled:opacity-50"
             >
