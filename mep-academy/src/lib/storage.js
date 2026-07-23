@@ -24,3 +24,18 @@ export function saveState(key, value) {
     // storage לא זמין — ממשיכים בזיכרון בלבד
   }
 }
+
+// ניקוי מלא של המצב המקומי — נקרא ביציאה מהחשבון, כדי שמשתמש אחר
+// שנכנס באותו מכשיר יתחיל נקי (ההתקדמות של היוצא שמורה בענן שלו).
+export function clearAllState() {
+  try {
+    const keys = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && k.startsWith(PREFIX)) keys.push(k);
+    }
+    keys.forEach((k) => localStorage.removeItem(k));
+  } catch {
+    // storage לא זמין
+  }
+}

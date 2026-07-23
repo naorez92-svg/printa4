@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { MODULES, getModule } from "./data/modules.js";
 import { getLesson } from "./data/lessons.js";
 import { TOFES4_CHECKLIST } from "./data/tofes4.js";
-import { loadState, saveState } from "./lib/storage.js";
+import { loadState, saveState, clearAllState } from "./lib/storage.js";
 import ModuleView from "./components/ModuleView.jsx";
 import StandardsView from "./components/StandardsView.jsx";
 import Tofes4View from "./components/Tofes4View.jsx";
@@ -60,7 +60,7 @@ function ProgressRing({ done, total }) {
   );
 }
 
-function Home({ completed, bestExam, tofes4Done, onNavigate, onOpenModule, session, onLogin, onLogout }) {
+function Home({ completed, bestExam, tofes4Done, onNavigate, onOpenModule, session, onLogout }) {
   const doneCount = MODULES.filter((m) => completed[m.id]).length;
   const nextModule = MODULES.find((m) => !completed[m.id]);
   const goTo = (tabId) => {
@@ -118,35 +118,20 @@ function Home({ completed, bestExam, tofes4Done, onNavigate, onOpenModule, sessi
         </button>
       </div>
 
-      {authAvailable && (
+      {session && (
         <div className="bg-white rounded-2xl shadow-sm p-5">
-          {session ? (
-            <div className="flex items-center justify-between gap-3 flex-wrap">
-              <div>
-                <p className="font-bold">☁️ מחובר — ההתקדמות מסונכרנת</p>
-                <p className="text-sm text-ink/70 font-mono" dir="ltr">{session.user.email}</p>
-              </div>
-              <button
-                onClick={onLogout}
-                className="rounded-xl border border-ink/15 px-4 py-2 font-semibold hover:border-red-400 hover:text-red-700 transition"
-              >
-                יציאה
-              </button>
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div>
+              <p className="font-bold">☁️ מחובר — ההתקדמות שלך מסונכרנת</p>
+              <p className="text-sm text-ink/70 font-mono" dir="ltr">{session.user.email}</p>
             </div>
-          ) : (
-            <div className="flex items-center justify-between gap-3 flex-wrap">
-              <div>
-                <p className="font-bold">☁️ סנכרון בין מכשירים</p>
-                <p className="text-sm text-ink/70">התחברו באימייל — וההתקדמות תישמר בכל מכשיר.</p>
-              </div>
-              <button
-                onClick={onLogin}
-                className="rounded-xl bg-magic text-white px-4 py-2 font-bold hover:opacity-90 transition"
-              >
-                התחברות
-              </button>
-            </div>
-          )}
+            <button
+              onClick={onLogout}
+              className="rounded-xl border border-ink/15 px-4 py-2 font-semibold hover:border-red-400 hover:text-red-700 transition"
+            >
+              יציאה / החלפת חשבון
+            </button>
+          </div>
         </div>
       )}
     </div>
@@ -218,27 +203,25 @@ export default function App() {
   }, [bestExam]);
 
   // ---- דף נחיתה, התחברות וסנכרון ענן ----
-  const [entered, setEntered] = useState(() => loadState("entered", false));
+  // הכניסה לאפליקציה מחייבת חשבון אישי — כך ההתקדמות של כל משתמש
+  // נשמרת לו בנפרד ולא מתערבבת עם אחרים באותו מכשיר.
   const [session, setSession] = useState(null);
+  const [authLoading, setAuthLoading] = useState(authAvailable);
   const [loginOpen, setLoginOpen] = useState(false);
   const cloudReadyRef = useRef(false); // מותר לדחוף לענן רק אחרי משיכה ומיזוג
 
-  useEffect(() => saveState("entered", entered), [entered]);
-
   useEffect(() => {
     if (!authAvailable) return;
-    supabase.auth.getSession().then(({ data }) => setSession(data.session ?? null));
+    supabase.auth.getSession().then(({ data }) => {
+      setSession(data.session ?? null);
+      setAuthLoading(false);
+    });
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, s) => {
       setSession(s);
       if (!s) cloudReadyRef.current = false;
     });
     return () => subscription.unsubscribe();
   }, []);
-
-  // מי שמחובר — עבר את דף הנחיתה
-  useEffect(() => {
-    if (session) setEntered(true);
-  }, [session]);
 
   // בכניסה: מושכים את המצב מהענן וממזגים עם המקומי (איחוד השלמות, שיא מקסימלי)
   useEffect(() => {
@@ -286,6 +269,14 @@ export default function App() {
   const signOut = () => {
     cloudReadyRef.current = false;
     supabase?.auth.signOut();
+    // מנקים את המכשיר: ההתקדמות של המשתמש שיצא שמורה בענן שלו,
+    // ומי שייכנס אחריו (גם בחשבון אחר) יתחיל נקי — בלי ערבוב.
+    clearAllState();
+    setCompleted({});
+    setTofes4Checked({});
+    setBestExam(null);
+    setOpenModuleId(null);
+    setTab("home");
   };
 
   const openModule = (id) => {
@@ -317,7 +308,6 @@ export default function App() {
         onNavigate={setTab}
         onOpenModule={openModule}
         session={session}
-        onLogin={() => setLoginOpen(true)}
         onLogout={signOut}
       />
     );
@@ -345,19 +335,27 @@ export default function App() {
     );
   }
 
-  // מבקר חדש (לא נכנס ולא מחובר) — דף הנחיתה
-  if (!entered && !session) {
+  // בזמן שחזור ההתחברות — מסך פתיחה קצר (מונע הבהוב של דף הנחיתה)
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <p className="text-4xl animate-pulse" aria-label="טוען">⚙️</p>
+      </div>
+    );
+  }
+
+  // לא מחובר — דף הנחיתה עם ההרשמה (אין כניסת אורח: לכל אחד המשתמש שלו)
+  if (authAvailable && !session) {
     return (
       <>
         {loginOpen && <LoginDialog onClose={() => setLoginOpen(false)} />}
-        <Landing onStart={() => setEntered(true)} onLogin={() => setLoginOpen(true)} />
+        <Landing onLogin={() => setLoginOpen(true)} />
       </>
     );
   }
 
   return (
     <div className="min-h-screen pb-24 flex flex-col">
-      {loginOpen && <LoginDialog onClose={() => setLoginOpen(false)} />}
       <a
         href="#main-content"
         className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:right-2 focus:z-50 focus:bg-white focus:px-4 focus:py-2 focus:rounded-xl focus:shadow-lg"
