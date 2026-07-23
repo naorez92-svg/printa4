@@ -1,0 +1,19 @@
+{
+  "name": "אקדמיית MEP — מערכות אלקטרומכניות בבנייה",
+  "short_name": "אקדמיית MEP",
+  "description": "קורס דיגיטלי למערכות אלקטרומכניות: שיעורים מונפשים, תקנים, הכנה לטופס 4 ומבחני תרגול",
+  "lang": "he",
+  "dir": "rtl",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#F7F6FB",
+  "theme_color": "#20184A",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
