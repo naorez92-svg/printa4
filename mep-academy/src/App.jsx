@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { MODULES, getModule } from "./data/modules.js";
 import { getLesson } from "./data/lessons.js";
 import { TOFES4_CHECKLIST } from "./data/tofes4.js";
@@ -7,6 +7,9 @@ import ModuleView from "./components/ModuleView.jsx";
 import StandardsView from "./components/StandardsView.jsx";
 import Tofes4View from "./components/Tofes4View.jsx";
 import ExamView from "./components/ExamView.jsx";
+import Landing from "./components/Landing.jsx";
+import LoginDialog from "./components/LoginDialog.jsx";
+import { supabase, authAvailable } from "./lib/supabase.js";
 
 const TABS = [
   { id: "home", label: "בית", icon: "🏠" },
@@ -57,7 +60,7 @@ function ProgressRing({ done, total }) {
   );
 }
 
-function Home({ completed, bestExam, tofes4Done, onNavigate, onOpenModule }) {
+function Home({ completed, bestExam, tofes4Done, onNavigate, onOpenModule, session, onLogin, onLogout }) {
   const doneCount = MODULES.filter((m) => completed[m.id]).length;
   const nextModule = MODULES.find((m) => !completed[m.id]);
   const goTo = (tabId) => {
@@ -114,6 +117,38 @@ function Home({ completed, bestExam, tofes4Done, onNavigate, onOpenModule }) {
           </p>
         </button>
       </div>
+
+      {authAvailable && (
+        <div className="bg-white rounded-2xl shadow-sm p-5">
+          {session ? (
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+              <div>
+                <p className="font-bold">☁️ מחובר — ההתקדמות מסונכרנת</p>
+                <p className="text-sm text-ink/70 font-mono" dir="ltr">{session.user.email}</p>
+              </div>
+              <button
+                onClick={onLogout}
+                className="rounded-xl border border-ink/15 px-4 py-2 font-semibold hover:border-red-400 hover:text-red-700 transition"
+              >
+                יציאה
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+              <div>
+                <p className="font-bold">☁️ סנכרון בין מכשירים</p>
+                <p className="text-sm text-ink/70">התחברו באימייל — וההתקדמות תישמר בכל מכשיר.</p>
+              </div>
+              <button
+                onClick={onLogin}
+                className="rounded-xl bg-magic text-white px-4 py-2 font-bold hover:opacity-90 transition"
+              >
+                התחברות
+              </button>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -182,6 +217,77 @@ export default function App() {
     if (bestExam !== null) saveState("bestExam", bestExam);
   }, [bestExam]);
 
+  // ---- דף נחיתה, התחברות וסנכרון ענן ----
+  const [entered, setEntered] = useState(() => loadState("entered", false));
+  const [session, setSession] = useState(null);
+  const [loginOpen, setLoginOpen] = useState(false);
+  const cloudReadyRef = useRef(false); // מותר לדחוף לענן רק אחרי משיכה ומיזוג
+
+  useEffect(() => saveState("entered", entered), [entered]);
+
+  useEffect(() => {
+    if (!authAvailable) return;
+    supabase.auth.getSession().then(({ data }) => setSession(data.session ?? null));
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, s) => {
+      setSession(s);
+      if (!s) cloudReadyRef.current = false;
+    });
+    return () => subscription.unsubscribe();
+  }, []);
+
+  // מי שמחובר — עבר את דף הנחיתה
+  useEffect(() => {
+    if (session) setEntered(true);
+  }, [session]);
+
+  // בכניסה: מושכים את המצב מהענן וממזגים עם המקומי (איחוד השלמות, שיא מקסימלי)
+  useEffect(() => {
+    if (!session || cloudReadyRef.current) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data } = await supabase
+          .from("mep_progress")
+          .select("data")
+          .eq("user_id", session.user.id)
+          .maybeSingle();
+        if (cancelled) return;
+        const remote = data?.data || {};
+        if (remote.completed) setCompleted((local) => ({ ...remote.completed, ...local }));
+        if (remote.tofes4) setTofes4Checked((local) => ({ ...remote.tofes4, ...local }));
+        if (Number.isFinite(remote.bestExam))
+          setBestExam((local) => Math.max(local ?? 0, remote.bestExam));
+      } catch {
+        // אין רשת / טבלה עוד לא קיימת — ממשיכים מקומית, ננסה שוב בכניסה הבאה
+      }
+      cloudReadyRef.current = true;
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [session]);
+
+  // דחיפה לענן (debounce) על כל שינוי — רק אחרי שהמיזוג הראשוני הסתיים
+  useEffect(() => {
+    if (!session || !cloudReadyRef.current) return;
+    const t = setTimeout(() => {
+      supabase
+        .from("mep_progress")
+        .upsert({
+          user_id: session.user.id,
+          data: { completed, tofes4: tofes4Checked, bestExam },
+          updated_at: new Date().toISOString(),
+        })
+        .then(() => {}, () => {});
+    }, 1500);
+    return () => clearTimeout(t);
+  }, [completed, tofes4Checked, bestExam, session]);
+
+  const signOut = () => {
+    cloudReadyRef.current = false;
+    supabase?.auth.signOut();
+  };
+
   const openModule = (id) => {
     setOpenModuleId(id);
     setTab("modules");
@@ -210,6 +316,9 @@ export default function App() {
         tofes4Done={TOFES4_CHECKLIST.filter((c) => tofes4Checked[c.id]).length}
         onNavigate={setTab}
         onOpenModule={openModule}
+        session={session}
+        onLogin={() => setLoginOpen(true)}
+        onLogout={signOut}
       />
     );
   } else if (tab === "modules") {
@@ -236,8 +345,19 @@ export default function App() {
     );
   }
 
+  // מבקר חדש (לא נכנס ולא מחובר) — דף הנחיתה
+  if (!entered && !session) {
+    return (
+      <>
+        {loginOpen && <LoginDialog onClose={() => setLoginOpen(false)} />}
+        <Landing onStart={() => setEntered(true)} onLogin={() => setLoginOpen(true)} />
+      </>
+    );
+  }
+
   return (
     <div className="min-h-screen pb-24 flex flex-col">
+      {loginOpen && <LoginDialog onClose={() => setLoginOpen(false)} />}
       <a
         href="#main-content"
         className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:right-2 focus:z-50 focus:bg-white focus:px-4 focus:py-2 focus:rounded-xl focus:shadow-lg"
