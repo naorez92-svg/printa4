@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block content %}
+
+<h2>{{ user.name or user.phone }} <small class="status-{{ user.status }}">({{ user.status }})</small></h2>
+<div class="cards">
+  <div class="card">יעד קלורי<b>{{ profile.daily_calorie_target or "—" }}</b></div>
+  <div class="card">יעד חלבון<b>{{ profile.protein_target_g or "—" }} גר'</b></div>
+  <div class="card">כשר / שומר שבת<b>{{ "כן" if profile.kosher else "לא" }} / {{ "כן" if profile.shomer_shabbat else "לא" }}</b></div>
+  <div class="card">דגל רפואי<b>{{ "כן ⚠" if user.medical_flag else "לא" }}</b></div>
+</div>
+
+{% if weights %}
+<h2>גרף משקל</h2>
+<canvas id="wchart" width="700" height="220" style="background:#fff;border-radius:8px;max-width:100%"></canvas>
+<script>
+  const data = {{ weights | tojson }};
+  const c = document.getElementById("wchart"), ctx = c.getContext("2d");
+  const pad = 40, W = c.width - pad * 2, H = c.height - pad * 2;
+  const kgs = data.map(d => d.kg);
+  const min = Math.min(...kgs) - 1, max = Math.max(...kgs) + 1;
+  const x = i => pad + (data.length === 1 ? W / 2 : i * W / (data.length - 1));
+  const y = v => pad + H - (v - min) / (max - min) * H;
+  ctx.strokeStyle = "#4467c4"; ctx.lineWidth = 2; ctx.beginPath();
+  data.forEach((d, i) => i === 0 ? ctx.moveTo(x(i), y(d.kg)) : ctx.lineTo(x(i), y(d.kg)));
+  ctx.stroke();
+  ctx.fillStyle = "#1c2333"; ctx.font = "11px Arial";
+  data.forEach((d, i) => {
+    ctx.beginPath(); ctx.arc(x(i), y(d.kg), 3, 0, 7); ctx.fill();
+    ctx.fillText(d.kg, x(i) - 10, y(d.kg) - 8);
+    ctx.fillText(d.date, x(i) - 12, c.height - 10);
+  });
+</script>
+{% endif %}
+
+<h2>שליחת הודעה ידנית (נכנסת לשיחה כאילו מהמאמן)</h2>
+<form class="inline" method="post" action="/admin/send">
+  <input type="hidden" name="user_id" value="{{ user.id }}">
+  <textarea name="text" rows="2" cols="50" required></textarea>
+  <button>שלח</button>
+</form>
+
+{% if plans %}
+<h2>תוכניות יומיות אחרונות</h2>
+<table>
+  <tr><th>תאריך</th><th>קלוריות מתוכננות</th><th>הקשר</th></tr>
+  {% for p in plans %}
+  <tr><td>{{ p.date }}</td><td>{{ p.planned_calories }}</td><td>{{ p.context_note }}</td></tr>
+  {% endfor %}
+</table>
+{% endif %}
+
+<h2>ציר שיחה</h2>
+{% for m in messages %}
+<div class="msg {{ m.direction }}">{{ m.content }}<div class="meta">{{ m.created_at.strftime("%d/%m %H:%M") }} · {{ m.msg_type }}</div></div>
+{% endfor %}
+
+{% endblock %}

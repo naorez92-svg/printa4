@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>מאמן — מאמן תזונה אישי בוואטסאפ</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;700;900&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: "Heebo", Arial, sans-serif; background: #10141f; color: #f2f4f8; min-height: 100vh;
+         display: flex; flex-direction: column; align-items: center; padding: 24px 20px; }
+  main { max-width: 560px; width: 100%; }
+  h1 { font-size: 44px; font-weight: 900; line-height: 1.15; margin: 40px 0 16px; }
+  h1 span { color: #35d08f; }
+  p.lead { font-size: 18px; color: #b8c0d0; margin-bottom: 28px; line-height: 1.6; }
+  .block { background: #1a2030; border-radius: 14px; padding: 20px 22px; margin-bottom: 14px; line-height: 1.6; }
+  .block b { color: #35d08f; }
+  form { background: #1a2030; border-radius: 14px; padding: 24px 22px; margin-top: 28px; }
+  form h2 { font-size: 22px; margin-bottom: 14px; }
+  input { width: 100%; padding: 13px 14px; margin-bottom: 12px; border-radius: 9px; border: 1px solid #303a52;
+          background: #10141f; color: #f2f4f8; font-size: 16px; font-family: inherit; }
+  button { width: 100%; padding: 14px; border: 0; border-radius: 9px; background: #35d08f; color: #10141f;
+           font-size: 18px; font-weight: 700; cursor: pointer; font-family: inherit; }
+  .ok { background: #12351f; border: 1px solid #35d08f; border-radius: 10px; padding: 16px; margin-top: 20px; text-align: center; }
+  footer { margin-top: 44px; color: #6c7688; font-size: 13px; text-align: center; line-height: 1.6; max-width: 560px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>מאמן שלא מחכה<br>שתפתח <span>אפליקציה</span></h1>
+  <p class="lead">מאמן תזונה אישי בוואטסאפ. בקול ובטקסט, בעברית, שפונה אליך — לא מחכה לך.</p>
+
+  <div class="block"><b>הבעיה:</b> אתה יודע מה לאכול. הקושי הוא להתמיד. אפליקציות תזונה פסיביות — אתה צריך לפתוח, לצלם, לדווח. ולכן רוב האנשים מפסיקים אחרי שבועיים.</div>
+  <div class="block"><b>השיטה:</b> כל בוקר מתכננים ביחד את היום ב-90 שניות. מצלמים מה שאוכלים. המאמן שם לב כשנעלמת ופונה אליך — תכנון מראש במקום רישום בדיעבד, בלי אשמה ובלי הרצאות.</div>
+  <div class="block"><b>הבטא:</b> אנחנו פותחים 50 מקומות לבטא. משאירים שם וטלפון — ואנחנו חוזרים אליך בוואטסאפ.</div>
+
+  {% if submitted %}
+  <div class="ok">קיבלנו! נחזור אליך בוואטסאפ בקרוב 🙂</div>
+  {% else %}
+  <form method="post" action="/">
+    <h2>להצטרפות לבטא</h2>
+    <input name="name" placeholder="שם" required>
+    <input name="phone" placeholder="טלפון" required inputmode="tel">
+    <button>אני בפנים</button>
+  </form>
+  {% endif %}
+</main>
+<footer>מאמן הוא שירות ליווי הרגלי תזונה. אינו תחליף לייעוץ רפואי או תזונתי.</footer>
+</body>
+</html>
