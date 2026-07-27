@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>מאמן — אדמין</title>
+<style>
+  body { font-family: Arial, "Segoe UI", sans-serif; background: #f5f6f8; margin: 0; color: #1c2333; }
+  header { background: #1c2333; color: #fff; padding: 12px 24px; display: flex; justify-content: space-between; align-items: center; }
+  header a { color: #ffd166; text-decoration: none; }
+  main { padding: 24px; max-width: 1100px; margin: 0 auto; }
+  table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 8px; overflow: hidden; }
+  th, td { padding: 10px 12px; text-align: right; border-bottom: 1px solid #eceff3; font-size: 14px; }
+  th { background: #eef1f6; }
+  tr:hover { background: #fafbfd; }
+  .banner-red { background: #d64545; color: #fff; padding: 10px 16px; border-radius: 8px; margin-bottom: 16px; font-weight: bold; }
+  .cards { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 20px; }
+  .card { background: #fff; border-radius: 8px; padding: 14px 18px; min-width: 160px; box-shadow: 0 1px 2px rgba(0,0,0,.06); }
+  .card b { display: block; font-size: 20px; margin-top: 4px; }
+  .status-active { color: #1a9e6e; } .status-paused { color: #d69a00; }
+  .status-onboarding { color: #4467c4; } .status-churned { color: #999; }
+  form.inline { display: flex; gap: 8px; margin: 16px 0; flex-wrap: wrap; }
+  input, textarea, button { padding: 8px 10px; border: 1px solid #cfd6e0; border-radius: 6px; font-size: 14px; font-family: inherit; }
+  button { background: #1c2333; color: #fff; cursor: pointer; border: 0; }
+  .msg { padding: 8px 12px; border-radius: 10px; margin: 6px 0; max-width: 70%; font-size: 14px; white-space: pre-wrap; }
+  .msg.in { background: #e8f0fe; margin-inline-start: auto; }
+  .msg.out { background: #e6f7ef; }
+  .meta { color: #8a93a3; font-size: 11px; margin-top: 2px; }
+  h2 { margin-top: 28px; }
+  ul.errors { background: #fff; border-radius: 8px; padding: 12px 28px; font-size: 12px; direction: ltr; text-align: left; }
+</style>
+</head>
+<body>
+<header><div><strong>מאמן</strong> · דשבורד אדמין</div><a href="/admin">כל המשתמשים</a></header>
+<main>{% block content %}{% endblock %}</main>
+</body>
+</html>

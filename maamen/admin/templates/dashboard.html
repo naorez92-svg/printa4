@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block content %}
+
+{% if costs.exceeded %}<div class="banner-red">⚠ חריגה מתקרת העלות היומית ({{ costs.total_cost_usd }}$ מתוך {{ costs.cap_usd }}$) — הבוט במצב טקסט/תבניות בלבד</div>{% endif %}
+
+<div class="cards">
+  <div class="card">עלות API היום<b>{{ costs.total_cost_usd }}$ / {{ costs.cap_usd }}$</b></div>
+  <div class="card">Scheduler<b>{{ "פעיל" if scheduler.running else "כבוי" }}</b></div>
+  <div class="card">שבת עכשיו?<b>{{ "כן" if scheduler.is_shabbat_now else "לא" }}</b></div>
+  <div class="card">לידים מהנחיתה<b>{{ leads|length }}</b></div>
+</div>
+
+<form class="inline" method="post" action="/admin/add-user">
+  <input name="name" placeholder="שם" required>
+  <input name="phone" placeholder="טלפון (9725...)" required>
+  <button>הוסף משתמש בטא</button>
+</form>
+
+<table>
+  <tr><th>שם</th><th>טלפון</th><th>סטטוס</th><th>ימי רצף חסרים</th><th>משקל אחרון</th><th>שינוי שבועי</th><th>אכילה רגשית השבוע</th><th>הודעה אחרונה</th></tr>
+  {% for r in rows %}
+  <tr>
+    <td><a href="/admin/user/{{ r.user.id }}">{{ r.user.name or "—" }}</a></td>
+    <td>{{ r.user.phone }}</td>
+    <td class="status-{{ r.user.status }}">{{ r.user.status }}</td>
+    <td>{{ r.user.missed_days_streak }}</td>
+    <td>{{ r.weight if r.weight is not none else "—" }}</td>
+    <td>{{ r.change if r.change is not none else "—" }}</td>
+    <td>{{ r.emotional }}</td>
+    <td>{{ r.last_seen }}</td>
+  </tr>
+  {% endfor %}
+</table>
+
+{% if leads %}
+<h2>לידים אחרונים</h2>
+<table>
+  <tr><th>שם</th><th>טלפון</th><th>מתי</th></tr>
+  {% for lead in leads %}
+  <tr><td>{{ lead.name }}</td><td>{{ lead.phone }}</td><td>{{ lead.created_at.strftime("%d/%m %H:%M") }}</td></tr>
+  {% endfor %}
+</table>
+{% endif %}
+
+{% if errors %}
+<h2>שגיאות אחרונות</h2>
+<ul class="errors">{% for e in errors %}<li>{{ e }}</li>{% endfor %}</ul>
+{% endif %}
+
+{% endblock %}

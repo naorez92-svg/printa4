@@ -90,6 +90,11 @@ def create_app() -> FastAPI:
     async def health():
         return {"ok": True, "mock_mode": settings.mock_mode}
 
+    from admin.routes import router as admin_router
+    from landing.routes import router as landing_router
+    app.include_router(admin_router)
+    app.include_router(landing_router)
+
     @app.on_event("startup")
     def _startup() -> None:
         if settings.scheduler_enabled:

@@ -12,3 +12,5 @@
 | 2026-07-27 | The MAAMEN mono-repo lives under `maamen/` inside the existing `printa4` repository | The build ran inside printa4; all plan paths are relative to `maamen/` |
 | 2026-07-27 | "Between meals" = outside the hour windows 6–10 / 12–15 / 18–21 | The spec requires an emotional-hunger question "between meals" without defining it; fixed windows are deterministic and testable |
 | 2026-07-27 | Meal clarification answers are re-analyzed by the LLM (original description + user answer) and logged as high confidence | One question → log, per spec; re-analysis refines the estimate without a second question |
+| 2026-07-27 | "Admin notification" for new landing leads = WARNING log + leads panel on the admin dashboard | No admin phone number defined in the spec; WhatsApp-ing the admin would need one |
+| 2026-07-27 | Nudge levels stored in `missed_days_streak` (1/2/4 = 24h/48h/96h), reset to 0 on any inbound | Matches the column's meaning and avoids a new column just for nudge dedup |
