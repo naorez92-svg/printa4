@@ -1,6 +1,11 @@
-import { useMemo, useRef, useState } from "react";
-import { getLesson } from "../data/lessons.js";
-import LessonPlayer from "./LessonPlayer.jsx";
+import { Suspense, lazy, useMemo, useRef, useState } from "react";
+import { LESSON_SLIDES, hasLesson } from "../data/lessonsMeta.js";
+import { qid } from "../lib/stats.js";
+import ErrorBoundary from "./ErrorBoundary.jsx";
+
+// נגן השיעורים (כולל קובץ השיעורים המלא והתרשימים) נטען עצל — רק כשלוחצים
+// על "צפייה בשיעור", לא בטעינת האפליקציה
+const LessonPlayer = lazy(() => import("./LessonPlayer.jsx"));
 
 // ערבוב סדר התשובות (Fisher–Yates) — בלעדיו התשובה הנכונה יושבת תמיד באותו מקום
 function shuffleOptions(q) {
@@ -16,9 +21,9 @@ function shuffleOptions(q) {
   };
 }
 
-function Section({ icon, title, children }) {
+function Section({ icon, title, children, printHide }) {
   return (
-    <section className="bg-white rounded-2xl shadow-sm p-5">
+    <section className={`bg-white rounded-2xl shadow-sm p-5${printHide ? " print-hide" : ""}`}>
       <h2 className="font-bold text-lg mb-3 flex items-center gap-2">
         <span aria-hidden>{icon}</span>
         {title}
@@ -81,30 +86,43 @@ function QuizQuestion({ index, item, chosen, onChoose }) {
   );
 }
 
-export default function ModuleView({ module, done, onToggleDone, onBack }) {
+export default function ModuleView({ module, done, onToggleDone, onAnswer, onBack }) {
   const [answers, setAnswers] = useState({});
   const [lessonOpen, setLessonOpen] = useState(false);
   const quizRef = useRef(null);
-  const lesson = getLesson(module.id);
+  const withLesson = hasLesson(module.id);
+  const slideCount = LESSON_SLIDES[module.id] || 0;
   // מערבבים פעם אחת לכל כניסה למודול — סדר יציב בזמן המענה
   const quiz = useMemo(() => module.quiz.map(shuffleOptions), [module.id]);
 
   return (
     <div className="space-y-4">
-      {lessonOpen && lesson && (
-        <LessonPlayer
-          lesson={lesson}
-          moduleId={module.id}
-          onClose={(reason) => {
-            setLessonOpen(false);
-            // בסיום השיעור — קופצים ישר לתרגול, כמו שהקריינות מבטיחה
-            if (reason === "finished")
-              setTimeout(() => quizRef.current?.scrollIntoView({ block: "start" }), 60);
-          }}
-        />
+      {lessonOpen && withLesson && (
+        <ErrorBoundary>
+          <Suspense
+            fallback={
+              <div className="fixed inset-0 z-50 bg-ink text-white flex items-center justify-center">
+                <p role="status" className="text-2xl animate-pulse">
+                  <span aria-hidden>▶️</span>
+                  <span className="sr-only">טוען את השיעור</span>
+                </p>
+              </div>
+            }
+          >
+            <LessonPlayer
+              moduleId={module.id}
+              onClose={(reason) => {
+                setLessonOpen(false);
+                // בסיום השיעור — קופצים ישר לתרגול, כמו שהקריינות מבטיחה
+                if (reason === "finished")
+                  setTimeout(() => quizRef.current?.scrollIntoView({ block: "start" }), 60);
+              }}
+            />
+          </Suspense>
+        </ErrorBoundary>
       )}
 
-      <button onClick={onBack} className="text-magic font-semibold hover:underline">
+      <button onClick={onBack} className="text-magic font-semibold hover:underline print-hide">
         <span aria-hidden>→ </span>חזרה לכל המודולים
       </button>
 
@@ -112,14 +130,14 @@ export default function ModuleView({ module, done, onToggleDone, onBack }) {
         <div className="text-4xl mb-2" aria-hidden>{module.icon}</div>
         <h1 className="font-bold text-2xl mb-2">{module.title}</h1>
         <p className="text-white/90 leading-relaxed">{module.summary}</p>
-        {lesson && (
+        {withLesson && (
           <button
             onClick={() => setLessonOpen(true)}
-            className="mt-4 w-full bg-brand text-ink rounded-2xl py-3.5 px-4 font-bold text-lg hover:opacity-90 transition flex items-center justify-center gap-2"
+            className="mt-4 w-full bg-brand text-ink rounded-2xl py-3.5 px-4 font-bold text-lg hover:opacity-90 transition flex items-center justify-center gap-2 print-hide"
           >
             <span aria-hidden>▶️</span>
-            צפייה בשיעור המונפש ({lesson.slides.length} פרקים, ~
-            {Math.max(5, Math.round(lesson.slides.length * 0.9))} דק')
+            צפייה בשיעור המונפש ({slideCount} פרקים, ~
+            {Math.max(5, Math.round(slideCount * 0.9))} דק')
           </button>
         )}
       </header>
@@ -127,7 +145,7 @@ export default function ModuleView({ module, done, onToggleDone, onBack }) {
       <Section icon="🎯" title="נקודות המפתח">
         <ul className="space-y-2">
           {module.points.map((p, i) => (
-            <li key={i} className="flex gap-2 leading-relaxed">
+            <li key={i} className="flex gap-2 leading-relaxed print-item">
               <span className="text-grow font-bold shrink-0">✓</span>
               <span>{p}</span>
             </li>
@@ -138,7 +156,7 @@ export default function ModuleView({ module, done, onToggleDone, onBack }) {
       <Section icon="📖" title="תקנים ורגולציה">
         <ul className="space-y-2">
           {module.standards.map((s, i) => (
-            <li key={i} className="bg-canvas rounded-lg px-3 py-2 text-sm leading-relaxed">
+            <li key={i} className="bg-canvas rounded-lg px-3 py-2 text-sm leading-relaxed print-item">
               {s}
             </li>
           ))}
@@ -148,7 +166,7 @@ export default function ModuleView({ module, done, onToggleDone, onBack }) {
       <Section icon="⚠️" title="ליקויים נפוצים בשטח">
         <ul className="space-y-2">
           {module.pitfalls.map((p, i) => (
-            <li key={i} className="flex gap-2 leading-relaxed text-sm">
+            <li key={i} className="flex gap-2 leading-relaxed text-sm print-item">
               <span className="text-brand font-bold shrink-0" aria-hidden>!</span>
               <span>{p}</span>
             </li>
@@ -160,7 +178,7 @@ export default function ModuleView({ module, done, onToggleDone, onBack }) {
         <Section icon="🌍" title="העשרה בינלאומית — מותאם לשוק הישראלי">
           <ul className="space-y-2">
             {module.intl.map((p, i) => (
-              <li key={i} className="bg-magic/5 border border-magic/20 rounded-lg px-3 py-2 text-sm leading-relaxed">
+              <li key={i} className="bg-magic/5 border border-magic/20 rounded-lg px-3 py-2 text-sm leading-relaxed print-item">
                 {p}
               </li>
             ))}
@@ -168,8 +186,15 @@ export default function ModuleView({ module, done, onToggleDone, onBack }) {
         </Section>
       )}
 
+      <button
+        onClick={() => window.print()}
+        className="w-full text-center text-ink/60 text-sm font-semibold hover:text-ink py-1 print-hide"
+      >
+        🖨️ הדפסת תקציר המודול (או שמירה כ-PDF)
+      </button>
+
       <div ref={quizRef} />
-      <Section icon="✍️" title="תרגול">
+      <Section icon="✍️" title="תרגול" printHide>
         <div className="space-y-4">
           {quiz.map((item, i) => (
             <QuizQuestion
@@ -177,7 +202,12 @@ export default function ModuleView({ module, done, onToggleDone, onBack }) {
               index={i}
               item={item}
               chosen={answers[i]}
-              onChoose={(choice) => setAnswers((a) => ({ ...a, [i]: choice }))}
+              onChoose={(choice) => {
+                setAnswers((a) => ({ ...a, [i]: choice }));
+                // מזין את החזרה המרווחת ואת סטטיסטיקת השליטה — לפי מיקום
+                // השאלה במאגר המקורי (i הוא אינדקס יציב של module.quiz)
+                onAnswer?.(module.id, qid(module.id, i), choice === item.answer);
+              }}
             />
           ))}
         </div>
@@ -186,14 +216,14 @@ export default function ModuleView({ module, done, onToggleDone, onBack }) {
       <button
         onClick={onToggleDone}
         aria-pressed={done}
-        className={`w-full rounded-2xl py-4 font-bold text-lg transition ${
+        className={`w-full rounded-2xl py-4 font-bold text-lg transition print-hide ${
           done ? "bg-growdeep text-white" : "bg-magic text-white hover:opacity-90"
         }`}
       >
         {done ? "✔️ המודול הושלם — לחיצה לביטול" : "סיימתי את המודול"}
       </button>
 
-      <button onClick={onBack} className="w-full text-center text-magic font-semibold hover:underline py-2">
+      <button onClick={onBack} className="w-full text-center text-magic font-semibold hover:underline py-2 print-hide">
         <span aria-hidden>→ </span>חזרה לכל המודולים
       </button>
     </div>

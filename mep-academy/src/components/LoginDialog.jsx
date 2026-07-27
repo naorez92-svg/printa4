@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { supabase, signInWithGoogle } from "../lib/supabase.js";
+import { useModal } from "../lib/useModal.js";
 
 // התחברות באימייל: שולחים קוד/קישור חד-פעמי, נכנסים בלי סיסמה.
 // תומך בשני המסלולים: הקלדת הקוד מהמייל, או לחיצה על הקישור שבו.
@@ -11,6 +12,10 @@ export default function LoginDialog({ onClose }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const dialogRef = useRef(null);
+
+  // מלכודת פוקוס + נעילת גלילת הרקע + החזרת פוקוס לכפתור הפותח בסגירה —
+  // בלעדיהן Tab בורח אל דף הנחיתה שמוסתר מאחורי הדיאלוג
+  useModal(dialogRef);
 
   // Escape סוגר גם כשהפוקוס מחוץ לדיאלוג (למשל אחרי מעבר לשלב הקוד)
   useEffect(() => {
@@ -95,7 +100,7 @@ export default function LoginDialog({ onClose }) {
               </svg>
               התחברות עם Google
             </button>
-            <div className="flex items-center gap-3 text-ink/50 text-sm">
+            <div className="flex items-center gap-3 text-ink/70 text-sm">
               <span className="flex-1 border-t border-ink/10" aria-hidden />
               או עם אימייל
               <span className="flex-1 border-t border-ink/10" aria-hidden />

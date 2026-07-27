@@ -59,7 +59,10 @@ body {
   }
 }
 
-/* הנגשה: כיבוד העדפת משתמש להפחתת אנימציות */
+/* הנגשה: כיבוד העדפת משתמש להפחתת אנימציות.
+   animation-delay מתאפס כדי שנקודות השיעור לא "יצוצו" בהדרגה,
+   ו-iteration-count מוגבל ל-1 כדי שאנימציות אינסופיות (flow-pipe)
+   לא ירצדו בכל פריים. */
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;
@@ -69,5 +72,34 @@ body {
   *::after {
     transition-duration: 0.01ms !important;
     animation-duration: 0.01ms !important;
+    animation-delay: 0s !important;
+    animation-iteration-count: 1 !important;
+  }
+}
+
+/* הדפסה: צ'ק-ליסט טופס 4 ותקצירי מודולים כדף נקי — בלי ניווט וכפתורים */
+@media print {
+  nav,
+  footer,
+  .print-hide {
+    display: none !important;
+  }
+  body {
+    background: #fff;
+  }
+  .bg-ink {
+    background: #fff !important;
+    color: #20184a !important;
+  }
+  .bg-ink * {
+    color: #20184a !important;
+  }
+  .shadow-sm,
+  .shadow-lg {
+    box-shadow: none !important;
+  }
+  section,
+  .print-item {
+    break-inside: avoid;
   }
 }

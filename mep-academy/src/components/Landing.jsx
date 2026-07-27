@@ -1,12 +1,10 @@
 import { useState } from "react";
 import { MODULES, TOTAL_QUIZ_QUESTIONS } from "../data/modules.js";
-import { LESSONS } from "../data/lessons.js";
+import { LESSON_COUNT, TOTAL_SLIDES } from "../data/lessonsMeta.js";
 import { authAvailable, signInWithGoogle } from "../lib/supabase.js";
 
 // דף הנחיתה — המסך הראשון למבקר חדש. מציג מה יש בקורס וכפתור כניסה.
-
-const LESSON_COUNT = Object.keys(LESSONS).length;
-const TOTAL_SLIDES = Object.values(LESSONS).reduce((n, l) => n + l.slides.length, 0);
+// המונים מגיעים ממטא-נתוני הבילד — בלי לטעון את קובץ השיעורים המלא.
 
 const FEATURES = [
   {
