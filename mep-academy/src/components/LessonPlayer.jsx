@@ -1,6 +1,8 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { DIAGRAMS } from "./diagrams.jsx";
+import { getLesson } from "../data/lessons.js";
 import { loadState, saveState } from "../lib/storage.js";
+import { useModal } from "../lib/useModal.js";
 
 // נגן שיעור מונפש: שקפים עם קריינות דפדפן (Web Speech API) וכתוביות.
 // אם אין קול עברי זמין — הנגן עובר אוטומטית למצב מתוזמן (כתוביות בלבד).
@@ -20,7 +22,9 @@ function readingMs(text) {
   return Math.max(7000, (words / 150) * 60000);
 }
 
-export default function LessonPlayer({ lesson, moduleId, onClose }) {
+export default function LessonPlayer({ moduleId, onClose }) {
+  // קובץ השיעורים נטען יחד עם הרכיב הזה (chunk עצל) — לא בטעינת האפליקציה
+  const lesson = getLesson(moduleId);
   // המשך מנקודת העצירה האחרונה — קריטי למי שלומד בנסיעות קצרות
   const posKey = `lesson-pos:${moduleId}`;
   const [index, setIndex] = useState(() => {
@@ -99,7 +103,10 @@ export default function LessonPlayer({ lesson, moduleId, onClose }) {
 
   useEffect(() => () => stopAll(), [stopAll]);
 
-  // הנגשה: פוקוס לדיאלוג בפתיחה, Esc לסגירה, חצים לניווט
+  // הנגשה: פוקוס לדיאלוג בפתיחה, Esc לסגירה, חצים לניווט.
+  // useModal כולא את ה-Tab בתוך הנגן (הטאב-בר והמודול שמאחור מוסתרים אך
+  // נשארים ב-DOM), נועל את גלילת הרקע ומחזיר את הפוקוס לכפתור הפותח בסגירה.
+  useModal(dialogRef);
   useEffect(() => {
     dialogRef.current?.focus();
   }, []);
@@ -202,7 +209,7 @@ export default function LessonPlayer({ lesson, moduleId, onClose }) {
       </div>
 
       {/* גוף השקף */}
-      <div ref={slideRef} key={index} className="flex-1 overflow-y-auto px-6 py-6 lesson-slide">
+      <div ref={slideRef} key={index} className="flex-1 overflow-y-auto overscroll-contain px-6 py-6 lesson-slide">
         <div className="max-w-2xl mx-auto space-y-5">
           <h1 className="font-bold text-2xl md:text-3xl leading-snug">{slide.title}</h1>
           {Diagram && (

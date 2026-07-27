@@ -10,10 +10,19 @@ function buildStamp() {
   try { return execSync("git rev-parse --short HEAD").toString().trim(); } catch { return "local"; }
 }
 
+// Lesson metadata computed at build time from the content file itself, so the
+// landing page / module list never have to load the full ~120KB lessons chunk
+// and the counters can never drift from the real content.
+const { LESSONS } = await import("./src/data/lessons.js");
+const LESSON_SLIDES = Object.fromEntries(
+  Object.entries(LESSONS).map(([id, lesson]) => [id, lesson.slides.length])
+);
+
 export default defineConfig({
   plugins: [react()],
   define: {
     __APP_VERSION__: JSON.stringify(buildStamp()),
+    __LESSON_SLIDES__: JSON.stringify(LESSON_SLIDES),
   },
   build: {
     rollupOptions: {

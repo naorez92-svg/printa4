@@ -1,15 +1,21 @@
-import { useEffect, useRef, useState } from "react";
+import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { MODULES, getModule } from "./data/modules.js";
-import { getLesson } from "./data/lessons.js";
+import { hasLesson } from "./data/lessonsMeta.js";
 import { TOFES4_CHECKLIST } from "./data/tofes4.js";
 import { loadState, saveState, clearAllState } from "./lib/storage.js";
+import { boolView, setMark, mergeProgress, sameProgress } from "./lib/progressMerge.js";
+import { applyAnswer, bumpMastery, countDue, qid, streakAlive, updateStreak } from "./lib/stats.js";
 import ModuleView from "./components/ModuleView.jsx";
-import StandardsView from "./components/StandardsView.jsx";
 import Tofes4View from "./components/Tofes4View.jsx";
 import ExamView from "./components/ExamView.jsx";
 import Landing from "./components/Landing.jsx";
 import LoginDialog from "./components/LoginDialog.jsx";
+import SearchBox from "./components/SearchBox.jsx";
+import Certificate from "./components/Certificate.jsx";
 import { supabase, authAvailable } from "./lib/supabase.js";
+
+// ספריית התקנים נטענת עצל — נדרשת רק כשנכנסים לטאב שלה
+const StandardsView = lazy(() => import("./components/StandardsView.jsx"));
 
 const TABS = [
   { id: "home", label: "בית", icon: "🏠" },
@@ -19,7 +25,20 @@ const TABS = [
   { id: "exam", label: "מבחן", icon: "🎓" },
 ];
 
-function ProgressRing({ done, total }) {
+const ALL_QIDS = MODULES.flatMap((m) => m.quiz.map((_, i) => qid(m.id, i)));
+
+// beforeinstallprompt עלול להישרף לפני שרכיב הבאנר עולה (הדפדפן יורה אותו
+// פעם אחת, מוקדם) — נתפס ברמת המודול ונמסר לרכיב דרך אירוע מותאם.
+let deferredInstallEvt = null;
+if (typeof window !== "undefined") {
+  window.addEventListener("beforeinstallprompt", (e) => {
+    e.preventDefault();
+    deferredInstallEvt = e;
+    window.dispatchEvent(new Event("mep-install-ready"));
+  });
+}
+
+function ProgressRing({ done, total, streak }) {
   const pct = total === 0 ? 0 : Math.round((done / total) * 100);
   return (
     <div className="bg-white rounded-2xl shadow-sm p-5 flex items-center gap-4">
@@ -50,19 +69,89 @@ function ProgressRing({ done, total }) {
           {pct}%
         </span>
       </div>
-      <div>
+      <div className="flex-1">
         <p className="font-bold text-lg">ההתקדמות שלך</p>
         <p className="text-ink/70 text-sm">
           הושלמו {done} מתוך {total} מודולים
         </p>
+        {streak?.n > 1 && streakAlive(streak) && (
+          <p className="mt-1 inline-block bg-brand/15 text-ink rounded-full px-3 py-0.5 text-sm font-semibold">
+            🔥 {streak.n} ימי למידה ברצף
+          </p>
+        )}
       </div>
     </div>
   );
 }
 
-function Home({ completed, bestExam, tofes4Done, onNavigate, onOpenModule, session, onLogout }) {
+function InstallBanner() {
+  const [dismissed, setDismissed] = useState(() => !!loadState("installDismissed", false));
+  const [installEvt, setInstallEvt] = useState(() => deferredInstallEvt);
+  useEffect(() => {
+    const onReady = () => setInstallEvt(deferredInstallEvt);
+    window.addEventListener("mep-install-ready", onReady);
+    return () => window.removeEventListener("mep-install-ready", onReady);
+  }, []);
+
+  const isStandalone =
+    window.matchMedia?.("(display-mode: standalone)").matches || window.navigator.standalone;
+  const isIos = /iphone|ipad|ipod/i.test(window.navigator.userAgent);
+  if (dismissed || isStandalone || (!installEvt && !isIos)) return null;
+
+  const dismiss = () => {
+    setDismissed(true);
+    saveState("installDismissed", true);
+  };
+
+  return (
+    <div className="bg-magic/10 border border-magic/25 rounded-2xl p-4 flex items-center gap-3">
+      <span className="text-2xl shrink-0" aria-hidden>📲</span>
+      <div className="flex-1 text-sm leading-relaxed">
+        <p className="font-bold">האפליקציה עובדת גם בלי קליטה</p>
+        {installEvt ? (
+          <p className="text-ink/80">התקינו אותה למסך הבית ולמדו גם באתר, בחניון או בממ"ד.</p>
+        ) : (
+          <p className="text-ink/80">
+            באייפון: לחצו על <span aria-hidden>שיתוף ⬆️</span>
+            <span className="sr-only">כפתור שיתוף</span> ואז "הוספה למסך הבית".
+          </p>
+        )}
+      </div>
+      {installEvt && (
+        <button
+          onClick={() => {
+            installEvt.prompt();
+            setInstallEvt(null);
+            dismiss();
+          }}
+          className="bg-magic text-white rounded-xl px-4 py-2 font-bold shrink-0"
+        >
+          התקנה
+        </button>
+      )}
+      <button onClick={dismiss} className="text-ink/60 hover:text-ink font-bold px-1 shrink-0">
+        ✕<span className="sr-only">סגירת ההצעה</span>
+      </button>
+    </div>
+  );
+}
+
+function Home({
+  completed,
+  bestExam,
+  tofes4Done,
+  dueCount,
+  streak,
+  onNavigate,
+  onOpenModule,
+  onSearchStandards,
+  session,
+  onLogout,
+  onCertificate,
+}) {
   const doneCount = MODULES.filter((m) => completed[m.id]).length;
   const nextModule = MODULES.find((m) => !completed[m.id]);
+  const certificateReady = doneCount === MODULES.length && (bestExam ?? 0) >= 90;
   const goTo = (tabId) => {
     onNavigate(tabId);
     window.scrollTo({ top: 0 });
@@ -77,9 +166,40 @@ function Home({ completed, bestExam, tofes4Done, onNavigate, onOpenModule, sessi
         </p>
       </header>
 
-      <ProgressRing done={doneCount} total={MODULES.length} />
+      <SearchBox
+        onOpenModule={onOpenModule}
+        onGoStandards={onSearchStandards}
+        onGoTab={goTo}
+      />
 
-      {nextModule ? (
+      <InstallBanner />
+
+      <ProgressRing done={doneCount} total={MODULES.length} streak={streak} />
+
+      {dueCount > 0 && (
+        <button
+          onClick={() => goTo("exam")}
+          className="w-full bg-white border-2 border-brand/60 rounded-2xl p-4 text-right hover:shadow-md transition flex items-center gap-3"
+        >
+          <span className="text-3xl shrink-0" aria-hidden>🗓️</span>
+          <span className="flex-1">
+            <span className="block font-bold">חזרה יומית — {dueCount} שאלות מחכות לך</span>
+            <span className="block text-sm text-ink/70">
+              חזרה מרווחת קצרה ביום שווה יותר מערב שלם לפני המבחן.
+            </span>
+          </span>
+        </button>
+      )}
+
+      {certificateReady ? (
+        <button
+          onClick={onCertificate}
+          className="w-full bg-gradient-to-l from-growdeep to-grow text-white rounded-2xl p-5 text-right hover:opacity-95 transition"
+        >
+          <p className="font-bold text-lg">🏆 סיימת את הקורס בהצטיינות!</p>
+          <p className="text-white/90 text-sm mt-1">לחצו להפקת תעודת סיום — ולשיתוף בוואטסאפ</p>
+        </button>
+      ) : nextModule ? (
         <button
           onClick={() => onOpenModule(nextModule.id)}
           className="w-full bg-magic text-white rounded-2xl p-5 text-right hover:opacity-90 transition"
@@ -91,7 +211,7 @@ function Home({ completed, bestExam, tofes4Done, onNavigate, onOpenModule, sessi
         </button>
       ) : (
         <div className="w-full bg-growdeep text-white rounded-2xl p-5 text-center font-bold text-lg">
-          🏆 סיימת את כל המודולים! עכשיו — מבחן.
+          🏆 סיימת את כל המודולים! ציון 90% ומעלה במבחן יפתח את תעודת הסיום.
         </div>
       )}
 
@@ -138,7 +258,7 @@ function Home({ completed, bestExam, tofes4Done, onNavigate, onOpenModule, sessi
   );
 }
 
-function ModulesList({ completed, onOpenModule }) {
+function ModulesList({ completed, mastery, onOpenModule }) {
   return (
     <div className="space-y-4">
       <header className="bg-ink text-white rounded-2xl p-6">
@@ -150,6 +270,8 @@ function ModulesList({ completed, onOpenModule }) {
       <div className="space-y-3">
         {MODULES.map((m, i) => {
           const done = !!completed[m.id];
+          const stat = mastery[m.id];
+          const answered = stat ? stat.c + stat.w : 0;
           return (
             <button
               key={m.id}
@@ -163,8 +285,13 @@ function ModulesList({ completed, onOpenModule }) {
                 <div className="flex-1">
                   <p className="text-xs text-ink/70 font-mono">
                     מודול {i + 1}
-                    {getLesson(m.id) && (
+                    {hasLesson(m.id) && (
                       <span className="mr-2 text-magic font-sans font-bold">▶️ כולל שיעור</span>
+                    )}
+                    {answered > 0 && (
+                      <span className="mr-2 font-sans">
+                        דיוק בתרגול: {Math.round((stat.c / answered) * 100)}%
+                      </span>
                     )}
                   </p>
                   <p className="font-bold">{m.title}</p>
@@ -187,20 +314,42 @@ function ModulesList({ completed, onOpenModule }) {
 export default function App() {
   const [tab, setTab] = useState("home");
   const [openModuleId, setOpenModuleId] = useState(null);
-  const [completed, setCompleted] = useState(() => loadState("completed", {}));
-  const [tofes4Checked, setTofes4Checked] = useState(() => loadState("tofes4", {}));
+  // מפות סימון עם חותמת זמן פר-מפתח (ראו progressMerge.js) — ה-UI מקבל תצוגה בוליאנית
+  const [completedMap, setCompletedMap] = useState(() => loadState("completed", {}));
+  const [tofes4Map, setTofes4Map] = useState(() => loadState("tofes4", {}));
   // null = עוד לא ניגשו למבחן; 0 הוא ציון אמיתי (0%) ולכן מובחן מ-null.
   // Number.isFinite מסנן ערך פגום שנשמר ידנית ב-storage.
   const [bestExam, setBestExam] = useState(() => {
     const v = loadState("bestExam", null);
     return Number.isFinite(v) ? v : null;
   });
+  // למידה מסתגלת: חזרה מרווחת, שליטה פר-מודול ורצף ימים
+  const [srs, setSrs] = useState(() => loadState("srs", {}));
+  const [mastery, setMastery] = useState(() => loadState("mastery", {}));
+  const [streak, setStreak] = useState(() => loadState("streak", null) || null);
+  const [standardsQuery, setStandardsQuery] = useState("");
+  const [certificateOpen, setCertificateOpen] = useState(false);
 
-  useEffect(() => saveState("completed", completed), [completed]);
-  useEffect(() => saveState("tofes4", tofes4Checked), [tofes4Checked]);
+  const completed = useMemo(() => boolView(completedMap), [completedMap]);
+  const tofes4Checked = useMemo(() => boolView(tofes4Map), [tofes4Map]);
+
+  useEffect(() => saveState("completed", completedMap), [completedMap]);
+  useEffect(() => saveState("tofes4", tofes4Map), [tofes4Map]);
   useEffect(() => {
     if (bestExam !== null) saveState("bestExam", bestExam);
   }, [bestExam]);
+  useEffect(() => saveState("srs", srs), [srs]);
+  useEffect(() => saveState("mastery", mastery), [mastery]);
+  useEffect(() => {
+    if (streak) saveState("streak", streak);
+  }, [streak]);
+
+  // כל תשובה בכל מקום (חידון מודול, מבחן, חזרה יומית) מזינה את שלוש המערכות
+  const onAnswer = useCallback((moduleId, questionId, correct) => {
+    setMastery((m) => bumpMastery(m, moduleId, correct));
+    setSrs((s) => ({ ...s, [questionId]: applyAnswer(s[questionId], correct) }));
+    setStreak((s) => updateStreak(s));
+  }, []);
 
   // ---- דף נחיתה, התחברות וסנכרון ענן ----
   // הכניסה לאפליקציה מחייבת חשבון אישי — כך ההתקדמות של כל משתמש
@@ -210,15 +359,19 @@ export default function App() {
   const [loginOpen, setLoginOpen] = useState(false);
   const cloudReadyRef = useRef(false); // מותר לדחוף לענן רק אחרי משיכה ומיזוג
   const lastUserIdRef = useRef(null);
-  const [syncTick, setSyncTick] = useState(0); // מאלץ דחיפה ראשונה אחרי מיזוג
+  const lastSyncRef = useRef(0);
+  const [syncTick, setSyncTick] = useState(0); // מאלץ סבב סנכרון (מיזוג ראשון / חזרה לטאב)
 
   // ניקוי המכשיר — ביציאה יזומה וגם בניתוק חיצוני (פקיעת חיבור, יציאה
   // מלשונית אחרת), כדי שהתקדמות של משתמש אחד לא תדלוף למשתמש הבא.
   const wipeLocal = () => {
     clearAllState();
-    setCompleted({});
-    setTofes4Checked({});
+    setCompletedMap({});
+    setTofes4Map({});
     setBestExam(null);
+    setSrs({});
+    setMastery({});
+    setStreak(null);
     setOpenModuleId(null);
     setTab("home");
     setLoginOpen(false);
@@ -228,7 +381,13 @@ export default function App() {
     if (!authAvailable) return;
     supabase.auth
       .getSession()
-      .then(({ data }) => setSession(data.session ?? null))
+      .then(({ data }) => {
+        // מכשיר שהחיבור בו פקע בזמן שהאפליקציה הייתה סגורה: הנתונים המקומיים
+        // שייכים למשתמש הקודם — מנקים לפני שמישהו אחר נכנס. (ההתקדמות שלו
+        // שמורה בענן שלו, והמיזוג ישחזר אותה בכניסה הבאה.)
+        if (!data.session && loadState("owner", null)) wipeLocal();
+        setSession(data.session ?? null);
+      })
       .catch(() => {})
       .finally(() => setAuthLoading(false));
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, s) => {
@@ -245,9 +404,14 @@ export default function App() {
     return () => subscription.unsubscribe();
   }, []);
 
-  // בכניסה: מושכים את המצב מהענן וממזגים עם המקומי (איחוד השלמות, שיא מקסימלי)
+  // בכניסה: מושכים את המצב מהענן וממזגים עם המקומי (מיזוג מונוטוני פר-מפתח —
+  // ראו progressMerge.js). לפני המיזוג: אם המצב המקומי שייך למשתמש אחר
+  // (מכשיר משותף שהחיבור בו התחלף) — מנקים אותו כדי שלא ידלוף לחשבון הנוכחי.
   useEffect(() => {
     if (!session || cloudReadyRef.current) return;
+    const owner = loadState("owner", null);
+    if (owner && owner !== session.user.id) wipeLocal();
+    saveState("owner", session.user.id);
     let cancelled = false;
     (async () => {
       try {
@@ -261,11 +425,15 @@ export default function App() {
         // אחרת שינוי מקומי קטן היה דורס את כל ההתקדמות השמורה בענן.
         if (error) return;
         const remote = data?.data || {};
-        if (remote.completed) setCompleted((local) => ({ ...remote.completed, ...local }));
-        if (remote.tofes4) setTofes4Checked((local) => ({ ...remote.tofes4, ...local }));
+        setCompletedMap((local) => mergeProgress(remote, { completed: local }).completed);
+        setTofes4Map((local) => mergeProgress(remote, { tofes4: local }).tofes4);
         if (Number.isFinite(remote.bestExam))
           setBestExam((local) => Math.max(local ?? 0, remote.bestExam));
+        setSrs((local) => mergeProgress(remote, { srs: local }).srs);
+        setMastery((local) => mergeProgress(remote, { mastery: local }).mastery);
+        setStreak((local) => mergeProgress(remote, { streak: local }).streak);
         cloudReadyRef.current = true;
+        lastSyncRef.current = Date.now();
         // דחיפה אחת מיד אחרי המיזוג — מכסה גם ענן ריק מול התקדמות מקומית קיימת
         setSyncTick((t) => t + 1);
       } catch {
@@ -277,24 +445,63 @@ export default function App() {
     };
   }, [session]);
 
-  // דחיפה לענן (debounce) על כל שינוי — רק אחרי שהמיזוג הראשוני הסתיים.
-  // התלות היא ב-user id ולא באובייקט session, כדי שרענון טוקן שעתי
-  // לא יגרור כתיבה מיותרת של נתונים זהים.
+  // חזרה לטאב אחרי זמן ממושך (PWA שנשארת פתוחה ימים): מרעננים מהענן,
+  // כדי שהתקדמות שנצברה במכשיר אחר תופיע — והדחיפה הבאה לא תדרוס אותה.
+  useEffect(() => {
+    const onVisible = () => {
+      if (
+        document.visibilityState === "visible" &&
+        cloudReadyRef.current &&
+        Date.now() - lastSyncRef.current > 10 * 60 * 1000
+      ) {
+        setSyncTick((t) => t + 1);
+      }
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, []);
+
+  // סנכרון לענן (debounce) על כל שינוי — רק אחרי שהמיזוג הראשוני הסתיים.
+  // לפני כל דחיפה מושכים את המצב העדכני מהענן וממזגים לתוכו, כך שטאב ישן
+  // לעולם לא דורס התקדמות שנעשתה בינתיים במכשיר אחר. התלות היא ב-user id
+  // ולא באובייקט session, כדי שרענון טוקן שעתי לא יגרור כתיבה מיותרת.
   const userId = session?.user?.id ?? null;
   useEffect(() => {
     if (!userId || !cloudReadyRef.current) return;
-    const t = setTimeout(() => {
-      supabase
-        .from("mep_progress")
-        .upsert({
-          user_id: userId,
-          data: { completed, tofes4: tofes4Checked, bestExam },
-          updated_at: new Date().toISOString(),
-        })
-        .then(() => {}, () => {});
+    const t = setTimeout(async () => {
+      try {
+        const { data, error } = await supabase
+          .from("mep_progress")
+          .select("data")
+          .eq("user_id", userId)
+          .maybeSingle();
+        if (error) return; // בלי מצב ענן אמין — לא דורסים
+        const remote = data?.data || {};
+        const local = { completed: completedMap, tofes4: tofes4Map, bestExam, srs, mastery, streak };
+        const merged = mergeProgress(remote, local);
+        lastSyncRef.current = Date.now();
+        if (!sameProgress(merged, mergeProgress(remote, {}))) {
+          await supabase.from("mep_progress").upsert({
+            user_id: userId,
+            data: merged,
+            updated_at: new Date().toISOString(),
+          });
+        }
+        // התקדמות חדשה מהענן (מכשיר אחר) — מוצגת מיד גם כאן
+        if (!sameProgress(merged, mergeProgress({}, local))) {
+          setCompletedMap(merged.completed);
+          setTofes4Map(merged.tofes4);
+          setBestExam(merged.bestExam);
+          setSrs(merged.srs);
+          setMastery(merged.mastery);
+          setStreak(merged.streak);
+        }
+      } catch {
+        // אין רשת — הנתונים שמורים מקומית; הדחיפה הבאה תסנכרן
+      }
     }, 1500);
     return () => clearTimeout(t);
-  }, [completed, tofes4Checked, bestExam, userId, syncTick]);
+  }, [completedMap, tofes4Map, bestExam, srs, mastery, streak, userId, syncTick]);
 
   const signOut = () => {
     cloudReadyRef.current = false;
@@ -303,16 +510,28 @@ export default function App() {
     wipeLocal();
   };
 
+  // ---- ניווט מודולים עם כפתור Back של הטלפון ----
+  const closingModuleRef = useRef(false); // מגן מפני back() כפול בלחיצות מהירות
+
   const openModule = (id) => {
     setOpenModuleId(id);
     setTab("modules");
+    closingModuleRef.current = false;
     // כפתור Back של הטלפון יחזיר לרשימת המודולים — לא יעיף מהאתר
     window.history.pushState({ m: id }, "");
     window.scrollTo({ top: 0 });
   };
 
   useEffect(() => {
+    // רשומת היסטוריה של מודול/שיעור ששרדה רענון עמוד לא משקפת שום UI —
+    // מנרמלים אותה כדי ש-Back לא "ייבלע" ולא יפתח מודול ישן במפתיע.
+    if (window.history.state?.m || window.history.state?.mepLesson) {
+      window.history.replaceState(null, "");
+    }
     const onPop = (e) => {
+      closingModuleRef.current = false;
+      // רשומת שיעור שייכת לנגן (LessonPlayer מטפל בה בעצמו) — לא סוגרים מודול
+      if (e.state?.mepLesson) return;
       // Back מחזיר למסך הקודם: רשומה עם מודול — פותחים אותו, אחרת לרשימה
       const m = e.state?.m ?? null;
       setOpenModuleId(m);
@@ -323,6 +542,17 @@ export default function App() {
   }, []);
 
   const currentModule = openModuleId ? getModule(openModuleId) : null;
+  const dueCount = useMemo(() => countDue(srs, ALL_QIDS), [srs]);
+
+  const onFinishExam = useCallback((pct) => {
+    setBestExam((b) => Math.max(b ?? 0, pct));
+  }, []);
+
+  const goToStandards = (query) => {
+    setStandardsQuery(query);
+    setTab("standards");
+    window.scrollTo({ top: 0 });
+  };
 
   let content = null;
   if (tab === "home") {
@@ -331,10 +561,14 @@ export default function App() {
         completed={completed}
         bestExam={bestExam}
         tofes4Done={TOFES4_CHECKLIST.filter((c) => tofes4Checked[c.id]).length}
+        dueCount={dueCount}
+        streak={streak}
         onNavigate={setTab}
         onOpenModule={openModule}
+        onSearchStandards={goToStandards}
         session={session}
         onLogout={signOut}
+        onCertificate={() => setCertificateOpen(true)}
       />
     );
   } else if (tab === "modules") {
@@ -343,20 +577,31 @@ export default function App() {
         module={currentModule}
         done={!!completed[currentModule.id]}
         onToggleDone={() =>
-          setCompleted((c) => ({ ...c, [currentModule.id]: !c[currentModule.id] }))
+          setCompletedMap((c) => setMark(c, currentModule.id, !completed[currentModule.id]))
         }
+        onAnswer={onAnswer}
         onBack={() => window.history.back()}
       />
     ) : (
-      <ModulesList completed={completed} onOpenModule={openModule} />
+      <ModulesList completed={completed} mastery={mastery} onOpenModule={openModule} />
     );
   } else if (tab === "standards") {
-    content = <StandardsView />;
+    content = (
+      <Suspense
+        fallback={
+          <p role="status" className="text-center text-ink/70 py-10">
+            טוען את ספריית התקנים…
+          </p>
+        }
+      >
+        <StandardsView initialQuery={standardsQuery} />
+      </Suspense>
+    );
   } else if (tab === "tofes4") {
     content = (
       <Tofes4View
         checked={tofes4Checked}
-        onToggle={(id) => setTofes4Checked((c) => ({ ...c, [id]: !c[id] }))}
+        onToggle={(id) => setTofes4Map((c) => setMark(c, id, !tofes4Checked[id]))}
       />
     );
   }
@@ -365,7 +610,10 @@ export default function App() {
   if (authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <p className="text-4xl animate-pulse" aria-label="טוען">⚙️</p>
+        <p role="status" className="text-4xl animate-pulse">
+          <span aria-hidden>⚙️</span>
+          <span className="sr-only">טוען</span>
+        </p>
       </div>
     );
   }
@@ -388,6 +636,13 @@ export default function App() {
       >
         דילוג לתוכן הראשי
       </a>
+      {certificateOpen && (
+        <Certificate
+          session={session}
+          bestExam={bestExam}
+          onClose={() => setCertificateOpen(false)}
+        />
+      )}
       <main id="main-content" className="w-full max-w-2xl mx-auto px-4 pt-6 flex-1">
         {content}
         {/* המבחן נשאר תמיד ברכיב חי (מוסתר כשלא בטאב שלו) כדי שמעבר טאב
@@ -395,7 +650,10 @@ export default function App() {
         <div hidden={tab !== "exam"}>
           <ExamView
             best={bestExam}
-            onFinish={(pct) => setBestExam((b) => Math.max(b ?? 0, pct))}
+            srs={srs}
+            mastery={mastery}
+            onFinish={onFinishExam}
+            onAnswer={onAnswer}
           />
         </div>
       </main>
@@ -410,8 +668,13 @@ export default function App() {
               key={t.id}
               onClick={() => {
                 setTab(t.id);
-                // מודול פתוח נסגר דרך ההיסטוריה — כך לא נשארת רשומת Back יתומה
-                if (openModuleId) window.history.back();
+                // מודול פתוח נסגר דרך ההיסטוריה — כך לא נשארת רשומת Back יתומה.
+                // closingModuleRef מונע back() כפול בלחיצות מהירות (שהיה מעיף
+                // את המשתמש אל מחוץ לאתר) — משוחרר ב-popstate.
+                if (openModuleId && !closingModuleRef.current) {
+                  closingModuleRef.current = true;
+                  window.history.back();
+                }
                 window.scrollTo({ top: 0 });
               }}
               aria-current={tab === t.id ? "page" : undefined}

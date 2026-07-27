@@ -1,14 +1,14 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { STANDARD_DOMAINS, STANDARDS_COUNT } from "../data/standards.js";
+import { normalize } from "../lib/text.js";
 
-// נרמול לחיפוש: גרשיים עבריים (״) ומרכאות מסולסלות מומרים למרכאות רגילות,
-// ואותיות לטיניות מושוות ללא תלות ברישיות (nfpa ↔ NFPA).
-function normalize(s) {
-  return s.replace(/[”“״]/g, '"').replace(/[׳']/g, "'").toLowerCase();
-}
+export default function StandardsView({ initialQuery = "" }) {
+  const [query, setQuery] = useState(initialQuery);
 
-export default function StandardsView() {
-  const [query, setQuery] = useState("");
+  // הגעה מהחיפוש הגלובלי בבית — השאילתה נכנסת ישר לשדה החיפוש של הספרייה
+  useEffect(() => {
+    if (initialQuery) setQuery(initialQuery);
+  }, [initialQuery]);
 
   const filtered = useMemo(() => {
     const q = normalize(query.trim());

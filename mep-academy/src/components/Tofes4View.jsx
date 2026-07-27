@@ -85,6 +85,13 @@ export default function Tofes4View({ checked, onToggle }) {
           ))}
         </ol>
       </section>
+
+      <button
+        onClick={() => window.print()}
+        className="w-full text-center text-ink/60 text-sm font-semibold hover:text-ink py-1 print-hide"
+      >
+        🖨️ הדפסת הצ'ק-ליסט (או שמירה כ-PDF) — לתלייה במשרד האתר
+      </button>
     </div>
   );
 }
