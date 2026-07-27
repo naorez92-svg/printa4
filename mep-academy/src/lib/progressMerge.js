@@ -90,8 +90,20 @@ export function mergeProgress(remote = {}, local = {}) {
   };
 }
 
+// השוואה עמוקה בלתי-תלויה בסדר מפתחות: Postgres מחזיר jsonb עם מפתחות
+// ממוינים ואילו המצב המקומי בסדר הכנסה — JSON.stringify רגיל היה מדווח
+// "שונה" על תוכן זהה וגורר סבבי סנכרון מיותרים.
+function stableStringify(x) {
+  if (x === null || typeof x !== "object") return JSON.stringify(x);
+  if (Array.isArray(x)) return `[${x.map(stableStringify).join(",")}]`;
+  return `{${Object.keys(x)
+    .sort()
+    .map((k) => `${JSON.stringify(k)}:${stableStringify(x[k])}`)
+    .join(",")}}`;
+}
+
 export function sameProgress(a, b) {
-  return JSON.stringify(a) === JSON.stringify(b);
+  return stableStringify(a) === stableStringify(b);
 }
 
 // סינון לפי מפתחות מוכרים בלבד. שכבת הגנה כפולה: (1) שורה בענן שנופחה

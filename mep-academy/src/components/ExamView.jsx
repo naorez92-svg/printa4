@@ -40,10 +40,12 @@ function fullPool() {
   );
 }
 
-function buildQuestions(mode, { srs, mastery }) {
+function buildQuestions(mode, { srs, mastery, today }) {
   const pool = fullPool();
   if (mode === "review") {
-    return shuffle(pool.filter((q) => isDue(srs[q.qid]))).slice(0, REVIEW_SIZE).map(shuffleOptions);
+    return shuffle(pool.filter((q) => isDue(srs[q.qid], today)))
+      .slice(0, REVIEW_SIZE)
+      .map(shuffleOptions);
   }
   if (mode === "targeted") {
     const weak = new Set(weakestModules(mastery, MODULES.map((m) => m.id)));
@@ -66,11 +68,11 @@ const MODE_TITLES = {
   review: "🗓️ חזרה יומית",
 };
 
-function ExamView({ best, srs, mastery, onFinish, onAnswer }) {
+function ExamView({ best, srs, mastery, today, onFinish, onAnswer }) {
   const [mode, setMode] = useState(null); // null = תפריט הבחירה
   const [attempt, setAttempt] = useState(0);
   const questions = useMemo(
-    () => (mode ? buildQuestions(mode, { srs, mastery }) : []),
+    () => (mode ? buildQuestions(mode, { srs, mastery, today }) : []),
     // מכוון: המאגר נבנה פעם אחת לכל כניסה למצב — עדכוני srs תוך כדי מענה
     // לא אמורים להחליף את השאלות מתחת לידיים
     [mode, attempt] // eslint-disable-line react-hooks/exhaustive-deps
@@ -82,13 +84,17 @@ function ExamView({ best, srs, mastery, onFinish, onAnswer }) {
   const [skipped, setSkipped] = useState(0); // מבחן אמת: שאלות שלא הספיקו
   const [mistakes, setMistakes] = useState([]);
   const [timeLeft, setTimeLeft] = useState(REAL_EXAM_SECONDS);
+  const deadlineRef = useRef(0);
   const counterRef = useRef(null);
 
   const isReal = mode === "real";
   const countsForBest = mode === "practice" || mode === "real";
   const hasAttempted = best !== null && best !== undefined;
 
-  const dueCount = useMemo(() => fullPool().filter((q) => isDue(srs[q.qid])).length, [srs]);
+  const dueCount = useMemo(
+    () => fullPool().filter((q) => isDue(srs[q.qid], today)).length,
+    [srs, today]
+  );
   const weakIds = useMemo(() => weakestModules(mastery, MODULES.map((m) => m.id)), [mastery]);
 
   // הנגשה: בהחלפת שאלה מחזירים את הפוקוס לראש הכרטיס כדי שקוראי מסך
@@ -109,6 +115,7 @@ function ExamView({ best, srs, mastery, onFinish, onAnswer }) {
 
   const start = (m) => {
     resetRun();
+    if (m === "real") deadlineRef.current = Date.now() + REAL_EXAM_SECONDS * 1000;
     setAttempt((a) => a + 1);
     setMode(m);
     requestAnimationFrame(() => counterRef.current?.focus());
@@ -126,15 +133,25 @@ function ExamView({ best, srs, mastery, onFinish, onAnswer }) {
     setFinished(true);
   };
 
-  // טיימר מבחן האמת — נעצר בסיום; באפס: סיום אוטומטי, מה שלא נענה נספר כטעות
+  // טיימר מבחן האמת נגזר מדד-ליין אבסולוטי ולא מספירה נצברת: דפדפנים
+  // מצמצמים טיימרים בטאב ברקע / מסך נעול, וספירה נצברת הייתה מקפיאה את
+  // השעון — עם דד-ליין, חזרה לטאב אוכפת מיד את הזמן שחלף באמת.
   useEffect(() => {
     if (!isReal || finished || questions.length === 0) return;
-    if (timeLeft <= 0) {
-      finish(score, index);
-      return;
-    }
-    const t = setTimeout(() => setTimeLeft((s) => s - 1), 1000);
-    return () => clearTimeout(t);
+    const tick = () =>
+      setTimeLeft(Math.max(0, Math.ceil((deadlineRef.current - Date.now()) / 1000)));
+    const id = setInterval(tick, 500);
+    document.addEventListener("visibilitychange", tick);
+    tick();
+    return () => {
+      clearInterval(id);
+      document.removeEventListener("visibilitychange", tick);
+    };
+  }, [isReal, finished, questions.length]);
+
+  // הזמן נגמר — סיום אוטומטי; מה שלא נענה נספר כטעות
+  useEffect(() => {
+    if (isReal && !finished && questions.length > 0 && timeLeft <= 0) finish(score, index);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isReal, finished, timeLeft, questions.length]);
 

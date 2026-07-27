@@ -4,7 +4,7 @@ import { hasLesson } from "./data/lessonsMeta.js";
 import { TOFES4_CHECKLIST } from "./data/tofes4.js";
 import { loadState, saveState, clearAllState } from "./lib/storage.js";
 import { boolView, setMark, mergeProgress, pruneKeys, sameProgress } from "./lib/progressMerge.js";
-import { applyAnswer, bumpMastery, countDue, qid, streakAlive, updateStreak } from "./lib/stats.js";
+import { applyAnswer, bumpMastery, countDue, qid, streakAlive, todayStr, updateStreak } from "./lib/stats.js";
 import ModuleView from "./components/ModuleView.jsx";
 import Tofes4View from "./components/Tofes4View.jsx";
 import ExamView from "./components/ExamView.jsx";
@@ -12,6 +12,7 @@ import Landing from "./components/Landing.jsx";
 import LoginDialog from "./components/LoginDialog.jsx";
 import SearchBox from "./components/SearchBox.jsx";
 import Certificate from "./components/Certificate.jsx";
+import ErrorBoundary from "./components/ErrorBoundary.jsx";
 import { supabase, authAvailable } from "./lib/supabase.js";
 
 // ספריית התקנים נטענת עצל — נדרשת רק כשנכנסים לטאב שלה
@@ -344,6 +345,9 @@ export default function App() {
   const [streak, setStreak] = useState(() => loadState("streak", null) || null);
   const [standardsQuery, setStandardsQuery] = useState("");
   const [certificateOpen, setCertificateOpen] = useState(false);
+  // "היום" כ-state ולא כחישוב-במקום: PWA שנשארת פתוחה ימים חייבת שהחזרה
+  // היומית תתעדכן במעבר חצות — מרוענן בחזרה לטאב ובטיימר חצות
+  const [today, setToday] = useState(() => todayStr());
 
   const completed = useMemo(() => boolView(completedMap), [completedMap]);
   const tofes4Checked = useMemo(() => boolView(tofes4Map), [tofes4Map]);
@@ -375,11 +379,16 @@ export default function App() {
   const cloudReadyRef = useRef(false); // מותר לדחוף לענן רק אחרי משיכה ומיזוג
   const lastUserIdRef = useRef(null);
   const lastSyncRef = useRef(0);
+  // טוקן דור לסבבי הסנכרון: כל שינוי מצב / יציאה מהחשבון מבטלים המשך
+  // סבב שעדיין באוויר — אחרת מיזוג שחושב מ-snapshot ישן היה דורס שינוי
+  // חדש, ואחרי יציאה אף היה מזריק את נתוני המשתמש הקודם למכשיר ריק
+  const pushGenRef = useRef(0);
   const [syncTick, setSyncTick] = useState(0); // מאלץ סבב סנכרון (מיזוג ראשון / חזרה לטאב)
 
   // ניקוי המכשיר — ביציאה יזומה וגם בניתוק חיצוני (פקיעת חיבור, יציאה
   // מלשונית אחרת), כדי שהתקדמות של משתמש אחד לא תדלוף למשתמש הבא.
   const wipeLocal = () => {
+    pushGenRef.current++; // סבב סנכרון באוויר לא ישחזר את מה שנמחק
     clearAllState();
     setCompletedMap({});
     setTofes4Map({});
@@ -397,10 +406,11 @@ export default function App() {
     supabase.auth
       .getSession()
       .then(({ data }) => {
-        // מכשיר שהחיבור בו פקע בזמן שהאפליקציה הייתה סגורה: הנתונים המקומיים
-        // שייכים למשתמש הקודם — מנקים לפני שמישהו אחר נכנס. (ההתקדמות שלו
-        // שמורה בענן שלו, והמיזוג ישחזר אותה בכניסה הבאה.)
-        if (!data.session && loadState("owner", null)) wipeLocal();
+        // חיבור שפקע כשהאפליקציה סגורה: לא מוחקים כאן — ייתכן שיש התקדמות
+        // אופליין שטרם סונכרנה והבעלים יתחבר שוב. ההכרעה נדחית לרגע
+        // ההתחברות: משתמש אחר → ניקוי (בדיקת owner במיזוג), אותו משתמש →
+        // ההתקדמות נשמרת ונדחפת לענן שלו. בלי התחברות הנתונים ממילא לא
+        // מוצגים (האפליקציה דורשת חשבון).
         setSession(data.session ?? null);
       })
       .catch(() => {})
@@ -473,17 +483,23 @@ export default function App() {
   // כדי שהתקדמות שנצברה במכשיר אחר תופיע — והדחיפה הבאה לא תדרוס אותה.
   useEffect(() => {
     const onVisible = () => {
-      if (
-        document.visibilityState === "visible" &&
-        cloudReadyRef.current &&
-        Date.now() - lastSyncRef.current > 10 * 60 * 1000
-      ) {
+      if (document.visibilityState !== "visible") return;
+      setToday(todayStr()); // מעבר חצות בזמן שהטאב היה ברקע
+      if (cloudReadyRef.current && Date.now() - lastSyncRef.current > 10 * 60 * 1000) {
         setSyncTick((t) => t + 1);
       }
     };
     document.addEventListener("visibilitychange", onVisible);
     return () => document.removeEventListener("visibilitychange", onVisible);
   }, []);
+
+  // מעבר חצות בזמן שהטאב פתוח וגלוי — החזרה היומית מתעדכנת בלי רענון
+  useEffect(() => {
+    const now = new Date();
+    const midnight = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 5);
+    const t = setTimeout(() => setToday(todayStr()), midnight.getTime() - now.getTime());
+    return () => clearTimeout(t);
+  }, [today]);
 
   // סנכרון לענן (debounce) על כל שינוי — רק אחרי שהמיזוג הראשוני הסתיים.
   // לפני כל דחיפה מושכים את המצב העדכני מהענן וממזגים לתוכו, כך שטאב ישן
@@ -492,6 +508,9 @@ export default function App() {
   const userId = session?.user?.id ?? null;
   useEffect(() => {
     if (!userId || !cloudReadyRef.current) return;
+    // כל הרצה של האפקט (= כל שינוי מצב) מבטלת המשך של סבב קודם שבאוויר
+    const gen = ++pushGenRef.current;
+    const stale = () => gen !== pushGenRef.current || !cloudReadyRef.current;
     const t = setTimeout(async () => {
       try {
         const { data, error } = await supabase
@@ -499,6 +518,7 @@ export default function App() {
           .select("data")
           .eq("user_id", userId)
           .maybeSingle();
+        if (stale()) return;
         if (error) return; // בלי מצב ענן אמין — לא דורסים
         // גיזום כפול (ענן ומקומי): שורה שנופחה בזדון עד תקרת ה-64KB לא
         // מזהמת את המכשיר, והדחיפה הבאה מבריאה את השורה בענן
@@ -513,6 +533,7 @@ export default function App() {
           });
           // דחיפה שנכשלה (רשת/מגבלת גודל) לא נחשבת סנכרון — הניסיון הבא יחזור עליה
           if (upsertError) return;
+          if (stale()) return;
         }
         lastSyncRef.current = Date.now();
         // התקדמות חדשה מהענן (מכשיר אחר) — מוצגת מיד גם כאן
@@ -532,6 +553,7 @@ export default function App() {
   }, [completedMap, tofes4Map, bestExam, srs, mastery, streak, userId, syncTick]);
 
   const signOut = () => {
+    pushGenRef.current++; // מבטל סבב סנכרון שבאוויר — לא ישחזר נתונים אחרי היציאה
     cloudReadyRef.current = false;
     supabase?.auth.signOut().catch(() => {});
     // ההתקדמות של המשתמש שיצא שמורה בענן שלו; המכשיר מתחיל נקי.
@@ -570,7 +592,7 @@ export default function App() {
   }, []);
 
   const currentModule = openModuleId ? getModule(openModuleId) : null;
-  const dueCount = useMemo(() => countDue(srs, ALL_QIDS), [srs]);
+  const dueCount = useMemo(() => countDue(srs, ALL_QIDS, today), [srs, today]);
 
   const onFinishExam = useCallback((pct) => {
     setBestExam((b) => Math.max(b ?? 0, pct));
@@ -615,15 +637,17 @@ export default function App() {
     );
   } else if (tab === "standards") {
     content = (
-      <Suspense
-        fallback={
-          <p role="status" className="text-center text-ink/70 py-10">
-            טוען את ספריית התקנים…
-          </p>
-        }
-      >
-        <StandardsView initialQuery={standardsQuery} />
-      </Suspense>
+      <ErrorBoundary>
+        <Suspense
+          fallback={
+            <p role="status" className="text-center text-ink/70 py-10">
+              טוען את ספריית התקנים…
+            </p>
+          }
+        >
+          <StandardsView initialQuery={standardsQuery} />
+        </Suspense>
+      </ErrorBoundary>
     );
   } else if (tab === "tofes4") {
     content = (
@@ -680,6 +704,7 @@ export default function App() {
             best={bestExam}
             srs={srs}
             mastery={mastery}
+            today={today}
             onFinish={onFinishExam}
             onAnswer={onAnswer}
           />
@@ -695,6 +720,9 @@ export default function App() {
             <button
               key={t.id}
               onClick={() => {
+                // כניסה ישירה לטאב התקנים מתחילה נקייה — בלי שאילתה ישנה
+                // שנשארה מחיפוש גלובלי קודם
+                if (t.id === "standards") setStandardsQuery("");
                 setTab(t.id);
                 // מודול פתוח נסגר דרך ההיסטוריה — כך לא נשארת רשומת Back יתומה.
                 // closingModuleRef מונע back() כפול בלחיצות מהירות (שהיה מעיף

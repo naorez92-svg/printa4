@@ -34,10 +34,15 @@ export default function SearchBox({ onOpenModule, onGoStandards, onGoTab }) {
   const [standardsReady, setStandardsReady] = useState(false);
   const loadStandards = () => {
     if (standardsRef.current) return;
-    standardsRef.current = import("../data/standards.js").then((mod) => {
-      standardsRef.current = mod;
-      setStandardsReady(true);
-    });
+    standardsRef.current = import("../data/standards.js")
+      .then((mod) => {
+        standardsRef.current = mod;
+        setStandardsReady(true);
+      })
+      .catch(() => {
+        // רשת נפלה באמצע — משחררים את הנעילה כדי שפוקוס הבא ינסה שוב
+        standardsRef.current = null;
+      });
   };
 
   const q = normalize(query.trim());

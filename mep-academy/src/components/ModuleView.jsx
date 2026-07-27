@@ -1,6 +1,7 @@
 import { Suspense, lazy, useMemo, useRef, useState } from "react";
 import { LESSON_SLIDES, hasLesson } from "../data/lessonsMeta.js";
 import { qid } from "../lib/stats.js";
+import ErrorBoundary from "./ErrorBoundary.jsx";
 
 // נגן השיעורים (כולל קובץ השיעורים המלא והתרשימים) נטען עצל — רק כשלוחצים
 // על "צפייה בשיעור", לא בטעינת האפליקציה
@@ -97,26 +98,28 @@ export default function ModuleView({ module, done, onToggleDone, onAnswer, onBac
   return (
     <div className="space-y-4">
       {lessonOpen && withLesson && (
-        <Suspense
-          fallback={
-            <div className="fixed inset-0 z-50 bg-ink text-white flex items-center justify-center">
-              <p role="status" className="text-2xl animate-pulse">
-                <span aria-hidden>▶️</span>
-                <span className="sr-only">טוען את השיעור</span>
-              </p>
-            </div>
-          }
-        >
-          <LessonPlayer
-            moduleId={module.id}
-            onClose={(reason) => {
-              setLessonOpen(false);
-              // בסיום השיעור — קופצים ישר לתרגול, כמו שהקריינות מבטיחה
-              if (reason === "finished")
-                setTimeout(() => quizRef.current?.scrollIntoView({ block: "start" }), 60);
-            }}
-          />
-        </Suspense>
+        <ErrorBoundary>
+          <Suspense
+            fallback={
+              <div className="fixed inset-0 z-50 bg-ink text-white flex items-center justify-center">
+                <p role="status" className="text-2xl animate-pulse">
+                  <span aria-hidden>▶️</span>
+                  <span className="sr-only">טוען את השיעור</span>
+                </p>
+              </div>
+            }
+          >
+            <LessonPlayer
+              moduleId={module.id}
+              onClose={(reason) => {
+                setLessonOpen(false);
+                // בסיום השיעור — קופצים ישר לתרגול, כמו שהקריינות מבטיחה
+                if (reason === "finished")
+                  setTimeout(() => quizRef.current?.scrollIntoView({ block: "start" }), 60);
+              }}
+            />
+          </Suspense>
+        </ErrorBoundary>
       )}
 
       <button onClick={onBack} className="text-magic font-semibold hover:underline print-hide">
