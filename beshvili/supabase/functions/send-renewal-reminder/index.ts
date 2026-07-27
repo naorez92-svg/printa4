@@ -54,12 +54,17 @@ Deno.serve(async (req) => {
   // Fetch profiles in the D+25–D+32 window, including renewal_reminder_sent_at so we
   // can detect subscription renewal: if admin resets pro_since for a renewed subscriber,
   // renewal_reminder_sent_at < pro_since → send a fresh reminder for the new cycle.
-  const { data: rawProfiles } = await admin
+  const { data: rawProfiles, error: profilesErr } = await admin
     .from("profiles")
     .select("id, pro_since, plan, renewal_reminder_sent_at")
     .in("plan", ["pro", "parent", "teacher"])
     .lte("pro_since", d25)
     .gte("pro_since", d32);
+  // A query failure must fail the cron run visibly — returning "sent: 0" on a DB
+  // error silently stops a revenue-critical email for as long as the error lasts.
+  if (profilesErr) {
+    return new Response(JSON.stringify({ error: profilesErr.message }), { status: 500, headers: cors });
+  }
 
   const pendingProfiles = (rawProfiles ?? []).filter(p =>
     p.renewal_reminder_sent_at === null ||
@@ -70,10 +75,14 @@ Deno.serve(async (req) => {
     return new Response(JSON.stringify({ sent: 0, message: "No pro users due for renewal reminder" }), { status: 200, headers: cors });
   }
 
+  // Look up each pending user directly — a single listUsers page silently drops
+  // anyone beyond the first 1000 accounts, skipping their reminder forever.
   const userIds = pendingProfiles.map(p => p.id);
-  const { data: authData } = await admin.auth.admin.listUsers({ perPage: 1000 });
   const emailByUserId: Record<string, string> = {};
-  (authData?.users ?? []).forEach(u => { if (u.email) emailByUserId[u.id] = u.email; });
+  for (const id of userIds) {
+    const { data: au } = await admin.auth.admin.getUserById(id);
+    if (au?.user?.email) emailByUserId[id] = au.user.email;
+  }
 
   // Unsubscribe state (migration 0028) — separate, graceful query.
   const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
@@ -167,8 +176,13 @@ Deno.serve(async (req) => {
       .lt("pro_since", fortyDaysAgo)
       .not("renewal_reminder_sent_at", "is", null);
     if (overdue?.length) {
-      const { data: authList } = await admin.auth.admin.listUsers({ perPage: 1000 });
-      const emailOf = (id: string) => authList?.users?.find((u) => u.id === id)?.email ?? id;
+      // Direct per-id lookups — a single listUsers page misses accounts beyond 1000.
+      const overdueEmails: Record<string, string> = {};
+      for (const p of overdue) {
+        const { data: au } = await admin.auth.admin.getUserById(p.id);
+        if (au?.user?.email) overdueEmails[p.id] = au.user.email;
+      }
+      const emailOf = (id: string) => overdueEmails[id] ?? id;
       const rows = overdue.map((p) =>
         `<tr><td style="padding:6px 0;">${emailOf(p.id)}</td><td style="padding:6px 0;">${p.plan}</td><td style="padding:6px 0;">${(p.pro_since ?? "").slice(0, 10)}</td></tr>`
       ).join("");

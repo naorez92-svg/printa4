@@ -92,7 +92,7 @@ function PhotoUploader({ photoUrl, uploading, inputRef, onFileChange, onRemove }
   );
 }
 
-function StudentCard({ student, onQuickCreate, onEdit, onHistory, onDelete }) {
+function StudentCard({ student, onQuickCreate, onEdit, onHistory, onDelete, deleting = false }) {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const world = student.worlds?.[0];
   const worldEmoji = world ? (WORLD_EMOJI[world] ?? "📚") : null;
@@ -169,9 +169,10 @@ function StudentCard({ student, onQuickCreate, onEdit, onHistory, onDelete }) {
           <div className="flex items-center gap-2">
             <button
               onClick={() => onDelete(student.id)}
-              className="text-xs font-semibold text-red-500 hover:text-red-700 px-2.5 py-1 rounded-lg bg-red-50 hover:bg-red-100 transition-colors"
+              disabled={deleting}
+              className="text-xs font-semibold text-red-500 hover:text-red-700 px-2.5 py-1 rounded-lg bg-red-50 hover:bg-red-100 transition-colors disabled:opacity-50"
             >
-              מחק!
+              {deleting ? "מוחק…" : "מחק!"}
             </button>
             <button
               onClick={() => setConfirmDelete(false)}
@@ -193,7 +194,7 @@ function StudentCard({ student, onQuickCreate, onEdit, onHistory, onDelete }) {
   );
 }
 
-export default function Students({ onBookletSaved, remaining, isPro, bookletCount = 0 }) {
+export default function Students({ onBookletSaved, remaining, isPro, bookletCount = 0, active = true }) {
   const [students, setStudents]   = useState([]);
   const [loading, setLoading]     = useState(true);
   const [loadError, setLoadError] = useState(null);
@@ -207,6 +208,8 @@ export default function Students({ onBookletSaved, remaining, isPro, bookletCoun
   const [quickCreate, setQuickCreate] = useState(null);
   const [history, setHistory]         = useState(null);
   const [editId, setEditId]           = useState(null);
+  const [deletingId, setDeletingId]   = useState(null);
+  const [deleteError, setDeleteError] = useState(null);
   const [editForm, setEditForm]       = useState(null);
   const [editPhotoUrl, setEditPhotoUrl] = useState(null);
   const [editPhotoUploading, setEditPhotoUploading] = useState(false);
@@ -301,8 +304,15 @@ export default function Students({ onBookletSaved, remaining, isPro, bookletCoun
   };
 
   const deleteStudent = async (id) => {
+    if (deletingId) return; // one delete at a time — rapid double-taps fired duplicates
+    setDeletingId(id);
+    setDeleteError(null);
     const { error } = await supabase.from("children").delete().eq("id", id);
-    if (error) { setSaveError("המחיקה נכשלה — נסה שנית"); return; }
+    setDeletingId(null);
+    // deleteError renders at the LIST level below — saveError only renders inside
+    // the add/edit forms, which are closed when deleting from a card, so a failed
+    // delete used to be completely invisible.
+    if (error) { setDeleteError("המחיקה נכשלה — בדקי את החיבור ונסי שוב"); return; }
     fetchStudents();
   };
 
@@ -315,9 +325,13 @@ export default function Students({ onBookletSaved, remaining, isPro, bookletCoun
   if (quickCreate) {
     return (
       <QuickCreate
+        active={active}
         student={quickCreate}
         onClose={() => setQuickCreate(null)}
-        onSaved={() => { setQuickCreate(null); onBookletSaved?.(); }}
+        // Refresh counts only — closing the panel here yanked the user away the
+        // instant generation finished, so the success Preview (print/share/rating)
+        // never rendered. The user leaves via the ✕ / "חוברת חדשה" when done.
+        onSaved={() => onBookletSaved?.()}
         remaining={remaining}
         isPro={isPro}
         bookletCount={bookletCount}
@@ -328,6 +342,7 @@ export default function Students({ onBookletSaved, remaining, isPro, bookletCoun
   if (history) {
     return (
       <StudentHistory
+        active={active}
         student={history}
         onBack={() => setHistory(null)}
         remaining={remaining}
@@ -357,6 +372,12 @@ export default function Students({ onBookletSaved, remaining, isPro, bookletCoun
           </button>
         )}
       </div>
+
+      {deleteError && (
+        <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-2.5 text-xs text-red-600 text-center">
+          {deleteError}
+        </div>
+      )}
 
       {/* Add form */}
       {showAdd && (
@@ -548,6 +569,7 @@ export default function Students({ onBookletSaved, remaining, isPro, bookletCoun
                 onEdit={startEdit}
                 onHistory={setHistory}
                 onDelete={deleteStudent}
+                deleting={deletingId === student.id}
               />
             )
           ))}

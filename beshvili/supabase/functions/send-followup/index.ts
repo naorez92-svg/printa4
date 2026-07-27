@@ -88,11 +88,28 @@ Deno.serve(async (req) => {
   const fiveDaysAgo = new Date(now.getTime() -  5 * 24 * 60 * 60 * 1000).toISOString();
   const tenDaysAgo  = new Date(now.getTime() - 10 * 24 * 60 * 60 * 1000).toISOString();
 
+  // Page through a select — PostgREST caps a single response at 1000 rows, so an
+  // unpaginated select silently truncates once the table outgrows that (users
+  // beyond the cap would never get email / be miscounted as 0-booklet).
+  // deno-lint-ignore no-explicit-any
+  const selectAll = async (build: (from: number, to: number) => any, pageSize = 1000) => {
+    // deno-lint-ignore no-explicit-any
+    const rows: any[] = [];
+    for (let from = 0; ; from += pageSize) {
+      const { data, error } = await build(from, from + pageSize - 1);
+      if (error) return { data: rows, error };
+      rows.push(...(data ?? []));
+      if ((data?.length ?? 0) < pageSize) break;
+    }
+    return { data: rows, error: null };
+  };
+
   // Load all profiles (free + pro, non-admin) — without dormant_followup_sent_at
   // so this query works even if migration 0020 hasn't been applied yet.
-  const { data: allProfiles, error: profilesError } = await admin
-    .from("profiles")
-    .select("id, full_name, plan, followup_sent_at, created_at");
+  const { data: allProfiles, error: profilesError } = await selectAll((from, to) =>
+    admin.from("profiles")
+      .select("id, full_name, plan, followup_sent_at, created_at")
+      .order("id").range(from, to));
 
   if (profilesError) {
     console.error("[send-followup] profiles query failed:", profilesError.message);
@@ -114,14 +131,21 @@ Deno.serve(async (req) => {
 
   // Separately fetch dormant_followup_sent_at (added by migration 0020).
   // If column doesn't exist yet, this query fails silently — Wave 2 is skipped.
+  // Chunk .in() lookups — a single .in() with thousands of ids both bloats the
+  // request and caps the response at 1000 rows (truncated maps here would email
+  // unsubscribed users, a compliance bug).
+  const idChunks: string[][] = [];
+  for (let i = 0; i < allIds.length; i += 500) idChunks.push(allIds.slice(i, i + 500));
+
   let dormantByUser: Record<string, string | null> | null = null;
-  if (allIds.length > 0) {
-    const { data: dData, error: dErr } = await admin
-      .from("profiles")
-      .select("id, dormant_followup_sent_at")
-      .in("id", allIds);
-    if (!dErr && dData) {
-      dormantByUser = {};
+  {
+    dormantByUser = {};
+    for (const chunk of idChunks) {
+      const { data: dData, error: dErr } = await admin
+        .from("profiles")
+        .select("id, dormant_followup_sent_at")
+        .in("id", chunk);
+      if (dErr || !dData) { dormantByUser = null; break; }
       dData.forEach((p: { id: string; dormant_followup_sent_at: string | null }) => {
         dormantByUser![p.id] = p.dormant_followup_sent_at;
       });
@@ -131,14 +155,13 @@ Deno.serve(async (req) => {
   // Unsubscribe state (migration 0028). Separate query so the function keeps
   // working if 0028 hasn't been applied yet — until then no links / no skipping.
   const unsubByUser: Record<string, { off: boolean; token: string | null }> = {};
-  if (allIds.length > 0) {
+  for (const chunk of idChunks) {
     const { data: uData, error: uErr } = await admin
-      .from("profiles").select("id, unsubscribed_at, unsubscribe_token").in("id", allIds);
-    if (!uErr && uData) {
-      uData.forEach((p: { id: string; unsubscribed_at: string | null; unsubscribe_token: string | null }) => {
-        unsubByUser[p.id] = { off: !!p.unsubscribed_at, token: p.unsubscribe_token };
-      });
-    }
+      .from("profiles").select("id, unsubscribed_at, unsubscribe_token").in("id", chunk);
+    if (uErr || !uData) continue;
+    uData.forEach((p: { id: string; unsubscribed_at: string | null; unsubscribe_token: string | null }) => {
+      unsubByUser[p.id] = { off: !!p.unsubscribed_at, token: p.unsubscribe_token };
+    });
   }
   const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
   // Append a one-click unsubscribe link to the email footer (legal requirement).
@@ -156,8 +179,11 @@ Deno.serve(async (req) => {
   };
   const isUnsub = (userId: string): boolean => unsubByUser[userId]?.off === true;
 
-  // Booklets: count + last created_at per user
-  const { data: allBooklets } = await admin.from("booklets").select("user_id, created_at").in("user_id", allIds);
+  // Booklets: count + last created_at per user (paginated — booklet rows outgrow
+  // the 1000-row cap quickly, and truncation misclassifies active users as
+  // never-activated).
+  const { data: allBooklets } = await selectAll((from, to) =>
+    admin.from("booklets").select("user_id, created_at").order("id").range(from, to));
   const bookletsByUser: Record<string, number> = {};
   const lastBookletByUser: Record<string, string> = {};
   (allBooklets ?? []).forEach((b: { user_id: string; created_at: string }) => {
@@ -175,9 +201,18 @@ Deno.serve(async (req) => {
   // deno-lint-ignore no-explicit-any
   let authListErr: any = null;
   for (let attempt = 0; attempt < 2; attempt++) {
-    const r = await admin.auth.admin.listUsers({ perPage: 1000 });
-    authData = r.data; authListErr = r.error;
-    if (!authListErr && (authData?.users?.length ?? 0) > 0) break;
+    // Page through — a single page silently drops accounts beyond the first 1000.
+    // deno-lint-ignore no-explicit-any
+    const users: any[] = [];
+    authListErr = null;
+    for (let page = 1; ; page++) {
+      const r = await admin.auth.admin.listUsers({ page, perPage: 1000 });
+      if (r.error) { authListErr = r.error; break; }
+      users.push(...(r.data?.users ?? []));
+      if ((r.data?.users?.length ?? 0) < 1000) break;
+    }
+    authData = { users };
+    if (!authListErr && users.length > 0) break;
     if (attempt === 0) await new Promise((res) => setTimeout(res, 800));
   }
   if (authListErr) console.error("[send-followup] listUsers failed:", authListErr.message);

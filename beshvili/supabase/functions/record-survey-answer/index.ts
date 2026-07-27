@@ -25,12 +25,21 @@ Deno.serve(async (req) => {
     const isGet = req.method === "GET";
 
     if (isGet) {
-      // Email one-click: ?uid=xxx&q=use_case&a=private_lessons&ctx=email_created_one
+      // Email one-click. Preferred: ?t=<unsubscribe_token>&q=..&a=.. — the token is
+      // unguessable, so answers can't be forged for arbitrary users. Legacy links
+      // (?uid=<auth uid>) from already-sent emails keep working.
       const url = new URL(req.url);
-      userId       = url.searchParams.get("uid") ?? "";
       questionKey  = url.searchParams.get("q")   ?? "";
       answer       = url.searchParams.get("a")   ?? "";
       triggerContext = url.searchParams.get("ctx") ?? null;
+      const token = url.searchParams.get("t") ?? "";
+      if (token) {
+        const { data: p } = await admin
+          .from("profiles").select("id").eq("unsubscribe_token", token).maybeSingle();
+        userId = p?.id ?? "";
+      } else {
+        userId = url.searchParams.get("uid") ?? "";
+      }
     } else {
       // In-app POST with JWT
       const jwt = req.headers.get("authorization")?.replace("Bearer ", "");
@@ -54,8 +63,13 @@ Deno.serve(async (req) => {
     // (one-click from email), so without these checks anyone can write arbitrary
     // unbounded strings into survey_responses for any uid.
     const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    // Every question_key a caller links to MUST be listed here — answers to
+    // unlisted keys are silently dropped (that's how the monthly_need/barrier
+    // one-click links from send-followup-emails were lost for months).
     const VALID_QUESTIONS: Record<string, string[]> = {
-      use_case: ["private_lessons", "full_class", "homework"],
+      use_case:     ["private_lessons", "full_class", "homework"],
+      monthly_need: ["up_to_5", "five_to_15", "twenty_plus"],
+      barrier:      ["no_time", "didnt_understand", "no_topic"],
     };
     const validAnswers = VALID_QUESTIONS[questionKey];
     if (!UUID_RE.test(userId) || !validAnswers || !validAnswers.includes(answer)) {

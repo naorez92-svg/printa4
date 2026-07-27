@@ -442,7 +442,7 @@ Deno.serve(async (req) => {
 
     // 3. Journey ownership + entitlement + abuse caps (independent reads)
     const dayAgo = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
-    const [journeyResult, { count: journeysToday }, profileResult] = await Promise.all([
+    const [journeyResult, journeysTodayResult, profileResult] = await Promise.all([
       admin.from("career_journeys")
         .select("id, user_id, ai_calls, last_ai_call_at, analyses")
         .eq("id", journeyId)
@@ -460,6 +460,12 @@ Deno.serve(async (req) => {
     if (journeyResult.error || !journey || journey.user_id !== user.id) {
       return new Response(JSON.stringify({ error: "not_found" }), { status: 404, headers: cors });
     }
+    // Fail CLOSED on a count-query error: null count coerced to 0 silently
+    // disabled the daily cost ceiling during any transient DB failure.
+    if (journeysTodayResult.error) {
+      return new Response(JSON.stringify({ error: "internal_error" }), { status: 503, headers: cors });
+    }
+    const journeysToday = journeysTodayResult.count;
     // Strict >: with N journeys existing, count === N — so ">" allows calls on
     // up to MAX journeys and blocks once an (MAX+1)th row exists.
     // followup is exempt: it runs on an ALREADY-PAID, completed journey and is

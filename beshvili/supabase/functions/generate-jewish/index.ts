@@ -208,9 +208,10 @@ Deno.serve(async (req) => {
     }
 
     const rateCutoff = new Date(Date.now() - RATE_LIMIT_SECONDS * 1000).toISOString();
+    const rateStampIso = new Date().toISOString();
     const { data: rateLockRow } = await admin
       .from("profiles")
-      .update({ last_generation_at: new Date().toISOString() })
+      .update({ last_generation_at: rateStampIso })
       .eq("id", user.id)
       .or(`last_generation_at.is.null,last_generation_at.lt.${rateCutoff}`)
       .select("id")
@@ -230,8 +231,12 @@ Deno.serve(async (req) => {
 
     // Release the rate-limit slot on failure so a failed generation (or the
     // client's 2s auto-retry) isn't rejected with a 60s lockout. Success keeps it.
+    // Conditional on OUR stamp so a slow-failing request can't clear the fresh
+    // stamp a newer request wrote after the 60s window elapsed.
     const releaseLock = () =>
-      admin.from("profiles").update({ last_generation_at: null }).eq("id", user.id).then(() => {}, () => {});
+      admin.from("profiles").update({ last_generation_at: null })
+        .eq("id", user.id).eq("last_generation_at", rateStampIso)
+        .then(() => {}, () => {});
 
     // Count the generation itself (not just the saved booklet) — calling this
     // endpoint directly and never inserting was unlimited free usage. See
@@ -468,11 +473,17 @@ ${notes ? `הוראות נוספות מהמורה: ${esc(notes)}` : ""}
         let anthropicResp: Response | null = null;
         let fastSpeed = useFastSpeed;
         let fastRetried = false;
+        // Shared wall-clock budget for ALL attempts — a late failure must not
+        // start a fresh 270s attempt that Deno's 300s hard limit kills mid-pump
+        // (no error frame, no refund, no lock release).
+        const pumpDeadline = Date.now() + 280_000;
         for (let attempt = 1; attempt <= 3; attempt++) {
+          const remainingMs = pumpDeadline - Date.now();
+          if (remainingMs < 15_000) break; // not enough budget for a real attempt
           try {
             const r = await fetch("https://api.anthropic.com/v1/messages", {
               method: "POST",
-              signal: AbortSignal.timeout(270_000),
+              signal: AbortSignal.timeout(Math.min(270_000, remainingMs)),
               headers: {
                 "content-type": "application/json",
                 "x-api-key": apiKey,
@@ -521,23 +532,38 @@ ${notes ? `הוראות נוספות מהמורה: ${esc(notes)}` : ""}
             throw fetchErr;
           }
         }
-        if (!anthropicResp) { releaseLock(); refundGeneration(); clearInterval(hb); await w.close(); return; }
+        if (!anthropicResp) {
+          releaseLock(); refundGeneration();
+          try { await w.write(sseError("timeout_error")); } catch { /* client gone */ }
+          clearInterval(hb); await w.close(); return;
+        }
 
+        // FRAME-ALIGNED passthrough — the 8s heartbeat must never land inside a
+        // half SSE frame (corrupts deltas client-side, silent holes in the HTML).
+        // Carry the incomplete tail; only write whole "\n\n"-terminated frames.
         const reader = anthropicResp.body!.getReader();
         const streamDecoder = new TextDecoder();
         let receivedMessageStop = false;
-        let tail = ""; // rolling tail so "message_stop" split across chunks is still seen
+        let carry = ""; // incomplete tail of the last frame — never written mid-frame
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
-          if (value) {
-            const chunk = streamDecoder.decode(value, { stream: true });
-            streamedChars += chunk.length;
-            for (const m of chunk.matchAll(/"text_delta","text":"((?:[^"\\]|\\.)*)"/g)) contentChars += m[1].length;
-            if ((tail + chunk).includes('"message_stop"')) receivedMessageStop = true;
-            tail = chunk.slice(-20);
+          if (!value) continue;
+          const chunk = streamDecoder.decode(value, { stream: true });
+          streamedChars += chunk.length;
+          for (const m of chunk.matchAll(/"text_delta","text":"((?:[^"\\]|\\.)*)"/g)) contentChars += m[1].length;
+          const text = carry + chunk;
+          if (text.includes('"message_stop"')) receivedMessageStop = true;
+          const cut = text.lastIndexOf("\n\n");
+          if (cut >= 0) {
+            try { await w.write(enc.encode(text.slice(0, cut + 2))); } catch (we) { clientGone = true; throw we; }
+            carry = text.slice(cut + 2);
+          } else {
+            carry = text;
           }
-          try { await w.write(value); } catch (we) { clientGone = true; throw we; }
+        }
+        if (carry) {
+          try { await w.write(enc.encode(carry)); } catch (we) { clientGone = true; throw we; }
         }
         // Client disconnected mid-gen: release the 60s lock ONLY for early failures.
         // Aborting just before message_stop must not hand out a free rate-limit

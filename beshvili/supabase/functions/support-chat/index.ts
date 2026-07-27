@@ -82,17 +82,25 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: "bad_request" }), { status: 400, headers: cors });
     }
 
-    // Rate limit: count this user's support messages in the last hour (events
-    // table — service-role insert below makes the count tamper-proof).
+    // Rate limit: INSERT the counter row first, then count (including our own
+    // row). Count-then-fire-and-forget-insert was a TOCTOU race: N parallel
+    // requests all read count < LIMIT before any row committed, giving
+    // effectively unlimited AI calls to a scripted client. Insert-then-count
+    // means every in-flight request is visible to every other one.
     const hourAgo = new Date(Date.now() - 3600_000).toISOString();
-    const { count } = await admin
-      .from("events").select("*", { count: "exact", head: true })
-      .eq("user_id", user.id).eq("event", "support_msg").gte("created_at", hourAgo);
-    if ((count ?? 0) >= HOURLY_LIMIT) {
+    const { error: insErr } = await admin
+      .from("events").insert({ user_id: user.id, event: "support_msg", metadata: {} });
+    if (insErr) {
+      // Fail closed — if the counter can't be written the limit can't be enforced.
+      console.error("support-chat rate-counter insert failed:", insErr.message);
       return new Response(JSON.stringify({ error: "rate_limited" }), { status: 429, headers: cors });
     }
-    admin.from("events").insert({ user_id: user.id, event: "support_msg", metadata: {} })
-      .then(() => {}, () => {});
+    const { count, error: cntErr } = await admin
+      .from("events").select("*", { count: "exact", head: true })
+      .eq("user_id", user.id).eq("event", "support_msg").gte("created_at", hourAgo);
+    if (cntErr || (count ?? HOURLY_LIMIT + 1) > HOURLY_LIMIT) {
+      return new Response(JSON.stringify({ error: "rate_limited" }), { status: 429, headers: cors });
+    }
 
     const apiKey = Deno.env.get("ANTHROPIC_API_KEY");
     if (!apiKey) return new Response(JSON.stringify({ error: "internal_error" }), { status: 500, headers: cors });

@@ -129,7 +129,7 @@ const A4_PX = 794;
 const A4_H  = 1123;
 const countPages = (html) => (html.match(/296mm/g) || []).length;
 
-export default function JewishCreate({ onSaved, remaining, isPro, packCredit = false, bookletCount = 0, onUpgrade }) {
+export default function JewishCreate({ onSaved, remaining, isPro, packCredit = false, bookletCount = 0, onUpgrade, active = true }) {
   const [subject, setSubject] = useState("הלכה");
   const [grade,   setGrade]   = useState("ה");
   const [topic,   setTopic]   = useState(CURRICULUM["הלכה"]?.["ה"]?.[0] ?? "");
@@ -465,6 +465,7 @@ export default function JewishCreate({ onSaved, remaining, isPro, packCredit = f
           bookletId={bookletId}
           title={bookletTitle}
           context="jewish"
+          active={active}
           onReset={() => { setHtml(null); setSaveWarning(false); setError(null); setShareToken(null); setBookletId(null); setBookletTitle(null); }}
         />
       </div>
