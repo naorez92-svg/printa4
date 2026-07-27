@@ -20,7 +20,9 @@ class Settings:
 
         self.green_api_id: str = os.getenv("GREEN_API_ID", "")
         self.green_api_token: str = os.getenv("GREEN_API_TOKEN", "")
-        self.webhook_secret: str = os.getenv("WEBHOOK_SECRET", "dev-secret")
+        # in mock/dev a default secret is convenient; in production an empty
+        # secret disables the webhook entirely (fail closed)
+        self.webhook_secret: str = os.getenv("WEBHOOK_SECRET", "") or ("dev-secret" if self.mock_mode else "")
 
         self.anthropic_api_key: str = os.getenv("ANTHROPIC_API_KEY", "")
         self.openai_api_key: str = os.getenv("OPENAI_API_KEY", "")

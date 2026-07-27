@@ -1,6 +1,8 @@
 """FastAPI app: Green API webhook, /dev/simulate, admin + landing mounts."""
 import base64
 import logging
+import secrets as secrets_mod
+from urllib.parse import urlparse
 
 from fastapi import BackgroundTasks, FastAPI, HTTPException, Query, Request
 
@@ -17,6 +19,16 @@ UNSUPPORTED_REPLY = "אני מבין טקסט, קול ותמונות 🙂"
 
 def _extract_phone(sender: str) -> str:
     return (sender or "").split("@")[0]
+
+
+def _safe_media_url(url: str) -> bool:
+    """Only download media from Green API hosts (SSRF guard)."""
+    try:
+        parsed = urlparse(url)
+    except ValueError:
+        return False
+    host = (parsed.hostname or "").lower()
+    return parsed.scheme == "https" and (host == "green-api.com" or host.endswith(".green-api.com"))
 
 
 def process_webhook_payload(payload: dict) -> None:
@@ -39,12 +51,14 @@ def process_webhook_payload(payload: dict) -> None:
             engine_router.process_incoming(phone, "text", text=text, wa_message_id=wa_id)
         elif mtype == "imageMessage":
             url = mdata.get("fileMessageData", {}).get("downloadUrl", "")
-            raw = get_wa_client().download_media(url) if url else b""
+            allowed = get_settings().mock_mode or _safe_media_url(url)
+            raw = get_wa_client().download_media(url) if (url and allowed) else b""
             image_b64 = base64.b64encode(raw).decode() if raw else None
             engine_router.process_incoming(phone, "image", image_b64=image_b64, wa_message_id=wa_id)
         elif mtype == "audioMessage":
             url = mdata.get("fileMessageData", {}).get("downloadUrl", "")
-            audio = get_wa_client().download_media(url) if url else b""
+            allowed = get_settings().mock_mode or _safe_media_url(url)
+            audio = get_wa_client().download_media(url) if (url and allowed) else b""
             engine_router.process_incoming(phone, "voice", audio_bytes=audio, wa_message_id=wa_id)
         else:
             engine_router.process_incoming(phone, "unsupported", text=None, wa_message_id=wa_id)
@@ -60,7 +74,8 @@ def create_app() -> FastAPI:
 
     @app.post("/webhook/green")
     async def green_webhook(request: Request, background_tasks: BackgroundTasks, token: str = Query("")):
-        if token != settings.webhook_secret:
+        # empty secret = webhook disabled (fail closed); constant-time compare
+        if not settings.webhook_secret or not secrets_mod.compare_digest(token, settings.webhook_secret):
             raise HTTPException(status_code=403, detail="bad token")
         try:
             payload = await request.json()

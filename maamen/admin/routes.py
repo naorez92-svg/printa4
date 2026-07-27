@@ -25,6 +25,19 @@ security = HTTPBasic()
 templates = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
 
 
+def require_same_origin(request: Request) -> None:
+    """CSRF guard for state-changing admin routes: browsers always send an
+    Origin header on cross-site form POSTs — reject when it doesn't match us.
+    Non-browser clients (no Origin/Referer) are unaffected."""
+    from urllib.parse import urlparse
+
+    origin = request.headers.get("origin") or request.headers.get("referer")
+    if not origin:
+        return
+    if (urlparse(origin).hostname or "") != (request.url.hostname or ""):
+        raise HTTPException(status_code=403, detail="cross-origin request rejected")
+
+
 def require_admin(credentials: HTTPBasicCredentials = Depends(security)) -> str:
     settings = get_settings()
     ok = (
@@ -101,7 +114,7 @@ def user_page(request: Request, user_id: int, _admin: str = Depends(require_admi
         session.close()
 
 
-@router.post("/send")
+@router.post("/send", dependencies=[Depends(require_same_origin)])
 def send_manual(user_id: int = Form(...), text: str = Form(...), _admin: str = Depends(require_admin)):
     """Manual message from the admin — lands in the chat as if from the coach."""
     session = get_session()
@@ -115,7 +128,7 @@ def send_manual(user_id: int = Form(...), text: str = Form(...), _admin: str = D
         session.close()
 
 
-@router.post("/add-user")
+@router.post("/add-user", dependencies=[Depends(require_same_origin)])
 def add_beta_user(name: str = Form(...), phone: str = Form(...), _admin: str = Depends(require_admin)):
     """Add a beta user manually (anti-ban: the only path to messaging a new number)."""
     session = get_session()

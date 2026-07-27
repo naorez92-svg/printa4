@@ -46,6 +46,22 @@ def test_admin_user_page_shows_conversation(client, outbox):
     assert "ציר שיחה" in resp.text and "רשמתי" in resp.text
 
 
+def test_admin_post_rejects_cross_origin(client, outbox):
+    user_id = make_active_user("972509090909")
+    resp = client.post("/admin/send", data={"user_id": user_id, "text": "פישינג"},
+                       auth=("admin", "admin-pass"),
+                       headers={"origin": "https://evil.example"},
+                       follow_redirects=False)
+    assert resp.status_code == 403
+    assert not outbox  # nothing was sent
+
+    resp = client.post("/admin/add-user", data={"name": "x", "phone": "972500000009"},
+                       auth=("admin", "admin-pass"),
+                       headers={"origin": "https://evil.example"},
+                       follow_redirects=False)
+    assert resp.status_code == 403
+
+
 def test_landing_page_and_lead_form(client):
     resp = client.get("/")
     assert resp.status_code == 200

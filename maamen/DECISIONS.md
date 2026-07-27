@@ -14,3 +14,5 @@
 | 2026-07-27 | Meal clarification answers are re-analyzed by the LLM (original description + user answer) and logged as high confidence | One question → log, per spec; re-analysis refines the estimate without a second question |
 | 2026-07-27 | "Admin notification" for new landing leads = WARNING log + leads panel on the admin dashboard | No admin phone number defined in the spec; WhatsApp-ing the admin would need one |
 | 2026-07-27 | Nudge levels stored in `missed_days_streak` (1/2/4 = 24h/48h/96h), reset to 0 on any inbound | Matches the column's meaning and avoids a new column just for nudge dedup |
+| 2026-07-27 | Admin CSRF guard = Origin/Referer same-host check on POST routes (no token infra) | Security review confirmed CSRF via cached Basic-Auth; origin check is the simplest fix that closes the browser attack path |
+| 2026-07-27 | `docker build` not verified in CI sandbox (registry blocked by network policy); Dockerfile is standard and Railway builds on deploy | Environment limitation, documented instead of blocking |
