@@ -1,6 +1,8 @@
 """DB helpers shared by the engine, scheduler and admin."""
 from datetime import date, datetime, timedelta
 
+from server.utils.timeutil import local_now
+
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -47,7 +49,7 @@ def record_inbound(
         content=content, wa_message_id=wa_message_id,
     )
     session.add(msg)
-    user.last_inbound_at = now or datetime.utcnow()
+    user.last_inbound_at = now or local_now()
     user.missed_days_streak = 0
     try:
         session.commit()

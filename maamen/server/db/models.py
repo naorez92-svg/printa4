@@ -1,4 +1,7 @@
-"""SQLAlchemy 2.x models — schema per build-plan section 4."""
+"""SQLAlchemy 2.x models — schema per build-plan section 4.
+
+All timestamps are naive Asia/Jerusalem local time (the app's single clock).
+"""
 from datetime import datetime, date, time
 
 from sqlalchemy import (
@@ -6,6 +9,8 @@ from sqlalchemy import (
     UniqueConstraint,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+
+from server.utils.timeutil import local_now
 
 
 class Base(DeclarativeBase):
@@ -18,7 +23,7 @@ class User(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     phone: Mapped[str] = mapped_column(String(32), unique=True, index=True)
     name: Mapped[str | None] = mapped_column(String(120))
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=local_now)
     # onboarding / active / paused / churned / blocked
     status: Mapped[str] = mapped_column(String(20), default="onboarding")
     medical_flag: Mapped[bool] = mapped_column(Boolean, default=False)
@@ -61,7 +66,7 @@ class DailyPlan(Base):
     plan_json: Mapped[str] = mapped_column(Text)  # list of planned meals
     planned_calories: Mapped[int | None] = mapped_column(Integer)
     context_note: Mapped[str | None] = mapped_column(Text)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=local_now)
 
 
 class Meal(Base):
@@ -100,7 +105,7 @@ class Message(Base):
     msg_type: Mapped[str] = mapped_column(String(20))  # text / voice / image / system
     content: Mapped[str | None] = mapped_column(Text)
     wa_message_id: Mapped[str | None] = mapped_column(String(128), unique=True)  # dedup
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=local_now)
 
 
 class ApiCost(Base):
@@ -132,4 +137,4 @@ class Lead(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(120))
     phone: Mapped[str] = mapped_column(String(32))
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=local_now)
