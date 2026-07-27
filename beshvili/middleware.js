@@ -52,11 +52,13 @@ export default async function middleware(request) {
   <meta property="og:url" content="${esc(pageUrl)}">
   <meta property="og:title" content="${esc(title)}">
   <meta property="og:description" content="חוברת לימוד AI מותאמת אישית — נוצרה עם בשבילי ✨">
-  <meta property="og:image" content="${esc(origin)}/icon-512.png">
-  <meta property="og:image:width" content="512">
-  <meta property="og:image:height" content="512">
+  <meta property="og:image" content="${esc(origin)}/og-image.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
   <meta property="og:site_name" content="בשבילי">
-  <meta name="twitter:card" content="summary">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="${esc(title)}">
+  <meta name="twitter:image" content="${esc(origin)}/og-image.png">
   <meta http-equiv="refresh" content="0; url=${esc(pageUrl)}">
 </head>
 <body>

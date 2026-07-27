@@ -27,8 +27,11 @@ const NAV = [
   ["history",  "📂", "החוברות שלי"],
 ];
 
-function QuotaBar({ loading, isPro, monthlyBookletCount, monthlyLimit, bookletCount, className = "" }) {
+function QuotaBar({ loading, isPro, monthlyBookletCount, monthlyLimit, bookletCount, remaining = 0, className = "" }) {
   if (loading) return null;
+  // Allowance = used + remaining, so a pack buyer sees "5/7" instead of "5/2"
+  // (lifetime count vs FREE_LIMIT alone ignored purchased credits).
+  const allowance = Math.max(FREE_LIMIT, bookletCount + remaining);
   return (
     <div className={`flex items-center gap-2 text-xs text-white/40 ${className}`}>
       <div className="flex-1 h-1 bg-white/10 rounded-full overflow-hidden">
@@ -36,12 +39,12 @@ function QuotaBar({ loading, isPro, monthlyBookletCount, monthlyLimit, bookletCo
           <div className={`h-full rounded-full transition-all ${monthlyBookletCount >= monthlyLimit ? "bg-amber-400" : "bg-magic"}`}
             style={{ width: `${Math.min(100, (monthlyBookletCount / monthlyLimit) * 100)}%` }} />
         ) : !isPro ? (
-          <div className={`h-full rounded-full transition-all ${bookletCount >= FREE_LIMIT ? "bg-red-400" : "bg-brand"}`}
-            style={{ width: `${Math.min(100, (bookletCount / FREE_LIMIT) * 100)}%` }} />
+          <div className={`h-full rounded-full transition-all ${remaining === 0 ? "bg-red-400" : "bg-brand"}`}
+            style={{ width: `${Math.min(100, (bookletCount / allowance) * 100)}%` }} />
         ) : null}
       </div>
       <span className="whitespace-nowrap">
-        {isPro && monthlyLimit ? `${monthlyBookletCount}/${monthlyLimit} החודש` : !isPro ? `${bookletCount}/${FREE_LIMIT} חינם` : ""}
+        {isPro && monthlyLimit ? `${monthlyBookletCount}/${monthlyLimit} החודש` : !isPro ? `${bookletCount}/${allowance} חינם` : ""}
       </span>
     </div>
   );
@@ -49,6 +52,12 @@ function QuotaBar({ loading, isPro, monthlyBookletCount, monthlyLimit, bookletCo
 
 export default function Dashboard() {
   const [tab, setTab]             = useState("create");
+  // Tabs that have been opened at least once — their components stay mounted
+  // (hidden) after switching away, so an in-flight generation isn't aborted.
+  const [openedTabs, setOpenedTabs] = useState(() => new Set(["create"]));
+  useEffect(() => {
+    setOpenedTabs((prev) => (prev.has(tab) ? prev : new Set(prev).add(tab)));
+  }, [tab]);
   const [showUpgrade, setShowUpgrade] = useState(false);
   const [showSurvey, setShowSurvey]   = useState(false);
   // Weekly-nudge deep link (?wk=1&child=..&grade=..&goal=..&level=..&weak=..):
@@ -94,6 +103,9 @@ export default function Dashboard() {
   const { profile, plan, bookletCount, monthlyBookletCount, monthlyLimit, remaining, freeRemaining, packCredits, isPro, isAdmin, loading, refresh } = useProfile();
   // The NEXT booklet will spend a pack credit (free quota exhausted, credits left)
   const packActive = !isPro && freeRemaining === 0 && packCredits > 0;
+  // Free allowance incl. purchased pack credits — bookletCount is the lifetime
+  // counter, so FREE_LIMIT alone would show "5/2" for pack buyers.
+  const freeAllowance = Math.max(FREE_LIMIT, bookletCount + remaining);
 
   const prevBookletCountRef = useRef(null);
   useEffect(() => {
@@ -166,7 +178,7 @@ export default function Dashboard() {
 
         {/* Quota + install + sign out */}
         <div className="px-5 py-4 border-t border-white/10 space-y-3">
-          <QuotaBar loading={loading} isPro={isPro} monthlyBookletCount={monthlyBookletCount} monthlyLimit={monthlyLimit} bookletCount={bookletCount} />
+          <QuotaBar loading={loading} isPro={isPro} monthlyBookletCount={monthlyBookletCount} monthlyLimit={monthlyLimit} bookletCount={bookletCount} remaining={remaining} />
           {!loading && bookletCount > 0 && (
             <div className="flex items-center gap-1.5 text-[11px] text-grow font-medium">
               <span>⏱</span>
@@ -205,7 +217,7 @@ export default function Dashboard() {
             </button>
           </div>
         </div>
-        <QuotaBar loading={loading} isPro={isPro} monthlyBookletCount={monthlyBookletCount} monthlyLimit={monthlyLimit} bookletCount={bookletCount} className="px-4 pb-2" />
+        <QuotaBar loading={loading} isPro={isPro} monthlyBookletCount={monthlyBookletCount} monthlyLimit={monthlyLimit} bookletCount={bookletCount} remaining={remaining} className="px-4 pb-2" />
       </header>
 
       {/* ── Main content ── */}
@@ -245,12 +257,12 @@ export default function Dashboard() {
             <div className="bg-white border border-ink/8 rounded-2xl px-5 py-4 mb-4 shadow-sm">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-xs font-semibold text-ink/60">חוברות חינמיות שנוצלו</span>
-                <span className="text-xs font-bold text-ink">{bookletCount} / {FREE_LIMIT}</span>
+                <span className="text-xs font-bold text-ink">{bookletCount} / {freeAllowance}</span>
               </div>
               <div className="w-full h-2 bg-canvas rounded-full overflow-hidden mb-3">
                 <div
                   className={`h-full rounded-full transition-all duration-500 ${remaining === 1 ? "bg-gradient-to-l from-red-400 to-orange-400" : "bg-gradient-to-l from-brand to-magic"}`}
-                  style={{ width: `${Math.min(100, (bookletCount / FREE_LIMIT) * 100)}%` }}
+                  style={{ width: `${Math.min(100, (bookletCount / freeAllowance) * 100)}%` }}
                 />
               </div>
               <div className="flex items-center justify-between gap-3">
@@ -282,8 +294,22 @@ export default function Dashboard() {
             onCreateSimilar={(b, extras = {}) => { setPendingStarter({ childName: b.child_name || "", grade: b.grade || "", world: b.world || "כדורגל", goal: b.goal || "", level: b.level || "medium", weaknesses: extras.weaknesses || "", ...(extras.weaknesses ? { mode: "form" } : {}) }); setTab("create"); }}
           />}
           <Suspense fallback={<div className="py-12 text-center text-ink/40 text-sm">טוען…</div>}>
-            {tab === "jewish" && <JewishCreate onSaved={() => refresh()} remaining={remaining} isPro={isPro} packCredit={packActive} bookletCount={bookletCount} onUpgrade={() => setShowUpgrade(true)} />}
-            {tab === "students" && <Students onBookletSaved={() => { refresh(); setTab("history"); }} remaining={remaining} isPro={isPro} bookletCount={bookletCount} />}
+            {/* JewishCreate + Students host quota-charged generations — like Create
+                above, they mount on first open and then HIDE on tab switch instead
+                of unmounting. Unmount aborted the in-flight SSE stream, throwing
+                away a generation the server had already counted. */}
+            {(tab === "jewish" || openedTabs.has("jewish")) && (
+              <div className={tab === "jewish" ? "" : "hidden"}>
+                <JewishCreate active={tab === "jewish"} onSaved={() => refresh()} remaining={remaining} isPro={isPro} packCredit={packActive} bookletCount={bookletCount} onUpgrade={() => setShowUpgrade(true)} />
+              </div>
+            )}
+            {(tab === "students" || openedTabs.has("students")) && (
+              <div className={tab === "students" ? "" : "hidden"}>
+                {/* refresh only — auto-switching to history hid the QuickCreate
+                    success screen (print/share/rating) the moment it appeared */}
+                <Students active={tab === "students"} onBookletSaved={() => refresh()} remaining={remaining} isPro={isPro} bookletCount={bookletCount} />
+              </div>
+            )}
             {tab === "branding" && (plan === "teacher" || plan === "pro" || isAdmin) && <BrandingSettings profile={profile} onSaved={refresh} />}
             {tab === "admin" && isAdmin && <AdminPanel />}
           </Suspense>

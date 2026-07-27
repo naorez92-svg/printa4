@@ -1,0 +1,7 @@
+User-agent: *
+Allow: /
+# Share/feedback pages are per-user capability links — keep them out of the index
+Disallow: /b/
+Disallow: /f/
+
+Sitemap: https://www.beshvili.com/sitemap.xml

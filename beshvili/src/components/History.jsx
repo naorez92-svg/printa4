@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabase";
 import Preview from "./Preview";
 import EmptyState from "./EmptyState";
+import { sanitizeBookletHtml } from "../lib/sanitize";
 import { track } from "../hooks/useEvents";
 
 const WORLD_COLORS = {
@@ -240,7 +241,10 @@ function BookletRow({ booklet: b, onDelete, index = 0, onCreateSimilar, results,
       track("history_open_failed", { booklet_id: b.id });
       return;
     }
-    setHtml(data.html);
+    // Sanitize at the point of render, not just at creation (mirrors
+    // PublicBooklet): DB-stored HTML is not a trust boundary, and Preview's
+    // new-tab/download paths render it OUTSIDE the sandboxed iframe.
+    setHtml(sanitizeBookletHtml(data.html));
     setShareToken(data.share_token ?? null);
     onOpened?.(b.id);
   };

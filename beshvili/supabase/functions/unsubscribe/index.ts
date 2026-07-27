@@ -1,10 +1,11 @@
 import { createClient } from "jsr:@supabase/supabase-js@2";
 
 // Public, no-auth unsubscribe endpoint reached from the link in marketing emails:
-//   GET /functions/v1/unsubscribe?token=<uuid>
+//   GET  /functions/v1/unsubscribe?token=<uuid>  → confirmation page (no side effect)
+//   POST /functions/v1/unsubscribe?token=<uuid>  → sets unsubscribed_at (also the
+//        RFC 8058 List-Unsubscribe-Post one-click target)
 // The token (profiles.unsubscribe_token) is the only credential — unguessable and
-// scoped to one user. Sets unsubscribed_at; send-followup / send-renewal-reminder
-// skip anyone with it set. Idempotent. Returns a small Hebrew confirmation page.
+// scoped to one user. The mailers skip anyone with unsubscribed_at set. Idempotent.
 
 const page = (title: string, body: string, ok: boolean) => `<!DOCTYPE html>
 <html dir="rtl" lang="he"><head><meta charset="utf-8">
@@ -43,6 +44,21 @@ Deno.serve(async (req) => {
 
     if (!profile) {
       return html(page("קישור לא תקין", "לא מצאנו את הכתובת הזו. ייתכן שהקישור פג או שכבר הוסרת.", false), 404);
+    }
+
+    // GET only CONFIRMS — the actual opt-out happens on POST. Corporate mail
+    // scanners and link-preview bots follow every GET in an email, so a GET
+    // side effect silently unsubscribed real users who never clicked. RFC 8058
+    // one-click (List-Unsubscribe-Post) sends POST, so it still works directly.
+    if (req.method === "GET" && !profile.unsubscribed_at) {
+      return html(page(
+        "הסרה מרשימת התפוצה",
+        `לחצי על הכפתור כדי לאשר שלא יישלחו אליך יותר מיילים שיווקיים מבשבילי.<br><br>
+         <form method="post" action="?token=${token}" style="margin:0">
+           <button type="submit" style="background:#20184A;color:#fff;border:none;padding:12px 28px;border-radius:12px;font-weight:bold;font-size:15px;cursor:pointer">אישור הסרה</button>
+         </form>`,
+        true,
+      ));
     }
 
     if (!profile.unsubscribed_at) {

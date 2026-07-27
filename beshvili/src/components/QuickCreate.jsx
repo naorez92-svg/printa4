@@ -30,7 +30,7 @@ const LOADING_MSGS = [
   "כמעט מוכן! עוד רגע...",
 ];
 
-export default function QuickCreate({ student, onClose, onSaved, remaining, isPro, bookletCount = 0, initialSubject = "", initialWorld = "כדורגל" }) {
+export default function QuickCreate({ student, onClose, onSaved, remaining, isPro, bookletCount = 0, initialSubject = "", initialWorld = "כדורגל", active = true }) {
   const [showUpgrade, setShowUpgrade] = useState(false);
   const [subject, setSubject]       = useState(initialSubject);
   const [world, setWorld]           = useState(student.worlds?.[0] || initialWorld);
@@ -169,14 +169,25 @@ export default function QuickCreate({ student, onClose, onSaved, remaining, isPr
 
     if (IS_INAPP) {
       // In-app browser (WhatsApp/Instagram) can't read SSE — the server returns the
-      // whole booklet in one JSON instead (body.noStream above).
+      // whole booklet in one JSON instead (body.noStream above). Abort at 125s
+      // (mirrors Create.jsx) so a hung response shows an error instead of spinning
+      // past the server's own 130s cap.
+      let noStreamTimedOut = false;
+      const noStreamTimeoutId = setTimeout(() => { noStreamTimedOut = true; ctrl.abort(); }, 125_000);
       try {
         const j = await resp.json();
+        clearTimeout(noStreamTimeoutId);
         htmlAccumulated = j?.html ?? "";
       } catch {
-        if (ctrl.signal.aborted) { creatingRef.current = false; return; }
+        clearTimeout(noStreamTimeoutId);
+        if (ctrl.signal.aborted && !noStreamTimedOut) { creatingRef.current = false; return; }
         setLoading(false);
         creatingRef.current = false;
+        if (noStreamTimedOut) {
+          trackError("nostream_timeout", { pages: pageCount });
+          setError("הייצור ארוך מדי — נסי עם פחות עמודים, או פתחי בדפדפן רגיל 🙏");
+          return;
+        }
         trackError("nostream_parse_failed");
         setError("לא הצלחנו לקבל את החוברת — נסי שוב 🙏");
         return;
@@ -266,13 +277,15 @@ export default function QuickCreate({ student, onClose, onSaved, remaining, isPr
     }
 
     setLoading(false);
-    creatingRef.current = false;
+    // creatingRef stays TRUE through sanitize + the DB insert — clearing it here
+    // re-enabled the submit button while html was still null (double generation).
     const rawHtml = htmlAccumulated.trim();
-    if (!rawHtml || !rawHtml.includes("<")) { trackError("empty_html"); setError("לא התקבל HTML תקין מהשרת"); return; }
+    if (!rawHtml || !rawHtml.includes("<")) { creatingRef.current = false; trackError("empty_html"); setError("לא התקבל HTML תקין מהשרת"); return; }
     const finalHtml = sanitizeBookletHtml(rawHtml);
 
     const userId = session.user?.id;
     if (!userId) {
+      creatingRef.current = false;
       trackError("no_session");
       setError("אתה לא מחובר — נסה להתחבר מחדש");
       return;
@@ -288,10 +301,14 @@ export default function QuickCreate({ student, onClose, onSaved, remaining, isPr
       level: student.level || "medium",
       html: finalHtml,
     }).select("id, share_token").single();
+    creatingRef.current = false;
     if (insertErr) {
-      // Don't discard a ~90s generation — show the booklet anyway, just without a cloud copy.
-      // Don't call onSaved here — it would close the panel and the user would lose the booklet view.
-      trackError("db_insert_failed", { message: insertErr.message });
+      // Don't discard a ~90s generation — show the booklet anyway, just without a
+      // cloud copy, and stash it locally so closing the tab doesn't lose it
+      // (Create.jsx's recovery effect re-saves the stash on next mount).
+      const title = `${student.name} — ${goal}${streamAborted ? " (חלקי)" : ""}`;
+      try { localStorage.setItem("beshvili_unsaved_booklet", JSON.stringify({ title, html: finalHtml, at: Date.now() })); } catch { /* ignore */ }
+      trackError(insertErr.message?.includes("quota_exceeded") ? "quota_exceeded_db" : "db_insert_failed", { message: insertErr.message });
       track("booklet_completed", { booklet_id: null, pages: pageCount, mode: "student_quick", child_id: student?.id, save_failed: true });
       setSaveWarning(true);
       setHtml(finalHtml);
@@ -328,7 +345,7 @@ export default function QuickCreate({ student, onClose, onSaved, remaining, isPr
               <span className="text-xl">{saveWarning ? "⚠️" : "✅"}</span>
               <span>החוברת {saveWarning ? "נוצרה (לא נשמרה)" : "נוצרה"} עבור {student.name}!</span>
             </div>
-            <Preview html={html} onReset={onClose} shareToken={shareToken} context="quick" bookletId={bookletId} />
+            <Preview html={html} onReset={onClose} shareToken={shareToken} context="quick" bookletId={bookletId} active={active} />
           </div>
         )}
       </section>

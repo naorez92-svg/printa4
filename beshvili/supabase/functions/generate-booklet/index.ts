@@ -440,9 +440,10 @@ Deno.serve(async (req) => {
     // before either writes the timestamp. If UPDATE returns 0 rows, the user is still
     // within the window and we 429 them.
     const rateCutoff = new Date(Date.now() - RATE_LIMIT_SECONDS * 1000).toISOString();
+    const rateStampIso = new Date().toISOString();
     const { data: rateLockRow } = await admin
       .from("profiles")
-      .update({ last_generation_at: new Date().toISOString() })
+      .update({ last_generation_at: rateStampIso })
       .eq("id", user.id)
       .or(`last_generation_at.is.null,last_generation_at.lt.${rateCutoff}`)
       .select("id")
@@ -466,8 +467,14 @@ Deno.serve(async (req) => {
     // after a failure. Release the slot on every failure path (fire-and-forget for
     // the streaming pump, awaited for no-stream returns). A SUCCESSFUL generation
     // keeps the stamp, so the 1-per-60s limit still holds for the happy path.
+    // Conditional on OUR stamp: streams run up to 270s while the rate window is
+    // 60s, so a slow-failing request A must not null out the fresh stamp a newer
+    // request B legitimately wrote at t+61s (that would let a third request start
+    // while B is still streaming).
     const releaseLock = () =>
-      admin.from("profiles").update({ last_generation_at: null }).eq("id", user.id).then(() => {}, () => {});
+      admin.from("profiles").update({ last_generation_at: null })
+        .eq("id", user.id).eq("last_generation_at", rateStampIso)
+        .then(() => {}, () => {});
 
     // ── 3.5 Count the generation itself (not just the saved booklet) ──────────
     // total_booklets_created is only incremented when the CLIENT inserts the row
@@ -743,11 +750,18 @@ Deno.serve(async (req) => {
         let anthropicResp: Response | null = null;
         let fastSpeed = useFastSpeed;
         let fastRetried = false;
+        // Total wall-clock budget for ALL attempts. Per-attempt 270s timeouts
+        // without a shared deadline meant a failure at t=200s started attempt 2
+        // with a fresh 270s window — the isolate then hit Deno's 300s hard kill
+        // mid-pump: no error frame, no refund, no lock release.
+        const pumpDeadline = Date.now() + 280_000;
         for (let attempt = 1; attempt <= 3; attempt++) {
+          const remainingMs = pumpDeadline - Date.now();
+          if (remainingMs < 15_000) break; // not enough budget for a real attempt
           try {
             const r = await fetch("https://api.anthropic.com/v1/messages", {
               method: "POST",
-              signal: AbortSignal.timeout(270_000), // headroom before Deno's 300s hard limit
+              signal: AbortSignal.timeout(Math.min(270_000, remainingMs)), // headroom before Deno's 300s hard limit
               headers: {
                 "content-type": "application/json",
                 "x-api-key": apiKey,
@@ -801,25 +815,42 @@ Deno.serve(async (req) => {
             throw fetchErr;
           }
         }
-        if (!anthropicResp) { releaseLock(); refundGeneration(); clearInterval(hb); await w.close(); return; }
+        if (!anthropicResp) {
+          releaseLock(); refundGeneration();
+          try { await w.write(sseError("timeout_error")); } catch { /* client gone */ }
+          clearInterval(hb); await w.close(); return;
+        }
 
+        // FRAME-ALIGNED passthrough: Anthropic SSE frames split across TCP reads,
+        // and the 8s heartbeat writes to the same writer — a heartbeat landing
+        // between two halves of one frame corrupted the delta client-side (silent
+        // holes in the booklet HTML). Carry the incomplete tail and only ever
+        // write whole "\n\n"-terminated frames (same pattern as career-compass).
         const reader = anthropicResp.body!.getReader();
         const streamDecoder = new TextDecoder();
         let receivedMessageStop = false;
-        let tail = ""; // rolling tail so "message_stop" split across chunks is still seen
+        let carry = ""; // incomplete tail of the last frame — never written mid-frame
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
-          if (value) {
-            const chunk = streamDecoder.decode(value, { stream: true });
-            streamedChars += chunk.length;
-            // Content accounting (boundary-straddling texts undercount slightly
-            // — fine for a threshold heuristic).
-            for (const m of chunk.matchAll(/"text_delta","text":"((?:[^"\\]|\\.)*)"/g)) contentChars += m[1].length;
-            if ((tail + chunk).includes('"message_stop"')) receivedMessageStop = true;
-            tail = chunk.slice(-20);
+          if (!value) continue;
+          const chunk = streamDecoder.decode(value, { stream: true });
+          streamedChars += chunk.length;
+          // Content accounting (boundary-straddling texts undercount slightly
+          // — fine for a threshold heuristic).
+          for (const m of chunk.matchAll(/"text_delta","text":"((?:[^"\\]|\\.)*)"/g)) contentChars += m[1].length;
+          const text = carry + chunk;
+          if (text.includes('"message_stop"')) receivedMessageStop = true;
+          const cut = text.lastIndexOf("\n\n");
+          if (cut >= 0) {
+            try { await w.write(enc.encode(text.slice(0, cut + 2))); } catch (we) { clientGone = true; throw we; }
+            carry = text.slice(cut + 2);
+          } else {
+            carry = text;
           }
-          try { await w.write(value); } catch (we) { clientGone = true; throw we; }
+        }
+        if (carry) {
+          try { await w.write(enc.encode(carry)); } catch (we) { clientGone = true; throw we; }
         }
         // Stream ended without the terminal event = client disconnected mid-gen.
         // Release the 60s lock ONLY if the generation produced little output —

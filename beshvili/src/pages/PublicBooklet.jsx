@@ -200,16 +200,21 @@ export default function PublicBooklet({ token }) {
           הדפס / שמור PDF
         </button>
 
-        {/* Promo footer */}
+        {/* Promo footer — the CTA carries the booklet's "recipe" (?wk=1&goal=…)
+            through signup via the existing weekly-nudge deep-link stash
+            (App.jsx → Dashboard pendingStarter), so the recipient lands on a
+            create form pre-filled with the exact booklet that impressed them. */}
         <div className="bg-white border border-ink/5 rounded-2xl p-4 text-center space-y-2">
-          <p className="text-sm font-semibold text-ink">רוצה ליצור חוברות מותאמות אישית?</p>
+          <p className="text-sm font-semibold text-ink">רוצה חוברת כזאת — לילד שלך?</p>
           <p className="text-xs text-ink/50">בשבילי יוצרת חוברות AI בעברית בתוך דקה — חינם!</p>
           <a
-            href="https://www.beshvili.com"
-            onClick={() => track("public_booklet_cta_click", { token, location: "promo_footer" })}
+            href={booklet.goal
+              ? `https://www.beshvili.com/?wk=1&goal=${encodeURIComponent(booklet.goal)}${booklet.grade ? `&grade=${encodeURIComponent(booklet.grade)}` : ""}${booklet.level ? `&level=${encodeURIComponent(booklet.level)}` : ""}`
+              : "https://www.beshvili.com"}
+            onClick={() => track("public_booklet_cta_click", { token, location: "promo_footer", prefilled: !!booklet.goal })}
             className="inline-block bg-gradient-to-l from-brand to-magic text-white rounded-xl px-6 py-2.5 text-sm font-semibold hover:opacity-90 transition-opacity"
           >
-            נסי חינם ← בשבילי
+            {booklet.goal ? "צרי חוברת כזאת בדיוק — חינם ✨" : "נסי חינם ← בשבילי"}
           </a>
         </div>
       </div>

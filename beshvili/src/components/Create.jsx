@@ -139,6 +139,7 @@ export default function Create({ onSaved, remaining, isPro, plan = "free", packC
   const firstTimer = bookletCount === 0;
   const [showMoreModes, setShowMoreModes] = useState(false);        // first-timers: hide free/exam behind disclosure
   const creatingRef   = useRef(false);   // prevent double-submit
+  const htmlRef       = useRef(null);    // mirrors `html` for timer callbacks (stale-closure-proof)
   const streamAbortRef = useRef(null);   // cancel in-flight SSE on unmount
   const retryCountRef  = useRef(0);      // auto-retry: 0=fresh, 1=used first retry
   const netRetryRef    = useRef(0);      // initial-connect auto-retry (flaky networks)
@@ -236,6 +237,11 @@ export default function Create({ onSaved, remaining, isPro, plan = "free", packC
   // onClick passes a SyntheticEvent here, which must NOT read as a retry.
   const create = useCallback(async (isAutoRetry = false) => {
     if (!canSubmit || creatingRef.current) return;
+    // A stale auto-retry timer (e.g. the 61s rate-limit retry) must never fire
+    // over a finished booklet — that would silently regenerate and burn quota.
+    if (isAutoRetry === true && htmlRef.current) return;
+    // Arm-once: entering create() invalidates any previously scheduled retry.
+    clearTimeout(retryTimerRef.current);
     // Block BEFORE anything is spent: in-app browsers (WhatsApp/Instagram/
     // Facebook webview) get a server-side 3-page cap, so a 4+ page request
     // would silently produce 3 pages AND consume a booklet from the quota.
@@ -248,9 +254,11 @@ export default function Create({ onSaved, remaining, isPro, plan = "free", packC
     }
     setInappCapWarn(false);
     creatingRef.current = true;
+    try {
     const startedAt = Date.now();   // true generation duration (not the stale loadingElapsed closure)
     setLoading(true);
     setHtml(null);
+    htmlRef.current = null;
     setPreviewHtml("");
     setError(null);
     const effectiveWorld = f.world === "אחר" ? customWorld.trim() || "נושא חופשי" : f.world;
@@ -376,6 +384,9 @@ export default function Create({ onSaved, remaining, isPro, plan = "free", packC
           trackError("rate_limited_retry_wait", { wait });
           retryTimerRef.current = setTimeout(() => createRef.current?.(true), (wait + 1) * 1000);
           setLoadingMsgIdx(0);
+          // Show the countdown while the auto-retry waits — an idle form for a
+          // full minute (then a surprise regeneration) read as "it's broken".
+          setError(`rate:${wait}`);
           return;
         }
         trackError("rate_limited", { wait }); setError(`rate:${wait}`); return;
@@ -543,7 +554,9 @@ export default function Create({ onSaved, remaining, isPro, plan = "free", packC
 
     wakeLock?.release().catch(() => {});
     setLoading(false);
-    creatingRef.current = false;
+    // creatingRef stays TRUE through sanitize + the DB insert below — clearing it
+    // here re-enabled the submit button (html is still null) for the hundreds of
+    // ms (2.5s+ on a retried insert) until setHtml, allowing a double generation.
     // Successful stream — restore the auto-retry budget for the next booklet.
     retryCountRef.current = 0;
     netRetryRef.current = 0;
@@ -591,11 +604,19 @@ export default function Create({ onSaved, remaining, isPro, plan = "free", packC
     }
     if (insertErr) {
       // DB trigger enforce_booklet_quota fires AFTER the Edge Function quota check
-      // passes (race window). Surface it as the real paywall instead of a save-failure
-      // warning, which would confuse the user ("I thought I had quota?").
+      // passes (race window). The user just watched a ~90s generation complete and
+      // the server already counted it — throwing the HTML away and showing only the
+      // paywall loses their work. Show the booklet with the save warning (print/
+      // download still work) and stash it locally; the paywall shows on the NEXT
+      // attempt (same recovery JewishCreate uses).
       if (insertErr.message?.includes("quota_exceeded")) {
         trackError("quota_exceeded_db");
-        setError("quota");
+        try { localStorage.setItem("beshvili_unsaved_booklet", JSON.stringify({ title, html: generatedHtml, at: Date.now() })); } catch { /* ignore */ }
+        setSaveWarning(true);
+        setBookletTitle(title);
+        setHtml(generatedHtml);
+        htmlRef.current = generatedHtml;
+        onSaved?.();
         return;
       }
       // A save failure must NOT discard a ~90s generation — show the booklet so the
@@ -607,6 +628,7 @@ export default function Create({ onSaved, remaining, isPro, plan = "free", packC
       setSaveWarning(true);
       setBookletTitle(title);
       setHtml(generatedHtml);
+      htmlRef.current = generatedHtml;
       onSaved?.(); // refresh quota count even though the DB row wasn't saved
       return;
     }
@@ -616,6 +638,7 @@ export default function Create({ onSaved, remaining, isPro, plan = "free", packC
     setBookletTitle(title);
     setShowRating(true);
     setHtml(generatedHtml);
+    htmlRef.current = generatedHtml;
     // pagesDelivered vs pages(requested): the field that reveals whether long
     // (15–20 page) requests actually complete or get cut by token/time limits.
     track("booklet_completed", { booklet_id: inserted?.id, pages: pageCount, pagesDelivered: countPages(htmlAccumulated), mode, durationSec: Math.round((Date.now() - startedAt) / 1000), chars: htmlAccumulated.length, partial: streamAborted, withAnswerKey, booklet_index: bookletCount + 1 });
@@ -630,6 +653,21 @@ export default function Create({ onSaved, remaining, isPro, plan = "free", packC
           tag: "booklet-ready",
         });
       } catch {}
+    }
+    } catch (e) {
+      // Top-level safety net: every expected failure is handled above, so landing
+      // here means an unanticipated throw (e.g. resp.body null in an exotic
+      // webview). Without this the spinner runs forever and creatingRef silently
+      // blocks every future submit.
+      if (streamAbortRef.current?.signal?.aborted) { creatingRef.current = false; return; }
+      console.error("[create] unexpected error:", e);
+      track("booklet_error", { type: "unexpected", mode, msg: String(e?.message || e).slice(0, 160) });
+      setLoading(false);
+      setError("generic:משהו השתבש באופן לא צפוי — נסי שוב 🙏");
+    } finally {
+      // Single release point for the double-submit guard — every return path
+      // (success, error, retry-scheduled) ends with the guard released.
+      creatingRef.current = false;
     }
   }, [canSubmit, mode, freeText, f, pageCount, withAnswerKey, onSaved, photoUrl, examGrade, examSubject, examTopic, noEmojis, customWorld, fastMode, bookletCount]);
   createRef.current = create; // keep stable pointer for auto-retry
@@ -671,7 +709,7 @@ export default function Create({ onSaved, remaining, isPro, plan = "free", packC
     e.target.value = "";
   }, []);
 
-  const reset = () => { setHtml(null); setF(EMPTY); setFreeText(""); setError(null); setBookletId(null); setShareToken(null); setBookletTitle(null); setShowRating(false); setChildSaved(false); setPhotoUrl(null); setSaveWarning(false); setCappedPages(null); };
+  const reset = () => { setHtml(null); htmlRef.current = null; setF(EMPTY); setFreeText(""); setError(null); setBookletId(null); setShareToken(null); setBookletTitle(null); setShowRating(false); setChildSaved(false); setPhotoUrl(null); setSaveWarning(false); setCappedPages(null); };
   const set   = (k) => (e) => setF((p) => ({ ...p, [k]: e.target.value }));
   const applyTmpl = (tmpl) => {
     track("template_chip_clicked", { label: tmpl.label, grade: tmpl.f.grade, world: tmpl.f.world, level: tmpl.f.level });
@@ -829,7 +867,9 @@ export default function Create({ onSaved, remaining, isPro, plan = "free", packC
                     : `${remaining} חוברות חינמיות נותרו`}
                 </p>
                 <div className="flex gap-1 mt-1.5">
-                  {[...Array(FREE_LIMIT)].map((_, i) => (
+                  {/* Allowance = used + remaining, so pack credits render as real pips
+                      instead of a maxed-out FREE_LIMIT bar ("5/2") for pack buyers. */}
+                  {[...Array(Math.max(FREE_LIMIT, bookletCount + remaining))].map((_, i) => (
                     <div key={i} className={`h-1.5 rounded-full flex-1 transition-all ${
                       i < bookletCount
                         ? remaining === 0 ? "bg-red-400" : remaining === 1 ? "bg-amber-400" : "bg-brand"

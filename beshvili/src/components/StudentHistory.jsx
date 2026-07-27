@@ -2,12 +2,13 @@ import { useState, useEffect } from "react";
 import { supabase } from "../lib/supabase";
 import Preview from "./Preview";
 import QuickCreate from "./QuickCreate";
+import { sanitizeBookletHtml } from "../lib/sanitize";
 
 function fmtDate(iso) {
   return new Date(iso).toLocaleDateString("he-IL", { day: "numeric", month: "long", year: "numeric" });
 }
 
-export default function StudentHistory({ student, onBack, remaining, isPro }) {
+export default function StudentHistory({ student, onBack, remaining, isPro, active = true }) {
   const [booklets, setBooklets] = useState([]);
   const [loading, setLoading]   = useState(true);
   const [viewing, setViewing]   = useState(null);
@@ -33,7 +34,7 @@ export default function StudentHistory({ student, onBack, remaining, isPro }) {
         >
           ← חזרה ל{student.name}
         </button>
-        <Preview html={viewing.html} onReset={() => setViewing(null)} shareToken={viewing.share_token} bookletId={viewing.id} title={viewing.title} context="history" />
+        <Preview html={sanitizeBookletHtml(viewing.html)} onReset={() => setViewing(null)} shareToken={viewing.share_token} bookletId={viewing.id} title={viewing.title} context="history" active={active} />
       </div>
     );
   }
@@ -42,11 +43,13 @@ export default function StudentHistory({ student, onBack, remaining, isPro }) {
   if (creating !== null) {
     return (
       <QuickCreate
+        active={active}
         student={student}
         initialSubject={creating.subject}
         initialWorld={creating.world}
         onClose={() => setCreating(null)}
-        onSaved={() => { setCreating(null); fetchBooklets(); }}
+        // Refresh only — closing here skipped the success Preview/rating screen.
+        onSaved={() => fetchBooklets()}
         remaining={remaining}
         isPro={isPro}
       />

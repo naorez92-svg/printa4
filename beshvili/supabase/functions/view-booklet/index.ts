@@ -25,9 +25,11 @@ Deno.serve(async (req) => {
 
   // Only booklets the owner has explicitly shared (is_public) are served — a
   // freshly-created booklet is private until the user shares it.
+  // goal/grade/world/level power the share page's "create one like this" CTA —
+  // deliberately NOT child_name (privacy: the recipient gets the recipe, not the child).
   const { data: booklet, error } = await admin
     .from("booklets")
-    .select("title, html, created_at")
+    .select("title, html, created_at, goal, grade, world, level")
     .eq("share_token", token)
     .eq("is_public", true)
     .single();
@@ -37,7 +39,10 @@ Deno.serve(async (req) => {
   }
 
   return new Response(
-    JSON.stringify({ title: booklet.title, html: booklet.html, createdAt: booklet.created_at }),
+    JSON.stringify({
+      title: booklet.title, html: booklet.html, createdAt: booklet.created_at,
+      goal: booklet.goal, grade: booklet.grade, world: booklet.world, level: booklet.level,
+    }),
     { headers: { ...cors, "content-type": "application/json" } }
   );
 });

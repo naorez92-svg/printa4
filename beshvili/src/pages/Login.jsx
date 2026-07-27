@@ -12,6 +12,19 @@ const GoogleIcon = () => (
   </svg>
 );
 
+// Deep link into the user's webmail — the #1 magic-link drop-off is "went to
+// find the email and never came back". Known providers get a one-tap button.
+const INBOX_PROVIDERS = [
+  [/@(gmail|googlemail)\./i, "Gmail",   "https://mail.google.com/mail/u/0/"],
+  [/@(outlook|hotmail|live|msn)\./i, "Outlook", "https://outlook.live.com/mail/"],
+  [/@walla\./i,  "וואלה מייל", "https://mail.walla.co.il/"],
+  [/@yahoo\./i,  "Yahoo",  "https://mail.yahoo.com/"],
+];
+const inboxFor = (email) => {
+  const hit = INBOX_PROVIDERS.find(([re]) => re.test(email || ""));
+  return hit ? { name: hit[1], url: hit[2] } : null;
+};
+
 // ── Branded inline-SVG icon system ──
 // Flat, geometric, rounded — matches Logo.jsx style (1–3 brand colors per icon).
 // Brand: ink #20184A · brand #F4A02C · magic #6C5CE7 · grow #1FB58F
@@ -323,9 +336,16 @@ export default function Login() {
           {/* ── Compact hero login card ── */}
           <div className="bg-white/10 backdrop-blur-sm border border-white/15 rounded-2xl px-5 py-4 max-w-xs mx-auto w-full">
             {heroSent ? (
-              <div className="text-center space-y-1.5 py-1">
+              <div className="text-center space-y-2 py-1">
                 <p className="text-white font-semibold text-sm">✉️ בדוק את {heroEmail}</p>
                 <p className="text-white/50 text-xs">שלחנו קישור — לחץ עליו להיכנס</p>
+                {inboxFor(heroEmail) && (
+                  <a href={inboxFor(heroEmail).url} target="_blank" rel="noopener noreferrer"
+                    onClick={() => track("auth_open_inbox_click", { provider: inboxFor(heroEmail).name, location: "hero" })}
+                    className="inline-block bg-white/90 hover:bg-white text-ink/80 rounded-xl px-4 py-2 text-xs font-semibold transition-colors">
+                    📬 פתח את {inboxFor(heroEmail).name}
+                  </a>
+                )}
               </div>
             ) : (
               <div className="space-y-3">
@@ -820,6 +840,13 @@ export default function Login() {
                   <p className="mt-1">לחץ על הכפתור בתוך המייל — תיכנס ישירות לאפליקציה ✨</p>
                 </div>
                 {error && <p className="text-red-500 text-sm text-center">{error}</p>}
+                {inboxFor(email) && (
+                  <a href={inboxFor(email).url} target="_blank" rel="noopener noreferrer"
+                    onClick={() => track("auth_open_inbox_click", { provider: inboxFor(email).name, location: "form" })}
+                    className="block w-full bg-gradient-to-l from-brand to-magic text-white rounded-xl px-4 py-3 text-sm font-semibold hover:opacity-90 transition-opacity">
+                    📬 פתח את {inboxFor(email).name}
+                  </a>
+                )}
                 <button onClick={() => { track("auth_change_email_click", {}); setStep("email"); setError(""); }}
                   className="w-full text-sm text-ink/65 hover:text-magic transition-colors border border-ink/15 rounded-xl px-4 py-2.5 hover:border-magic/40">
                   שנה מייל / שלח קישור מחדש

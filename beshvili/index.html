@@ -15,16 +15,84 @@
     <meta property="og:url" content="https://beshvili.com" />
     <meta property="og:title" content="בשבילי · חוברות לימוד AI בעברית" />
     <meta property="og:description" content="חוברת לימוד מותאמת אישית לילד שלך — בפחות מ-60 שניות, חינם!" />
-    <meta property="og:image" content="https://beshvili.com/icon-512.png" />
-    <meta property="og:image:width" content="512" />
-    <meta property="og:image:height" content="512" />
+    <meta property="og:image" content="https://www.beshvili.com/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
     <meta property="og:site_name" content="בשבילי" />
-    <meta name="twitter:card" content="summary" />
+    <meta property="og:locale" content="he_IL" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="בשבילי · חוברות לימוד AI בעברית" />
+    <meta name="twitter:description" content="חוברת לימוד מותאמת אישית לילד שלך — בפחות מ-60 שניות, חינם!" />
+    <meta name="twitter:image" content="https://www.beshvili.com/og-image.png" />
 
     <!-- Icons & PWA -->
     <link rel="icon" type="image/svg+xml" href="/icon.svg" />
     <link rel="apple-touch-icon" href="/icon.svg" />
     <link rel="manifest" href="/manifest.json" />
+    <link rel="canonical" href="https://www.beshvili.com/" />
+
+    <!-- Structured data: app + the landing-page FAQ (the FAQ is React-rendered,
+         so without this crawlers that skip JS execution never see it) -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "SoftwareApplication",
+      "name": "בשבילי",
+      "url": "https://www.beshvili.com/",
+      "applicationCategory": "EducationalApplication",
+      "operatingSystem": "Web",
+      "inLanguage": "he",
+      "description": "יצירת חוברות לימוד מותאמות אישית לילדים בעברית — AI שמייצר חוברת A4 מוכנה להדפסה תוך 60 שניות",
+      "offers": [
+        { "@type": "Offer", "name": "חינם", "price": "0", "priceCurrency": "ILS", "description": "2 חוברות חינם" },
+        { "@type": "Offer", "name": "הורה", "price": "19", "priceCurrency": "ILS", "description": "5 חוברות בחודש" },
+        { "@type": "Offer", "name": "מורה פרטית", "price": "59", "priceCurrency": "ILS", "description": "20 חוברות בחודש" }
+      ]
+    }
+    </script>
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "למה לא פשוט להשתמש ב-ChatGPT, Gemini או Claude?",
+          "acceptedAnswer": { "@type": "Answer", "text": "ChatGPT נותן טקסט גולמי שצריך לעצב, לפרמט ולחזור עליו עם פרומפטים — כ-20-40 דקות לחוברת. בשבילי בנויה על אותה AI אבל הכל מוגדר מראש: עיצוב מגזין שבו הילד גיבור הסיפור, התאמה לכיתות ולתכנית הלימודים הישראלית, ארכיון בענן — ותוך 60 שניות החוברת מוכנה להדפסה." }
+        },
+        {
+          "@type": "Question",
+          "name": "כמה זמן לוקח ליצור חוברת?",
+          "acceptedAnswer": { "@type": "Answer", "text": "בממוצע 45-90 שניות מרגע שלחצת 'צור חוברת'. מילוי הטופס לוקח עוד 30 שניות — תוך פחות מ-2 דקות יש לך חוברת מוכנה להדפסה." }
+        },
+        {
+          "@type": "Question",
+          "name": "האם צריך ידע טכני או לדעת לכתוב פרומפטים?",
+          "acceptedAnswer": { "@type": "Answer", "text": "בכלל לא. בשבילי עובדת עם 3 שדות פשוטים: שם התלמיד, כיתה, ומה תרצי לתרגל. יש גם נושאים מוכנים שאפשר ללחוץ עליהם — הטופס מתמלא אוטומטית." }
+        },
+        {
+          "@type": "Question",
+          "name": "האם החוברת מותאמת לתכנית הלימודים הישראלית?",
+          "acceptedAnswer": { "@type": "Answer", "text": "כן. בשבילי יודעת מה לומדים בכל כיתה — חיבור וחיסור בכיתה ב', הכפלה בכיתה ג', שברים בכיתה ד'. אפשר גם לציין רמה ולהתאים לצרכים מיוחדים כמו ADHD, דיסלקציה או מחוננות." }
+        },
+        {
+          "@type": "Question",
+          "name": "אפשר לערוך את החוברת אחרי שנוצרה?",
+          "acceptedAnswer": { "@type": "Answer", "text": "כרגע לא — אבל אפשר ליצור גרסה חדשה עם הנחיות מעודכנות. אם יש תוספת שרצית — פשוט ציינו אותה בשדה 'הנחיות חופשיות'." }
+        },
+        {
+          "@type": "Question",
+          "name": "האם הנתונים של התלמידים שלי מוגנים?",
+          "acceptedAnswer": { "@type": "Answer", "text": "לחלוטין. בשבילי שומרת רק את מה שאת מזינה (שם, כיתה, נושא), עובדת עם Supabase שמצפין את כל הנתונים ועומד בתקנות GDPR, ולא מוכרת נתונים לאף גורם." }
+        },
+        {
+          "@type": "Question",
+          "name": "מה קורה אחרי 2 החוברות החינמיות?",
+          "acceptedAnswer": { "@type": "Answer", "text": "האפליקציה תציג הצעה לשדרג — בלי חיוב אוטומטי ובלי כרטיס אשראי. תוכנית מורה עולה ₪59/חודש (20 חוברות) ותוכנית הורה ₪19/חודש (5 חוברות). ביטול בכל עת דרך WhatsApp." }
+        }
+      ]
+    }
+    </script>
 
     <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
