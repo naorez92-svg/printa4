@@ -3,7 +3,7 @@ import { MODULES, getModule } from "./data/modules.js";
 import { hasLesson } from "./data/lessonsMeta.js";
 import { TOFES4_CHECKLIST } from "./data/tofes4.js";
 import { loadState, saveState, clearAllState } from "./lib/storage.js";
-import { boolView, setMark, mergeProgress, sameProgress } from "./lib/progressMerge.js";
+import { boolView, setMark, mergeProgress, pruneKeys, sameProgress } from "./lib/progressMerge.js";
 import { applyAnswer, bumpMastery, countDue, qid, streakAlive, updateStreak } from "./lib/stats.js";
 import ModuleView from "./components/ModuleView.jsx";
 import Tofes4View from "./components/Tofes4View.jsx";
@@ -26,6 +26,21 @@ const TABS = [
 ];
 
 const ALL_QIDS = MODULES.flatMap((m) => m.quiz.map((_, i) => qid(m.id, i)));
+
+// מפתחות לגיטימיים לכל רכיב מסונכרן — כל השאר נגזם במיזוג (ראו pruneKeys)
+const MODULE_ID_SET = new Set(MODULES.map((m) => m.id));
+const TOFES4_ID_SET = new Set(TOFES4_CHECKLIST.map((c) => c.id));
+const QID_SET = new Set(ALL_QIDS);
+
+function pruneAll(data) {
+  return {
+    ...data,
+    completed: pruneKeys(data.completed, MODULE_ID_SET),
+    tofes4: pruneKeys(data.tofes4, TOFES4_ID_SET),
+    srs: pruneKeys(data.srs, QID_SET),
+    mastery: pruneKeys(data.mastery, MODULE_ID_SET),
+  };
+}
 
 // beforeinstallprompt עלול להישרף לפני שרכיב הבאנר עולה (הדפדפן יורה אותו
 // פעם אחת, מוקדם) — נתפס ברמת המודול ונמסר לרכיב דרך אירוע מותאם.
@@ -410,7 +425,16 @@ export default function App() {
   useEffect(() => {
     if (!session || cloudReadyRef.current) return;
     const owner = loadState("owner", null);
-    if (owner && owner !== session.user.id) wipeLocal();
+    if (owner !== session.user.id) {
+      // מכשיר משותף: המצב המקומי שייך למשתמש אחר — מנקים לפני המיזוג.
+      // גם נתונים ללא רשומת בעלים (גרסה ישנה של האפליקציה) נחשבים זרים —
+      // ההתקדמות של בעליהם האמיתיים שמורה בענן שלהם ותשוחזר משם.
+      const hasLegacy =
+        Object.keys(loadState("completed", {})).length > 0 ||
+        Object.keys(loadState("tofes4", {})).length > 0 ||
+        loadState("bestExam", null) !== null;
+      if (owner || hasLegacy) wipeLocal();
+    }
     saveState("owner", session.user.id);
     let cancelled = false;
     (async () => {
@@ -424,7 +448,7 @@ export default function App() {
         // משיכה שנכשלה לא נחשבת "ענן ריק": משאירים את הדחיפה נעולה,
         // אחרת שינוי מקומי קטן היה דורס את כל ההתקדמות השמורה בענן.
         if (error) return;
-        const remote = data?.data || {};
+        const remote = pruneAll(data?.data || {});
         setCompletedMap((local) => mergeProgress(remote, { completed: local }).completed);
         setTofes4Map((local) => mergeProgress(remote, { tofes4: local }).tofes4);
         if (Number.isFinite(remote.bestExam))
@@ -476,17 +500,21 @@ export default function App() {
           .eq("user_id", userId)
           .maybeSingle();
         if (error) return; // בלי מצב ענן אמין — לא דורסים
-        const remote = data?.data || {};
-        const local = { completed: completedMap, tofes4: tofes4Map, bestExam, srs, mastery, streak };
+        // גיזום כפול (ענן ומקומי): שורה שנופחה בזדון עד תקרת ה-64KB לא
+        // מזהמת את המכשיר, והדחיפה הבאה מבריאה את השורה בענן
+        const remote = pruneAll(data?.data || {});
+        const local = pruneAll({ completed: completedMap, tofes4: tofes4Map, bestExam, srs, mastery, streak });
         const merged = mergeProgress(remote, local);
-        lastSyncRef.current = Date.now();
         if (!sameProgress(merged, mergeProgress(remote, {}))) {
-          await supabase.from("mep_progress").upsert({
+          const { error: upsertError } = await supabase.from("mep_progress").upsert({
             user_id: userId,
             data: merged,
             updated_at: new Date().toISOString(),
           });
+          // דחיפה שנכשלה (רשת/מגבלת גודל) לא נחשבת סנכרון — הניסיון הבא יחזור עליה
+          if (upsertError) return;
         }
+        lastSyncRef.current = Date.now();
         // התקדמות חדשה מהענן (מכשיר אחר) — מוצגת מיד גם כאן
         if (!sameProgress(merged, mergeProgress({}, local))) {
           setCompletedMap(merged.completed);

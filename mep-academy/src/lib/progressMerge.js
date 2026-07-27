@@ -93,3 +93,12 @@ export function mergeProgress(remote = {}, local = {}) {
 export function sameProgress(a, b) {
   return JSON.stringify(a) === JSON.stringify(b);
 }
+
+// סינון לפי מפתחות מוכרים בלבד. שכבת הגנה כפולה: (1) שורה בענן שנופחה
+// בזדון/בטעות עד תקרת ה-64KB לא מזהמת את המכשיר ולא מקבעת כשל דחיפה
+// נצחי; (2) גודל ה-payload חסום מבנית — תוכן לגיטימי רחוק מהתקרה.
+export function pruneKeys(obj = {}, allowed) {
+  const out = {};
+  for (const k of Object.keys(obj)) if (allowed.has(k)) out[k] = obj[k];
+  return out;
+}
