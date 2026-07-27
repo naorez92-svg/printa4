@@ -10,3 +10,5 @@
 | 2026-07-27 | Weekly weigh-in request is sent on the Sunday evening check-in (fixed day) | Spec says "once a week (fixed day)"; Sunday is the Israeli week start |
 | 2026-07-27 | Scheduler jobs are pure functions driven by a minute tick; APScheduler only wires the tick + daily backup | Makes every proactive flow unit-testable with freezegun |
 | 2026-07-27 | The MAAMEN mono-repo lives under `maamen/` inside the existing `printa4` repository | The build ran inside printa4; all plan paths are relative to `maamen/` |
+| 2026-07-27 | "Between meals" = outside the hour windows 6–10 / 12–15 / 18–21 | The spec requires an emotional-hunger question "between meals" without defining it; fixed windows are deterministic and testable |
+| 2026-07-27 | Meal clarification answers are re-analyzed by the LLM (original description + user answer) and logged as high confidence | One question → log, per spec; re-analysis refines the estimate without a second question |

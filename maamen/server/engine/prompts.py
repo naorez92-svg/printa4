@@ -103,3 +103,17 @@ WEIGHT_LOGGED_REPLY = "רשמתי {weight} ק\"ג 👍"
 HOUR_UPDATED_REPLY = "מעודכן — נדבר כל בוקר ב-{hour} 🙂"
 
 TEMPLATE_FALLBACK_REPLY = "קיבלתי 👍"
+
+# --- Meals ---
+
+MEAL_LOGGED_REPLY = "רשמתי: {desc}, ~{cal} קלוריות. אתה על {total}/{target} היום 👍"
+OVER_TARGET_REPLY = "עברת ב-{over} קק\"ל מהיעד היומי. קורה. ערב קל — ונאזן מחר."
+MEAL_CLARIFY_PREFIX = "רק כדי לרשום נכון — {question}"
+EMOTIONAL_QUESTION = "שאלה קטנה — רעב אמיתי או משהו אחר (שעמום/לחץ)?"
+EMOTIONAL_ACK = "הבנתי, רשמתי לעצמי 🙂"
+TECHNIQUE_SUGGESTION = (
+    "שמתי לב שזו כבר פעם שנייה השבוע שאוכל מגיע מלחץ או שעמום. "
+    "נסה עכשיו אחד מאלה: לדחות ב-10 דקות, כוס מים, או הליכה קצרה 🙂"
+)
+SUPPORT_MODE_REPLY = "אני איתך 🙂 בלי מעקב קלוריות כרגע — מקשיב לכל דבר אחר. איך אתה מרגיש?"
+NOT_FOOD_FALLBACK = "לא בטוח שהבנתי 🙂 אפשר לצלם את הארוחה או לכתוב מה אכלת."

@@ -120,6 +120,12 @@ def _route(
 
     from server.engine import meals, planner  # lazy: stage modules
 
+    # support-only mode: no calorie tracking for medically-flagged users
+    if user.medical_flag:
+        if msg_type == "image":
+            return [prompts.SUPPORT_MODE_REPLY]
+        return coach_chat(session, user, norm)
+
     if msg_type == "image":
         return meals.handle_photo(session, user, image_b64 or "", now)
 
