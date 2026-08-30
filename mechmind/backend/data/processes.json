@@ -1,0 +1,118 @@
+{
+  "_comment": "תהליכי ייצור. עלויות אומדן שוק ישראלי 2025. מודל העלות מחושב בקוד (process_planner) מהפרמטרים כאן.",
+  "processes": [
+    {
+      "id": "cnc_milling",
+      "name_he": "עיבוד שבבי — כרסום CNC",
+      "suitable_classes": ["steel", "stainless", "aluminum", "copper", "titanium", "polymer"],
+      "geometry": ["prismatic", "complex"],
+      "min_qty": 1,
+      "max_qty": 500,
+      "setup_cost_ils": 450,
+      "machine_rate_ils_per_hr": 260,
+      "handling_min_per_part": 8,
+      "removal_rate_cm3_min_by_machinability": {"1": 2, "2": 5, "3": 12, "4": 25, "5": 45},
+      "tolerance_mm": 0.02,
+      "tooling_cost_ils": 0,
+      "dfm_notes_he": [
+        "העדף רדיוסים פנימיים ≥ 3 מ\"מ — פינה פנימית חדה דורשת EDM יקר.",
+        "עומק כיס עד פי 4 מקוטר הכלי; כיסים עמוקים וצרים מייקרים מאוד.",
+        "צמצם מספר כיווני עיבוד (setups) — כל כיוון נוסף מוסיף עלות קיבוע."
+      ]
+    },
+    {
+      "id": "cnc_turning",
+      "name_he": "עיבוד שבבי — חריטה CNC",
+      "suitable_classes": ["steel", "stainless", "aluminum", "copper", "titanium", "polymer"],
+      "geometry": ["axisymmetric"],
+      "min_qty": 1,
+      "max_qty": 5000,
+      "setup_cost_ils": 280,
+      "machine_rate_ils_per_hr": 220,
+      "handling_min_per_part": 4,
+      "removal_rate_cm3_min_by_machinability": {"1": 3, "2": 8, "3": 18, "4": 35, "5": 60},
+      "tolerance_mm": 0.01,
+      "tooling_cost_ils": 0,
+      "dfm_notes_he": [
+        "מתאים רק לגאומטריה סיבובית (צירים, בוקסות, אוגנים).",
+        "יחס אורך/קוטר מעל 8 דורש תמיכה (lunette) ומייקר.",
+        "הימנע מחריצים פנימיים עמוקים — כלי פנימי ארוך רוטט."
+      ]
+    },
+    {
+      "id": "sheet_laser_bend",
+      "name_he": "חיתוך לייזר + כיפוף פח",
+      "suitable_classes": ["steel", "stainless", "aluminum"],
+      "geometry": ["sheet"],
+      "min_qty": 1,
+      "max_qty": 20000,
+      "setup_cost_ils": 180,
+      "machine_rate_ils_per_hr": 300,
+      "handling_min_per_part": 2,
+      "cut_speed_mm_min": 3000,
+      "cost_per_bend_ils": 4,
+      "tolerance_mm": 0.1,
+      "tooling_cost_ils": 0,
+      "dfm_notes_he": [
+        "רדיוס כיפוף פנימי מינימלי = עובי הפח (לפלדה) או 1.5×עובי (לאלומיניום).",
+        "חור קרוב מדי לקו כיפוף (פחות מ-2.5×עובי) יתעוות — הרחק אותו.",
+        "שמור על עובי פח אחיד לכל החלק; שילוב עוביים = חלקים נפרדים."
+      ]
+    },
+    {
+      "id": "sand_casting",
+      "name_he": "יציקת חול",
+      "suitable_classes": ["steel", "aluminum", "copper"],
+      "geometry": ["complex", "prismatic"],
+      "min_qty": 20,
+      "max_qty": 5000,
+      "setup_cost_ils": 500,
+      "tooling_cost_ils": 9000,
+      "unit_cost_per_kg_ils": 14,
+      "handling_min_per_part": 0,
+      "tolerance_mm": 0.8,
+      "dfm_notes_he": [
+        "עובי דופן מינימלי כ-4 מ\"מ לאלומיניום, 6 מ\"מ לפלדה.",
+        "נדרשות שיפועי שליפה (draft) של 1–3 מעלות.",
+        "משטחי דיוק דורשים עיבוד שבבי משלים אחרי היציקה — תמחר זאת."
+      ]
+    },
+    {
+      "id": "injection_molding",
+      "name_he": "הזרקת פלסטיק",
+      "suitable_classes": ["polymer"],
+      "geometry": ["complex", "prismatic", "sheet"],
+      "min_qty": 1000,
+      "max_qty": 10000000,
+      "setup_cost_ils": 800,
+      "tooling_cost_ils": 45000,
+      "unit_cost_per_kg_ils": 25,
+      "handling_min_per_part": 0,
+      "tolerance_mm": 0.1,
+      "dfm_notes_he": [
+        "עובי דופן אחיד 1.5–3 מ\"מ; שינויי עובי חדים יוצרים שקעים (sink marks).",
+        "שיפוע שליפה ≥ 1° על כל דופן אנכית.",
+        "התבנית היא ההשקעה — שינוי תכן אחרי פתיחת תבנית עולה עשרות אלפי ש\"ח."
+      ]
+    },
+    {
+      "id": "fdm_printing",
+      "name_he": "הדפסת תלת-ממד (FDM)",
+      "suitable_classes": ["polymer"],
+      "geometry": ["complex", "prismatic", "axisymmetric"],
+      "min_qty": 1,
+      "max_qty": 100,
+      "setup_cost_ils": 40,
+      "machine_rate_ils_per_hr": 35,
+      "print_rate_cm3_hr": 20,
+      "handling_min_per_part": 0,
+      "tolerance_mm": 0.3,
+      "tooling_cost_ils": 0,
+      "dfm_notes_he": [
+        "חוזק בציר Z (בין שכבות) נמוך ב-30–50% — כוון את העומס למישור השכבות.",
+        "זקיפים (overhangs) מעל 45° דורשים תמיכות שמשאירות סימנים.",
+        "מתאים לאבות-טיפוס וכמויות קטנות; לסדרות — עבור להזרקה."
+      ]
+    }
+  ]
+}
